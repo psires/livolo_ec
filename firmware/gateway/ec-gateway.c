@@ -338,7 +338,8 @@ static int input_byte(unsigned char c)
 			command_head = next;
 			process_poll(&gateway_process);
 		}
-		input_pos = discard_line = 0;
+		discard_line = 0;
+		input_pos = 0;
 	} else if (!discard_line) {
 		if (c < 32 || c > 126 || input_pos >= LINE_SIZE - 1)
 			discard_line = 1;
@@ -512,7 +513,8 @@ static void command(char *line)
 		strcpy(result, "OK ");
 		status(result + 3, sizeof(result) - 3);
 	} else if (count == 2 && !strcmp(tok[1], "DISARM")) {
-		lease_seconds = ack_enabled = 0;
+		ack_enabled = 0;
+		lease_seconds = 0;
 		phase_clear();
 		strcpy(result, "OK DISARMED");
 #ifdef EC_ENABLE_UPDATES
@@ -543,7 +545,9 @@ static void command(char *line)
 		if (nonzero && ec_unhex(tok[2], gw, 4) == 4 &&
 		    ec_unhex(tok[3], &tag, 1) == 1 &&
 		    ec_network_set(&network, gw, tag)) {
-			lease_seconds = ack_enabled = legacy = 0;
+			legacy = 0;
+			ack_enabled = 0;
+			lease_seconds = 0;
 			phase_clear();
 			memcpy(session, epoch, 8);
 			revision++;
@@ -616,7 +620,8 @@ static void command(char *line)
 		    ec_identity_valid(candidate.device) &&
 		    memcmp(candidate.gateway, candidate.device, 4) &&
 		    candidate.tag && candidate.tag != 255) {
-			lease_seconds = ack_enabled = 0;
+			ack_enabled = 0;
+			lease_seconds = 0;
 			phase_clear();
 			ec_network_set(&network, candidate.gateway,
 				       candidate.tag);
