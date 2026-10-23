@@ -1,0 +1,25 @@
+# Linux kernel layout for project-owned C; use clang-format 18.1.8.
+BasedOnStyle: LLVM
+UseTab: Always
+IndentWidth: 8
+TabWidth: 8
+ContinuationIndentWidth: 8
+ColumnLimit: 80
+BreakBeforeBraces: Linux
+IndentCaseLabels: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+PointerAlignment: Right
+SpaceBeforeParens: ControlStatements
+SortIncludes: Never
+AlignAfterOpenBracket: Align
+BinPackArguments: true
+BinPackParameters: true
+BreakBeforeBinaryOperators: None
+Cpp11BracedListStyle: false
+SpaceBeforeAssignmentOperators: true
+ReflowComments: false
+TypenameMacros:
+  - PROCESS_THREAD

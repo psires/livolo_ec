@@ -1,0 +1,10 @@
+__pycache__/
+firmware/**/build/
+firmware/**/*.simplelink
+vendor/
+.local/
+.venv/
+.cache/
+*.pyc
+
+firmware/**/build.log

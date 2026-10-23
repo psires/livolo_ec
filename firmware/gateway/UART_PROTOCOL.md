@@ -1,0 +1,313 @@
+# EC radio UART protocol v3
+
+Host integration contract. UART: `/dev/ttyAMA0`, 115200 8N1, no flow control.
+One exclusive owner, one outstanding request. No settings are written to flash.
+This is a guarded EC radio adapter, not a Zigbee coordinator or device database.
+
+## Framing and lifecycle
+
+Requests: `<nonzero uint32 decimal id> COMMAND arguments\n` (maximum 319 ASCII
+characters excluding newline). Replies: `RSP <id> OK ...` or `RSP <id> ERR ...`.
+RX, ACK and periodic STATUS records may appear between request and reply.
+Use exact request-ID matching. Unknown commands/arity normally return `ERR SYNTAX`;
+configuration/edit gates may reject earlier with NOT_CONFIGURED or ARMED.
+Numbers are decimal except fields explicitly described as hex.
+
+Opening a live UART may start mid-line or yield a corrupt first line. Discard
+malformed records and resynchronize at newline; do not search inside garbage for
+a successful reply. Retry an unanswered request using the same ID and bytes.
+The hardware test observed this condition on its initial PING and recovered
+using the reply cache on the subsequent run.
+
+Boot prints `EC-GATEWAY 3 ... tx=disabled`. Configuration, all peers, lease,
+ACK enable, session and request cache are volatile. Boot is unconfigured/disarmed.
+The host restores its own authoritative configuration after every module reset.
+
+The last complete request and reply are cached. Same ID and identical bytes
+returns the old reply without repeating effects; same ID/different bytes gives
+`ERR ID_REUSE`. This is one cached request, not a durable transaction log.
+Retry a missing reply using the same ID and bytes. If unresolved, DISARM and
+reconnect/reconcile state; do not blindly issue a new command token.
+
+## Commands
+
+| Command | Result/effect |
+| --- | --- |
+| `PING` | `OK EC-GATEWAY 3` |
+| `CAPS` | Machine-readable `key=value` capabilities; ignore unknown keys |
+| `STATUS` | Network, session, revision, peer count, lease and diagnostics |
+| `NETWORK <gateway8hex> <tag2hex> <session16hex>` | Disarm, clear all peers, install network; nonzero session required |
+| `PEER SET <slot> <device8hex> <ackmask2hex>` | Set/replace a slot, only while disarmed; duplicate device in another slot rejected |
+| `PEER DEL <slot>` | Remove slot (idempotent), only while disarmed |
+| `PEER GET <slot>` | `OK PEER slot=N used=0` or `... used=1 device=... ack_mask=...` |
+| `PEER CLEAR` | Clear all slots, only while disarmed |
+| `ARM <session16hex> <seconds>` | Enable TX for 1–60 seconds; renew before expiry |
+| `ACK <session16hex> <0\|1>` | Global fast-ACK gate; enabling requires a live lease |
+| `SEND <session16hex> <rawhex>` | Guarded frame transmission; requires matching session and live lease |
+| `CHECK <rawhex>` | Generate configured peer's ACK without TX: `OK ACKHEX ...` or `OK NO_ACK` |
+| `META <0\|1>` | Enable/disable optional callback-time metadata; default off |
+| `DISARM` | Immediately disable TX and ACKs; does not delete configuration |
+
+Slots are 0–255. A slot's device identity must be nonzero, nonbroadcast and distinct
+from the gateway. Tag must be 01–fe. Identity hex is **wire byte order**, as in
+the captures; do not reverse it to match IEEE/PAN notation. An ACK mask of zero
+keeps the peer eligible for host TX but disables its automatic ACKs.
+
+ACK mask bits: `01` state (`9e/05`), `02` property (`9e/15`), `04` capability
+(`9e/a0`), `08` direct keepalive (`9e/08`), `10` additionally allow broadcast state
+reports. Mask `1f` is the currently verified profile. Bit `10` has no effect
+without bit `01`. Unknown bits are rejected. No broadcast keepalive, admission,
+announcement or ACK-of-ACK response is implemented. A valid checksum, configured
+tag, and matching immediate source AND subject are required for automatic ACKs.
+Existing ACK body/sequence construction and zero timing trailer are unchanged.
+
+Use a newly generated nonzero session per NETWORK installation. It is an opaque
+host-provided incarnation identifier, not a secret or authentication mechanism.
+Modern ARM/ACK/SEND require it. After reset old SEND requests fail, even if a new
+network has been installed under a different session. This prevents accidental
+retransmission across radio resets; it does not provide exactly-once delivery.
+Never reuse a session when rebuilding configuration after a reset.
+
+NETWORK is an explicit replacement operation and disarms even if previously
+armed. PEER edits return `ERR ARMED` during a live lease. Restore a complete table
+while disarmed, verify via GET/STATUS, then ARM/ACK. Expiry disables ACKs; a later
+ARM does not re-enable them. Renewing a live lease preserves the ACK gate.
+
+SEND allows a valid 41-byte family-8c EC frame with configured gateway source/tag
+and destination equal to a configured peer, broadcast, or gateway itself. FCF
+must be `01 88`; application sum8 must pass. Short diagnostic frames (11–38 bytes)
+are allowed only to the gateway itself. FCS is generated by the radio. Max raw
+length is 125. Unknown peers, IEEE ACK-request frames and arbitrary other packet
+formats are rejected. The host builds EC packet bodies and schedules retries.
+Manual sends use CCA; immediate MCU ACKs bypass CCA.
+
+SEND result `OK TX 0` means radio transmission succeeded, **not** that a device
+acted on it. `ERR TX 2` is an explicit channel-busy/collision result that the host
+may retry with a new request ID. `ERR TX 1` is a radio error with uncertain outcome.
+`ERR TX 3` is no IEEE ACK (not expected with the supported frame policy). Never
+interpret a UART timeout as a known RF failure.
+
+Errors also include `NOT_CONFIGURED`, `SESSION`, `LEASE`, `DISARMED`, `CONFIG`,
+`PEER`, `DUPLICATE_PEER`, `ARMED`, `HEX`, `FRAME_POLICY`, `ID_REUSE`, `SYNTAX`.
+Malformed/overflow input may be discarded without a reply; input_errors increments.
+
+## Events and diagnostics
+
+- `RX <sequence> <clock_ticks> <rssi> <lqi> <length> <rawhex>`: existing v2 layout.
+  Sequence counts all received frames, including frames whose log was dropped.
+  Ticks are sampled at MAC callback entry; they are not an RF SFD timestamp.
+- Optional `RXMETA <sequence> callback_rtimer=<ticks>`: same frame, higher resolution
+  callback timestamp. Discover clock frequencies and widths via CAPS. Both wrap.
+- `ACKTX <rxsequence> result=<radio-result> work_ticks=<rtimer ticks> <rawhex>`:
+  automatic reply. Work ticks include radio work and are not RF turnaround time.
+- `STATUS <key=value ...>` every five seconds, plus STATUS command reply.
+
+STATUS includes configured, gateway, tag, session, revision, peers, armed, ack,
+lease (configured duration, not remaining), rx/tx/tx_ok/ack_tx/ack_ok, rx_drops,
+uart_drops (bytes), meta_drops (records), input_errors and ticks. Counters wrap
+at 32 bits and reset at boot. Revision advances on successful network/table edits.
+Keep RX processing separate from outstanding command response handling. UART
+115200 is a throughput limit: all raw frames are exposed; this is not a lossless
+capture guarantee. Detect gaps and counter increases; a missing log does not mean
+the radio failed to ACK. Use Nordic timestamps for real over-air measurements.
+
+The compatibility `device` field in STATUS shows slot 0 only; it is not a selected
+peer and does not describe the whole table. Use PEER GET for each slot. `legacy`
+indicates CONFIG compatibility mode; `meta` reports metadata enable state.
+
+## Compatibility and example
+
+Legacy `CONFIG gw tag device` clears the table and installs slot 0 with mask 1f,
+disarmed and session zero. Only in this legacy mode are `ARM seconds`, `ACK 0|1`
+and `TX rawhex` accepted. Modern NETWORK disables those mutating legacy forms;
+new hosts must use the session-protected forms. PING reports v3 in both modes.
+RX/ACKTX formats remain compatible with existing capture tools.
+
+```text
+1 CAPS
+2 NETWORK 2a992b12 a7 0123456789abcdef
+3 PEER SET 0 46715621 1f
+4 PEER GET 0
+5 ARM 0123456789abcdef 30
+6 ACK 0123456789abcdef 1
+7 STATUS
+8 DISARM
+```
+
+The example session is illustrative; generate a fresh one. No host heartbeats,
+pairing policy, route selection, device names, output state, transaction-token
+allocation, MQTT, or authoritative persistence belong in this firmware.
+# Experimental phase extension (flashed; diagnostic validation only)
+
+The source now advertises the optional capability `phase=tx_entry_v1`, with
+`phase_scale=65500 phase_max_ms=12000 phase_probe=1`. Do not infer this capability
+from `proto=3`: deployed older v3 firmware does not implement it. Runtime use
+must remain opt-in. The first independent Nordic diagnostic run passed; device
+output acceptance and timing under CCA contention remain unverified. See
+`analysis/development/gateway-phase-01.md` for the installed image and evidence.
+
+The timestamp is sampled immediately before the radio call, after selecting its
+CCA mode. It is **before the driver's actual CCA check and RF scheduling**, not
+an SFD timestamp. The driver permits scheduling delay. `return_ticks` measures
+when that synchronous radio call returned; it is not a TX-completion hardware
+timestamp. No fitted constant offset is applied.
+
+## Commands
+
+`ID SEND_PHASE SESSION RAWHEX`
+
+Requires the normal configured modern session and live lease. Only 41-byte,
+checksum-valid `8c/02` frames addressed directly to a configured peer are
+accepted: source/tag match the network, route A is zero, route B and subject
+equal the destination, flags are `1e`, and the supplied trailer is zero. Other
+forms return `ERR FRAME_POLICY`; there is no fallback to raw transmission.
+The three trailer bytes are replaced at radio entry; application bytes and
+checksum remain unchanged.
+
+`ID PHASE_PROBE SESSION SEQ2HEX NONCE8HEX`
+
+Generates a 38-byte non-EC diagnostic under the existing self-addressed frame
+policy. This does not issue a query or output command to any device. Layout:
+
+| Offsets | Bytes |
+| --- | --- |
+| 0–2 | `01 88`, supplied sequence byte |
+| 3–6 | Configured gateway destination |
+| 7–10 | Configured gateway source |
+| 11–27 | ASCII `EC_PHASE_PROBE_V1` (17 bytes) |
+| 28–31 | Supplied four nonce bytes, in their written order |
+| 32–34 | Zero |
+| 35–37 | Computed timing trailer |
+
+Both commands return the existing TX result prefix followed by diagnostics:
+
+```text
+RSP ID OK TX 0 timestamp=tx_entry entry_ticks=N return_ticks=N anchor_ticks=N anchor_gen=N age_ticks=N raw=HEX
+RSP ID ERR TX 2 timestamp=tx_entry entry_ticks=N return_ticks=N anchor_ticks=N anchor_gen=N age_ticks=N raw=HEX
+```
+
+`raw` is the exact buffer supplied to the radio call. For a CCA failure it is
+the attempted buffer, not proof of a transmission. Tick fields use the CAPS
+`rtimer_hz` and `rtimer_bits`; age is unsigned modular subtraction. A missing
+or expired reference returns `ERR PHASE_REFERENCE` without calling the radio.
+Session/configuration/lease failures retain their existing errors.
+
+## Reference and conversion
+
+A successful raw `SEND` of the gateway's own valid heartbeat creates a reference:
+41-byte `8c/08`, broadcast destination, zero route fields and subject/suffix,
+flags `0e`, zero trailer, configured source/tag and valid checksum. Its reference
+tick is that heartbeat's radio-entry sample, recorded only after `RADIO_TX_OK`.
+The heartbeat data remains host-owned. Legacy raw reply formatting stays
+unchanged (`OK TX 0` or `ERR TX n`); query `STATUS` for `phase_valid`,
+`phase_anchor_ticks` and `phase_anchor_gen`.
+
+A definitely busy heartbeat retains the previous reference. An ambiguous radio
+error on a heartbeat invalidates it. DISARM, lease expiry, NETWORK/CONFIG changes
+and MCU reset invalidate it. ACKs, queries, probes and output commands cannot
+create a reference. A reference expires at 12 seconds; both high-resolution and
+coarse-clock age checks prevent an old reference becoming valid after timer wrap.
+Status anchor fields may retain historical values when `phase_valid=0`.
+
+For age ticks `A` and timer frequency `H`:
+
+```text
+seconds = A // H
+fraction = ((A % H) * 65500) // H
+trailer = fraction_low_byte, fraction_high_byte, seconds
+```
+
+Multiplication uses a 64-bit intermediate. Age at or beyond 12 seconds is rejected,
+not wrapped modulo a heartbeat cycle. Conversion precision is distinct from RF
+accuracy. At this board's 65536 Hz, a timer tick is about 15.26 microseconds.
+
+The existing one-request UART cache is unchanged: exact ID/body replay returns
+the original result and stamped bytes without another RF attempt or restamp.
+Use a new request ID only for a deliberately authorized new attempt; uncertain
+UART results must use the established same-ID recovery rule. `SEND`, legacy `TX`,
+automatic ACK framing, and persistent host ownership otherwise remain unchanged.
+
+## First hardware validation, pending review
+
+Coordinate exclusive UART ownership and preserve the host database before any
+firmware change. Restore the existing session/peers from the host afterward.
+Start Nordic capture before heartbeat/probe traffic. Use only ordinary own
+heartbeats and self-addressed probes with unique nonces at several phases
+(including near a second boundary and near the end of the heartbeat interval).
+Compare captured SFD intervals with entry-age metadata and encoded trailers;
+retain CCA failures and radio-call durations. Repeat exact UART IDs to verify
+one over-air probe per accepted new request. Test missing/expired references
+without issuing output commands. Evaluate timing error and its tail before
+enabling device `SEND_PHASE`; do not label a same-state output request a probe.
+
+# Signed UART updates — release 0.2
+
+Release numbers are `major.minor` (numeric components, 0..65535). They are
+independent of UART protocol `3` and application schema numbers. `PING` remains
+`OK EC-GATEWAY 3`. `VERSION` returns `fw_version`, `board`, `proto`, `update` and
+`boot_version`; `CAPS` also advertises release/update support. `STATUS` and the
+startup banner include `fw_version`. Old firmware with no version fields is
+**unknown**, not implicitly 0.1. An ordinary non-update build says `update=none`.
+
+An update-enabled build advertises `update=uart_signed_v1`. Its host owns UART
+exclusively throughout transfer. Except STATUS/CONFIRM, update operations require
+DISARM. Radio transmission and reconfiguration are blocked during transfer and
+once a candidate is committed. No update command operates RESET/FLASH GPIOs.
+
+| Command after request ID | Result / purpose |
+| --- | --- |
+| `UPDATE_STATUS` | Persistent `state`, volatile `received`/`receiving`, `trial`, verification `key`, candidate/current SHA-512 |
+| `UPDATE_HEADER TOKEN OFFSET HEX` | Two 96-byte manifest parts at offsets 0 and 96; TOKEN is 16 hex characters |
+| `UPDATE_BEGIN TOKEN` | Verify signed manifest, board/layout/version and current image, then erase staging slot |
+| `UPDATE_DATA TOKEN OFFSET HEX` | Sequential 4-byte-aligned chunks of 4..96 bytes; return `received=N` |
+| `UPDATE_COMMIT TOKEN` | Verify staged image, preserve verified current image and manifest, then durably mark READY |
+| `UPDATE_ACTIVATE` | Acknowledge, drain UART output, software reset into a committed image |
+| `UPDATE_CONFIRM` | Make a successfully restored trial permanent |
+| `UPDATE_ABORT` | Discard an incomplete transfer; a committed candidate returns `ERR ALREADY_COMMITTED` |
+| `UPDATE_REBOOT` | Drain reply and software reset; an unconfirmed trial rolls back |
+
+Existing request-ID replay rules still apply. Repeated already-written data must
+match flash exactly. Duplicate data is not programmed again. A reset during
+transfer discards its RAM offset; restart the transfer, preserving the current
+application. After an aborted transfer, reboot to restore normal receiver state.
+An interrupted host process can rerun the updater with the same signed package;
+a matching committed candidate resumes at activation rather than being erased.
+Do not treat a missing COMMIT/ACTIVATE response as proof that it did not happen.
+Inspect the persistent state and exact candidate digest.
+
+The package is a 192-byte manifest followed by the application bytes. The first
+128 manifest bytes are signed with Ed25519; the final 64 are the signature.
+The header is little-endian `<8s8I64s24s>`: magic `ECUPD01\0`, format `0x10000`,
+board `0x26520001`, major, minor, UART protocol 3, execution address `0x8000`,
+image length, reserved zero, SHA-512 of the image, and 24 reserved zero bytes.
+The signature covers every header field. Length must be word-aligned, 256..98304
+bytes. Stack/reset vectors and strictly increasing major.minor are checked.
+The compiler's version marker must match the packaging version.
+
+| Flash range | Purpose |
+| --- | --- |
+| `0x00000..0x07fff` | Resident bootloader and public verification key |
+| `0x08000..0x1ffff` | Fixed application execution slot |
+| `0x20000..0x37fff` | Candidate staging slot |
+| `0x38000..0x4ffff` | Previous application recovery slot |
+| `0x50000..0x51fff` | Transaction state and candidate manifest at +256 |
+| `0x52000..0x53fff` | Current application manifest |
+| `0x54000..0x55fff` | Recovery application manifest |
+| `0x56000..0x57fff` | Reserved factory configuration sector; never updated |
+
+State words are `ffffffff` (initial install), `fffffffe` (READY), `fffffffc`
+(INSTALLING), `fffffff8` (TRIAL), `fffffff0` (CONFIRMED), `ffffffe8` (ROLLBACK),
+and `ffffffc8` (RESTORED). Each transition only clears bits. Backup and candidate
+are verified before READY. INSTALLING precedes the first execution-slot erase;
+reset there repeats installation from staging. TRIAL is recorded before the
+first jump. Any reset before confirmation restores the previous signed image;
+interrupted rollback repeats from that preserved copy. A 60-second application
+trial deadline and hardware watchdog provide recovery without host GPIO access.
+Unknown/corrupt metadata or unverifiable images fail closed; ROM recovery remains
+available. Hardware fault injection beyond the documented validation remains a
+release-hardening task, not a claim of exhaustive silicon failure coverage.
+
+The host confirms only its matching release, after capability, peer-table,
+ARM/ACK and (when enabled) heartbeat-reference checks. It then persists a fresh
+firmware status in SQLite for update orchestration. Firmware update metadata is
+not authoritative network state; the host still reconstructs all peers/sessions.
