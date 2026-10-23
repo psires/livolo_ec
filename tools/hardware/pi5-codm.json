@@ -1,0 +1,7 @@
+{
+  "chip": "/dev/gpiochip0",
+  "chip_label": "pinctrl-rp1",
+  "port": "/dev/ttyAMA0",
+  "reset_gpio": 23,
+  "flash_gpio": 24
+}
