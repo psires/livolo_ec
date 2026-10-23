@@ -1,0 +1,3 @@
+# Canonical line endings for source and generated textual evidence.
+* text=auto eol=lf
+*.pcapng binary

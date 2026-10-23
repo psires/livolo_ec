@@ -1,0 +1,143 @@
+[
+  {
+    "file": "ec_1gang_on_off.pcapng",
+    "sha256": "32c8baf58014d4a194c21042d1170ab1e984d95f11705b79f463c0af3ac8cd6d",
+    "packets": 20,
+    "start_utc": "2025-04-09T15:23:56.515222+00:00",
+    "duration_seconds": 12.618323,
+    "channels": [
+      11
+    ],
+    "families": {
+      "8c": 16,
+      "9e": 4
+    },
+    "opcodes": {
+      "02": 5,
+      "05": 3,
+      "07": 1,
+      "08": 2,
+      "0a": 6,
+      "fa": 3
+    },
+    "sources_wire": {
+      "9bf4ea38": 13,
+      "46715621": 7
+    },
+    "checksums_valid": 20,
+    "matched_relays": 3,
+    "matched_gateway_acks": 3
+  },
+  {
+    "file": "ec_device_pairing_sequence.pcapng",
+    "sha256": "ed7f1b0bc601e7fffb9b37ea322224fc0d10ea981b7ff84f558e75416f95263b",
+    "packets": 322,
+    "start_utc": "2025-04-09T15:20:42.013783+00:00",
+    "duration_seconds": 49.210931,
+    "channels": [
+      11
+    ],
+    "families": {
+      "8c": 286,
+      "9e": 36
+    },
+    "opcodes": {
+      "01": 3,
+      "05": 17,
+      "07": 3,
+      "08": 5,
+      "09": 1,
+      "0a": 249,
+      "0c": 2,
+      "10": 1,
+      "15": 6,
+      "a0": 2,
+      "ac": 1,
+      "fa": 32
+    },
+    "sources_wire": {
+      "9bf4ea38": 196,
+      "46715621": 126
+    },
+    "checksums_valid": 322,
+    "matched_relays": 90,
+    "matched_gateway_acks": 28
+  },
+  {
+    "file": "ec_gateway ready to pair.pcapng",
+    "sha256": "e2061f0ccf9e26c40823d2bec4f34d682c7efb5b277d883d63274e6af6ffbb6b",
+    "packets": 494,
+    "start_utc": "2025-04-09T15:18:07.098372+00:00",
+    "duration_seconds": 136.41174,
+    "channels": [
+      11
+    ],
+    "families": {
+      "8c": 494
+    },
+    "opcodes": {
+      "08": 13,
+      "0a": 456,
+      "0c": 2,
+      "11": 23
+    },
+    "sources_wire": {
+      "9bf4ea38": 494
+    },
+    "checksums_valid": 494,
+    "matched_relays": 0,
+    "matched_gateway_acks": 0
+  },
+  {
+    "file": "ec_no_connection_registered.pcapng",
+    "sha256": "724a3eaf8d7a3e31a3d810104b10495c911a20644adbe27b8d18556b443e4ad1",
+    "packets": 220,
+    "start_utc": "2025-04-09T15:11:42.279631+00:00",
+    "duration_seconds": 144.410206,
+    "channels": [
+      11
+    ],
+    "families": {
+      "8c": 220
+    },
+    "opcodes": {
+      "08": 15,
+      "0a": 205
+    },
+    "sources_wire": {
+      "9bf4ea38": 220
+    },
+    "checksums_valid": 220,
+    "matched_relays": 0,
+    "matched_gateway_acks": 0
+  },
+  {
+    "file": "ec_set_on_off_on_off.pcapng",
+    "sha256": "bbca51d623f0c0f66626732814596358b8e2fee8df03953c8c4d9d79ccb81004",
+    "packets": 85,
+    "start_utc": "2025-04-09T15:23:24.915157+00:00",
+    "duration_seconds": 12.400833,
+    "channels": [
+      11
+    ],
+    "families": {
+      "8c": 79,
+      "9e": 6
+    },
+    "opcodes": {
+      "02": 7,
+      "05": 5,
+      "08": 2,
+      "0a": 64,
+      "15": 1,
+      "fa": 6
+    },
+    "sources_wire": {
+      "9bf4ea38": 51,
+      "46715621": 34
+    },
+    "checksums_valid": 85,
+    "matched_relays": 28,
+    "matched_gateway_acks": 6
+  }
+]
