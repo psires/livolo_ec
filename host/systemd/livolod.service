@@ -1,0 +1,33 @@
+[Unit]
+Description=Livolo EC MQTT gateway
+Wants=network-online.target
+After=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+User=livolod
+Group=livolod
+SupplementaryGroups=dialout
+StateDirectory=livolod
+StateDirectoryMode=0700
+EnvironmentFile=-/etc/livolod/environment
+ExecStart=/opt/livolod/bin/livolod --config /etc/livolod/config.json
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

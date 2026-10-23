@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f7f9">
+  <title>Livolo · Device manager</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232c735b'/%3E%3Cpath d='M13 10v20h15' stroke='white' stroke-width='4' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="#devices" aria-label="Livolo home"><span class="brand-mark">L<span></span></span><span>livolo<span class="brand-sub">LOCAL DEVICE MANAGER</span></span></a>
+    <div class="sidebar-label">WORKSPACE</div>
+    <nav aria-label="Main navigation">
+      <a href="#devices" class="nav-link active" data-view="devices"><span class="nav-icon">▦</span> Devices <span id="nav-count" class="nav-count">—</span></a>
+      <a href="#activity" class="nav-link" data-view="activity"><span class="nav-icon">≋</span> Activity</a>
+      <a href="#network" class="nav-link" data-view="network"><span class="nav-icon">⌘</span> Network</a>
+    </nav>
+    <div class="sidebar-bottom"><span class="network-symbol">⌁</span><div>Made for your home<small>Local control. Your network.</small></div></div>
+  </aside>
+  <div class="workspace">
+    <header class="topbar"><div><span class="breadcrumb">Workspace</span><span class="slash">/</span><span id="page-label">Devices</span></div><span class="connection" id="connection"><span class="dot"></span>Connecting</span></header>
+    <main>
+      <div id="simulation" class="banner simulation" hidden>Simulation mode · Changes affect simulated devices only.</div>
+      <div id="connection-error" class="banner error" role="alert" hidden></div>
+      <section id="view-devices" class="view">
+        <div class="page-heading"><div><p class="eyebrow">YOUR CONNECTED HOME</p><h1>Devices</h1><p class="subtitle">A little more control over every room.</p></div><button class="button primary" id="add-device"><span aria-hidden="true">＋</span> Add device</button></div>
+        <div class="metrics" aria-label="Network summary">
+          <div class="metric"><span class="metric-icon">▦</span><div><span class="metric-label">Total devices</span><strong id="total-count">—</strong></div><span class="metric-note">in your network</span></div>
+          <div class="metric"><span class="metric-icon green">⌁</span><div><span class="metric-label">Online</span><strong id="online-count">—</strong></div><span class="metric-note">ready to control</span></div>
+          <div class="metric"><span class="metric-icon">◷</span><div><span class="metric-label">Offline</span><strong id="offline-count">—</strong></div><span class="metric-note">awaiting a report</span></div>
+        </div>
+        <div id="pairing-banner" class="banner pairing" hidden><div><strong id="pairing-title"></strong><span id="pairing-description"></span></div><button class="button small" id="stop-pairing">Stop pairing</button></div>
+        <section class="device-panel" aria-label="Device list">
+          <div class="list-toolbar"><div class="filters" role="group" aria-label="Filter devices"><button data-filter="all" class="filter active" aria-pressed="true">All devices</button><button data-filter="online" class="filter" aria-pressed="false">Online</button><button data-filter="offline" class="filter" aria-pressed="false">Offline</button></div><label class="search"><span aria-hidden="true">⌕</span><input type="search" id="search" placeholder="Search name or device ID" aria-label="Search name or device ID"></label></div>
+          <div class="table-scroll"><table><thead><tr><th scope="col">Device</th><th scope="col">Status</th><th scope="col">Outputs</th><th scope="col">Signal</th><th scope="col">Last report</th><th scope="col"><span class="sr-only">Manage device</span></th></tr></thead><tbody id="device-list"></tbody></table></div>
+          <div id="empty-state" class="empty"><div class="empty-icon">▦</div><h2>Connecting to your gateway</h2><p>Your devices will appear here in a moment.</p></div>
+          <div class="list-footer"><span id="list-summary">Loading devices…</span><span><span class="live-dot"></span> <span id="refresh-label">Updates automatically</span></span></div>
+        </section>
+        <div class="help-note"><span class="help-icon">i</span><p><strong>A name that feels like home.</strong> Open a device to give it a friendly name, pair it, or see its details.</p></div>
+      </section>
+      <section id="view-activity" class="view" hidden><div class="page-heading"><div><p class="eyebrow">KEEP AN EYE ON THINGS</p><h1>Activity</h1><p class="subtitle">Recent requests and their confirmed outcomes.</p></div></div><div class="surface" id="activity-list"></div></section>
+      <section id="view-network" class="view" hidden><div class="page-heading"><div><p class="eyebrow">BEHIND YOUR DEVICES</p><h1>Network</h1><p class="subtitle">Your local gateway at a glance.</p></div></div><div class="network-layout"><div class="surface network-details" id="network-details"></div>
+        <section class="surface mqtt-settings" aria-labelledby="mqtt-title">
+          <div class="mqtt-heading"><div><p class="eyebrow">CONNECT YOUR AUTOMATIONS</p><h2 id="mqtt-title">MQTT settings</h2></div><span id="mqtt-status" class="badge">Connecting</span></div>
+          <p class="muted">Connect Livolo to your MQTT broker. Changes apply without restarting the radio.</p>
+          <form id="mqtt-form">
+            <div class="form-row"><label class="field">Server<input id="mqtt-host" required maxlength="253" placeholder="e.g. 192.168.1.10" autocomplete="off" spellcheck="false"><small>Hostname or IP address, without mqtt://</small></label><label class="field">Port<input id="mqtt-port" type="number" required min="1" max="65535" value="1883"></label></div>
+            <label class="field">Topic prefix<input id="mqtt-topic" required maxlength="1024" placeholder="livolo" autocomplete="off" spellcheck="false"><small id="mqtt-topic-help">Messages are published beneath this prefix.</small></label>
+            <label class="field">Username<input id="mqtt-username" maxlength="1024" autocomplete="off" spellcheck="false"><small>Leave empty for anonymous access.</small></label>
+            <div class="form-row"><label class="field">Password action<select id="mqtt-password-action"><option value="keep">Keep existing password</option><option value="replace">Replace password</option><option value="clear">Clear password</option></select></label><label class="field" id="mqtt-password-field" hidden>New password<input id="mqtt-password" type="password" maxlength="1024" autocomplete="new-password"></label></div>
+            <p class="muted" id="mqtt-password-note"></p><p class="muted" id="mqtt-transport"></p>
+            <p id="mqtt-error" class="form-error" role="alert" hidden></p><p id="mqtt-feedback" class="muted" role="status"></p>
+            <div class="dialog-actions"><button type="button" class="button" id="mqtt-reset">Discard changes</button><button type="submit" class="button primary" id="mqtt-save">Save &amp; reconnect</button></div>
+          </form>
+        </section></div></section>
+      <footer>Livolo EC <span>·</span> Local network manager <span class="footer-right">Channel 11 · Proprietary 802.15.4</span></footer>
+    </main>
+  </div>
+  <dialog id="device-dialog" aria-labelledby="device-dialog-title"><form id="rename-form"><div class="dialog-heading"><div><p class="eyebrow">DEVICE DETAILS</p><h2 id="device-dialog-title">Manage device</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close device details">×</button></div><label class="field">Friendly name<input id="device-name" name="name" maxlength="100" required autocomplete="off"></label><div id="device-details" class="detail-grid"></div><p id="device-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button" id="pair-device">Pair device</button><button type="submit" class="button primary">Save name</button></div><div class="danger-area"><div><strong>Forget this device</strong><p>Removes it from this gateway. This does not reset or unpair the physical switch.</p></div><button type="button" class="button danger small" id="forget-device">Forget</button></div></form></dialog>
+  <dialog id="add-dialog" aria-labelledby="add-title"><form id="add-form"><div class="dialog-heading"><div><p class="eyebrow">GROW YOUR NETWORK</p><h2 id="add-title">Add a device</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close add device">×</button></div><p class="dialog-intro">Choose a detected switch or enter its device ID. Only the device you select will be allowed to pair.</p><div id="discoveries" class="discoveries"></div><div class="form-row"><label class="field">Device ID<input id="new-id" required pattern="[0-9a-fA-F]{8}" minlength="8" maxlength="8" spellcheck="false" placeholder="e.g. 46715621" autocomplete="off"><small>8 hexadecimal characters, in wire order</small></label><label class="field">Outputs<select id="new-outputs"><option value="2">2 outputs</option><option value="1">1 output</option></select></label></div><label class="field">Friendly name<input id="new-name" required maxlength="100" placeholder="e.g. Living room lights" autocomplete="off"></label><details class="advanced"><summary>Advanced device settings</summary><label class="field">Device suffix<input id="new-suffix" value="0002" required pattern="[0-9a-fA-F]{4}" minlength="4" maxlength="4" spellcheck="false"><small>Use the suffix reported by the device.</small></label></details><div class="pairing-help"><strong>Ready to pair?</strong><ol><li>If migrating, remove this switch from the old gateway and keep that gateway’s pairing disabled.</li><li>Choose “Save &amp; start pairing”, then follow your switch’s documented pairing procedure.</li><li>Wait for a device report to confirm pairing. The window closes after 2 minutes.</li></ol></div><p id="add-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="submit" class="button" value="save">Save only</button><button type="submit" class="button primary" value="pair">Save &amp; start pairing</button></div></form></dialog>
+  <dialog id="forget-dialog" aria-labelledby="forget-title"><form id="forget-form"><div class="dialog-heading"><h2 id="forget-title">Forget device?</h2><button type="button" class="icon-button close-dialog" aria-label="Cancel forgetting">×</button></div><p id="forget-description"></p><p class="muted">The switch may retain its association. To join another gateway, use the model’s documented pairing or reset procedure.</p><p id="forget-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button close-dialog">Keep device</button><button type="submit" class="button danger">Forget device</button></div></form></dialog>
+  <dialog id="login-dialog" aria-labelledby="login-title"><form id="login-form"><p class="eyebrow">LOCAL GATEWAY</p><h2 id="login-title">Connect to Livolo</h2><p class="muted">Enter the web access token configured on your gateway.</p><label class="field">Access token<input id="access-token" type="password" required autocomplete="current-password"></label><p id="login-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button class="button primary" type="submit">Connect</button></div></form></dialog>
+  <div id="toasts" class="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+</body>
+</html>

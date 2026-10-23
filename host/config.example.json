@@ -1,0 +1,26 @@
+{
+  "network": {
+    "gateway": "2a992b12",
+    "tag": "a7",
+    "heartbeat_parameter": 1
+  },
+  "serial_port": "/dev/ttyAMA0",
+  "database": "/var/lib/livolod/state.sqlite3",
+  "offline_after": 180,
+  "output_mode": "experimental_legacy",
+  "mqtt": {
+    "host": "127.0.0.1",
+    "port": 1883,
+    "base_topic": "livolo",
+    "client_id": "livolod-2a992b12"
+  },
+  "devices": [
+    {
+      "id": "46715621",
+      "name": "Development switch",
+      "slot": 0,
+      "outputs": 2,
+      "suffix": "0002"
+    }
+  ]
+}
