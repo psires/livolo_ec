@@ -74,6 +74,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for function-documentation conventions,
 Linux kernel C style, pinned formatters and the complete offline test commands.
 Python functions use purpose and parameter docstrings, C APIs use Doxygen blocks,
 and browser helpers use JSDoc.
+The [source validation record](docs/SOURCE_VALIDATION.md) lists the latest clean
+export checks, target builds and remaining release limitations.
 
 Historical development notes describe experiments on one installation. Additional
 local capture and deployment logs referenced by those notes are not part of the

@@ -6,6 +6,9 @@ published, deployed or flashed by this assessment.
 Follow-up: the owner selected **BSD-2-Clause** on 2026-11-01. The root `LICENSE`
 now records that decision. References below to selecting a licence describe the
 assessment baseline; dependency notices and release checks remain separate work.
+The subsequent [source finalization record](SOURCE_VALIDATION.md) documents the
+committed implementation, passing source checks, tests and target builds, while
+preserving the outstanding binary-distribution and publication work.
 
 The current implementation is viable for a **board-specific developer preview**
 after the release gates below. It does not yet support a general plug-and-play
