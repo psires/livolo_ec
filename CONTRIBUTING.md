@@ -47,6 +47,7 @@ local results and CI consistent:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt -e './host[mqtt,update]'
 python tools/check_documentation.py
 black --check tools host firmware client custom_components homeassistant wireshark
@@ -58,10 +59,16 @@ python -m unittest discover -s tools -p 'test_*.py'
 PYTHONPATH=host python -m unittest discover -s host/tests -p 'test_*.py'
 python -m unittest discover -s firmware/gateway/tests -p 'test_*.py'
 python -m unittest discover -s firmware/update/tests -p 'test_*.py'
+python -m unittest discover -s firmware/mg21/tests -p 'test_*.py'
+python -m unittest discover -s firmware/nrf52840/tests -p 'test_*.py'
+python -m unittest discover -s wireshark -p 'test_*.py'
 git diff --check
 ```
 
 The JavaScript checks require Node.js and npm (`npx`).
+The Wireshark suite requires TShark and skips when it is unavailable; CI installs
+it explicitly. Home Assistant tests require their separate Python 3.14
+environment; see [homeassistant/README.md](homeassistant/README.md).
 
 To apply layout fixes, run
 `black tools host firmware client custom_components homeassistant wireshark`

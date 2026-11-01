@@ -5,6 +5,11 @@ vendor/
 .local/
 .venv/
 .cache/
+/dist/
+*.egg-info/
+.pytest_cache/
+/host/build/
+/client/build/
 *.pyc
 
 firmware/**/build.log

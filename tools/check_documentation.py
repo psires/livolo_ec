@@ -10,7 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def source_files():
     """Yield maintained Python sources, excluding dependencies and build outputs."""
-    for directory in ("tools", "host", "firmware"):
+    for directory in (
+        "tools",
+        "host",
+        "firmware",
+        "client",
+        "custom_components",
+        "homeassistant",
+        "wireshark",
+    ):
         for path in sorted((ROOT / directory).rglob("*.py")):
             if not {"third_party", "build", ".venv", "__pycache__"} & set(path.parts):
                 yield path

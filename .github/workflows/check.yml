@@ -19,11 +19,11 @@ jobs:
         with:
           node-version: '22'
       - name: Install test and formatting dependencies
-        run: python -m pip install -r requirements-dev.txt
+        run: python -m pip install -r requirements-dev.txt -e './host[mqtt,update]'
       - name: Check documentation and source layout
         run: |
           python tools/check_documentation.py
-          black --check tools host firmware
+          black --check tools host firmware client custom_components homeassistant wireshark
           find firmware -path '*/third_party' -prune -o \( -name '*.c' -o -name '*.h' \) -exec clang-format --dry-run --Werror {} +
           node --check host/livolod/static/app.js
           npx --yes prettier@3.3.3 --check host/livolod/static/app.js
@@ -37,3 +37,20 @@ jobs:
         run: python -m unittest discover -s firmware/gateway/tests -p 'test_*.py'
       - name: Test update authentication and rollback
         run: python -m unittest discover -s firmware/update/tests -p 'test_*.py'
+      - name: Test Silicon Labs UART and Nordic clock handling
+        run: |
+          python -m unittest discover -s firmware/mg21/tests -p 'test_*.py'
+          python -m unittest discover -s firmware/nrf52840/tests -p 'test_*.py'
+  wireshark:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+      - name: Install dissector test runtime
+        run: |
+          sudo apt-get update
+          sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y tshark
+      - name: Test Lua dissector against capture fixtures
+        run: python -m unittest discover -s wireshark -p 'test_*.py'
