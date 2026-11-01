@@ -16,8 +16,9 @@ The Unix and ZigBee specialists agreed that no MCU protocol change is needed
 for the initial TI signed-UART and exact-board MG21 Gecko backends. Nordic
 installation remains gated on a qualified DFU runtime and USB device tracking.
 The baseline gaps below describe the original assessment; they are not a claim
-that completed source/licence work is still missing. The updater's validation
-record and remaining hardware gates are recorded separately when finalized.
+that completed source/licence work is still missing. The
+[updater validation record](SOURCE_VALIDATION.md#firmware-updater-follow-up)
+reports 253 passing tests from committed source and the remaining hardware gates.
 
 The current implementation is viable for a **board-specific developer preview**
 after the release gates below. It does not yet support a general plug-and-play
