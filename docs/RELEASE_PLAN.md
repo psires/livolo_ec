@@ -14,7 +14,7 @@ inspection with the ZigBee Specialist, Unix Sepcialist, Web Specialist and
 HomeAssistent Specialist reviews. Hardware results are existing qualification
 records, not new tests performed for this document.
 
-## Current state and release blockers
+## Assessment baseline and release blockers
 
 - The inspected Git base is `44cd4b1`; substantial newer source and hardware
   evidence remain modified or untracked. Freeze reviewed commits before building

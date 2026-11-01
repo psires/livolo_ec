@@ -2,18 +2,30 @@
 
 Capture-based analysis of the EC gateway and a two-gang switch.
 
-Release versions use **major.minor**, currently **0.2**. The root [VERSION](VERSION)
+Release versions use **major.minor**, currently **0.12**. The root [VERSION](VERSION)
 is the release source; `python3 tools/project_version.py` checks host and firmware
 metadata, and `--write` propagates a new release number. UART protocol and data
 schema numbers are separate compatibility identifiers.
 
-The gateway supports signed firmware updates over UART after a one-time
+The CC2652P gateway supports signed firmware updates over UART after a one-time
 bootloader installation. The daemon reports running and target versions and
 confirms a trial image only after restoring the radio session. Unconfirmed trial
 images roll back. See [firmware build and update instructions](firmware/gateway/README.md)
 and [host update operations](host/README.md#firmware-updates).
 
-A custom CC2652P UART gateway firmware is now flashed on the development Pi.
+The gateway supports three MCU families through four board profiles: cod.m
+CC2652P, Sonoff ZBDongle-E, ZB-GW04 v1.2 and official Nordic PCA10059. They share
+the packet, peer, scheduler and protocol-v3 core, with MCU queues, heartbeats,
+bounded state queries and heartbeat-aligned output control. The host retains
+authoritative network state. The current development installation uses the
+ZB-GW04 through the [Home Assistant app and native integration](homeassistant/README.md).
+The former standalone Pi is retired; Sonoff runs the
+[passive reference sniffer](firmware/sniffer-mg21/README.md). See the
+[radio support matrix](analysis/development/ha-radio-support.md),
+[Nordic qualification](analysis/development/nrf52840-012-20261101.md) and
+[current deployment](host/DEPLOYMENT.md).
+
+The original custom CC2652P UART gateway firmware established the baseline.
 It receives raw EC frames on channel 11 and adds guarded transmit commands and
 MCU-side ACK generation. The spare switch has successfully paired to the local
 identity, and both outputs have been controlled with the stock EC unplugged.
@@ -22,14 +34,16 @@ The [Raspberry Pi daemon](host/README.md) now provides MQTT control, persistent
 device names/state, targeted pairing, radio-session recovery and a shared GUI API.
 Its bounded hardware check verified configuration restoration, lease renewal,
 state reception and clean disarm. Multi-device RF operation and route recovery
-still need further validation. The daemon is now
-[deployed as a persistent Pi service](host/DEPLOYMENT.md), with a configured MQTT
-broker and web UI reached through SSH forwarding.
+still need further validation. The daemon supports
+[standalone Docker deployment](host/docker/README.md), optional MQTT and a
+native authenticated API. See the [deployment history](host/DEPLOYMENT.md) for
+the migration from the standalone Pi to Home Assistant.
 
 - [Protocol reconstruction and packet evidence](analysis/protocol.md)
 - [Decoded packet index](analysis/decoded_packets.csv)
 - [Capture summaries and SHA-256 hashes](analysis/summary.json)
 - [Offline decoder](tools/decode_ec.py)
+- [Wireshark EC plugin: installation, filters and tests](wireshark/README.md)
 - [Development Pi setup and live capture results](analysis/development/bringup.md)
 - [Bounded Nordic sniffer capture tool](tools/capture_nrf.py)
 - [CC2652P passive receiver firmware](firmware/receiver/README.md)
@@ -66,5 +80,15 @@ local capture and deployment logs referenced by those notes are not part of the
 source distribution; the two development captures required by regression tests
 are included. Signing keys and generated firmware remain local.
 
-A project license still needs to be selected before the public open-source
-release. Vendored Monocypher retains its upstream license and attribution.
+Project-owned code is released under the [BSD 2-Clause License](LICENSE).
+Third-party components retain their own licences and attribution; see
+[third-party notices](THIRD_PARTY_NOTICES.md). The
+[release plan](docs/RELEASE_PLAN.md) describes packaging and remaining
+qualification work. Public packages and automated firmware delivery are not yet
+available.
+
+Release 0.12 adds MCU-owned output transactions aligned to heartbeat-relative
+200 ms slots. The Pi still allocates tokens and owns device state. Each command
+has at most six radio attempts and a four-second deadline; queries and immediate
+automatic ACK dispatch retain their previous policies. See the
+[UART contract](firmware/gateway/UART_PROTOCOL.md) for confirmation and cancellation.
