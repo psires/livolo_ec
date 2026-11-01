@@ -1,0 +1,7 @@
+
+# App-specific additions to the existing daemon Dockerfile, assembled by build_release.py.
+USER root
+COPY LICENSE /usr/share/licenses/livolo-ec/LICENSE
+COPY run.py /usr/local/lib/livolo-app.py
+ENTRYPOINT ["python", "/usr/local/lib/livolo-app.py"]
+CMD []

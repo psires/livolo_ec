@@ -1,0 +1,5 @@
+homeassistant==2026.10.4
+pytest-homeassistant-custom-component==0.13.375
+black==24.8.0
+pyserial==3.5
+paho-mqtt==2.1.0

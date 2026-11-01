@@ -1,0 +1,103 @@
+{
+  "title": "Livolo EC",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Livolo EC",
+        "description": "Connect to the native API of your Livolo daemon. The radio remains owned by the daemon.",
+        "data": {
+          "url": "API URL",
+          "token": "API token",
+          "allow_simulated": "Allow a simulator (testing only)"
+        }
+      },
+      "reconfigure": {
+        "title": "Connect to Livolo EC",
+        "description": "Connect to the native API of your Livolo daemon. The radio remains owned by the daemon.",
+        "data": {
+          "url": "API URL",
+          "token": "API token",
+          "allow_simulated": "Allow a simulator (testing only)"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Connect to Livolo EC",
+        "description": "Connect to the native API of your Livolo daemon. The radio remains owned by the daemon.",
+        "data": {
+          "url": "API URL",
+          "token": "API token",
+          "allow_simulated": "Allow a simulator (testing only)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the Livolo native API.",
+      "invalid_auth": "The API token was rejected.",
+      "incompatible": "This endpoint does not provide a compatible Livolo EC API.",
+      "invalid_url": "Enter a valid HTTP or HTTPS URL and token.",
+      "simulation_disabled": "This endpoint is a simulator. Enable simulation explicitly for testing.",
+      "command_failed": "The command was not confirmed. Check daemon status before retrying.",
+      "confirm_required": "Confirm that you want to forget this device."
+    },
+    "abort": {
+      "already_configured": "This Livolo EC network is already configured.",
+      "wrong_network": "This endpoint belongs to a different EC network.",
+      "reauth_successful": "Authentication updated.",
+      "reconfigure_successful": "Connection updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "menu_options": {
+          "add": "Register a device",
+          "pair": "Open or close pairing",
+          "refresh": "Refresh reported state",
+          "forget": "Forget a device"
+        }
+      },
+      "add": {
+        "title": "Register a switch",
+        "description": "Use a verified wire identity and profile. The suffix is not an output count. Then open pairing separately. {outcome}",
+        "data": {
+          "device": "Device ID (8 hexadecimal characters)",
+          "name": "Device name",
+          "outputs": "Number of outputs",
+          "suffix": "Verified wire suffix"
+        }
+      },
+      "pair": {
+        "title": "Targeted pairing",
+        "description": "Register the device first. A zero duration closes pairing. Acceptance opens the window; pairing completes only after a valid device report. {outcome}",
+        "data": {
+          "device": "Registered device ID",
+          "seconds": "Window in seconds (0–300)"
+        }
+      },
+      "refresh": {
+        "title": "Refresh state",
+        "description": "Runs one bounded read-only query. A timeout does not prove the device is offline. {outcome}",
+        "data": {
+          "device": "Registered device ID"
+        }
+      },
+      "forget": {
+        "title": "Forget device",
+        "description": "Removes the daemon record, not the physical device pairing. Its HA entities become unavailable and can then be removed. {outcome}",
+        "data": {
+          "device": "Registered device ID",
+          "confirm": "Forget this device"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the Livolo native API.",
+      "invalid_auth": "The API token was rejected.",
+      "incompatible": "This endpoint does not provide a compatible Livolo EC API.",
+      "invalid_url": "Enter a valid HTTP or HTTPS URL and token.",
+      "simulation_disabled": "This endpoint is a simulator. Enable simulation explicitly for testing.",
+      "command_failed": "The command was not confirmed. Check daemon status before retrying.",
+      "confirm_required": "Confirm that you want to forget this device."
+    }
+  }
+}

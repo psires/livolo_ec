@@ -1,0 +1,32 @@
+name: Native Home Assistant
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - run: python -m pip install -r homeassistant/requirements-test.txt
+      - run: python -m black --check client custom_components homeassistant
+      - run: python -m pytest -c homeassistant/pytest.ini homeassistant/tests -q
+      - run: python homeassistant/build_release.py --app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: livolo-native-ha
+          path: |
+            dist/livolo-ec-ha-*.zip
+            dist/ha-addons/
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master

@@ -1,0 +1,12 @@
+{
+  "domain": "livolo_ec",
+  "name": "Livolo EC",
+  "codeowners": ["@psires"],
+  "config_flow": true,
+  "documentation": "https://github.com/psires/livolo_ec/blob/main/homeassistant/README.md",
+  "integration_type": "hub",
+  "iot_class": "local_push",
+  "issue_tracker": "https://github.com/psires/livolo_ec/issues",
+  "requirements": [],
+  "version": "0.1.1"
+}

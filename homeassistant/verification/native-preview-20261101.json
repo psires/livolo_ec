@@ -1,0 +1,71 @@
+{
+  "date": "2026-11-01",
+  "scope": "Public summary; private deployment identities, credentials and raw captures are excluded",
+  "versions": {
+    "integration": "0.1.1",
+    "client": "0.1.0",
+    "app": "0.1.0",
+    "daemon_and_radio_firmware": "0.12",
+    "native_api": 1
+  },
+  "final_source_validation": {
+    "home_assistant": "2026.10.4",
+    "python": "3.14.7",
+    "ha_client_packaging_tests_passed": 28,
+    "native_api_tests_passed": 14,
+    "ingress_tests_passed": 10,
+    "failed": 0,
+    "radio_transport": "Simulator/fakes only; isolated loopback HTTP and WebSocket servers",
+    "black": "24.8.0; all assigned Python sources pass",
+    "function_documentation": "Purpose and parameter coverage passes for all 18 assigned Python sources",
+    "hassfest": {
+      "passed": true,
+      "official_core_tag": "2026.10.4",
+      "core_commit": "357cae5c598dfcd7a0ea7dc5b1facccd4ec6037b",
+      "invalid_integrations": 0
+    },
+    "packaging": {
+      "client_sdist_and_wheel_built": true,
+      "wheel_license_expression": "BSD-2-Clause",
+      "client_archives_include_root_license": true,
+      "assembled_integration_includes_client_and_root_license": true,
+      "assembled_app_context_includes_root_license": true,
+      "app_image_rebuilt_during_finalization": false
+    }
+  },
+  "earlier_live_validation": {
+    "hardware": "Raspberry Pi 5",
+    "architecture": "aarch64",
+    "ha_os": "18.4",
+    "ha_core": "2026.10.4",
+    "supervisor": "2026.10.5",
+    "radio": "ZB-GW04 v1.2",
+    "mqtt_enabled": false,
+    "devices": 2,
+    "outputs": 3,
+    "integration_reload_passed": true,
+    "daemon_continued_during_reload": true,
+    "ingress_access_checks_passed": true,
+    "ingress_browser_rendering_confirmed_by_user": true,
+    "close_range_control": {
+      "ha_commands_confirmed": 6,
+      "web_commands_confirmed": 6,
+      "read_only_refreshes_confirmed": 2,
+      "outputs_restored_with_confirmation": true,
+      "firmware_and_settings_unchanged": true,
+      "limitation": "Bounded two-device comparison after relocation; not a long-term reliability guarantee"
+    },
+    "final_diagnostics_and_packaging_changes_deployed": false
+  },
+  "not_qualified": [
+    "HACS or Marketplace installation and upgrades",
+    "Home Assistant releases other than 2026.10.4",
+    "HA app architectures other than aarch64",
+    "Physical-button push on the live HA deployment",
+    "USB removal/reconnection and boot without the adapter",
+    "Long-term or many-device reliability",
+    "Guided radio firmware installation, update jobs and backup/import UI",
+    "Automatic app discovery/setup",
+    "Socket and curtain profiles"
+  ]
+}
