@@ -25,6 +25,7 @@
     <header class="topbar"><div><span class="breadcrumb">Workspace</span><span class="slash">/</span><span id="page-label">Devices</span></div><span class="connection" id="connection"><span class="dot"></span>Connecting</span></header>
     <main>
       <div id="simulation" class="banner simulation" hidden>Simulation mode · Changes affect simulated devices only.</div>
+      <div id="maintenance-banner" class="banner firmware-banner" role="status" hidden><span id="maintenance-message">Firmware maintenance is in progress. Device changes are temporarily unavailable.</span> <a href="#network">View update</a></div>
       <div id="connection-error" class="banner error" role="alert" hidden></div>
       <section id="view-devices" class="view">
         <div class="page-heading"><div><p class="eyebrow">YOUR CONNECTED HOME</p><h1>Devices</h1><p class="subtitle">A little more control over every room.</p></div><button class="button primary" id="add-device"><span aria-hidden="true">＋</span> Add device</button></div>
@@ -43,7 +44,18 @@
         <div class="help-note"><span class="help-icon">i</span><p><strong>A name that feels like home.</strong> Open a device to give it a friendly name, pair it, or see its details.</p></div>
       </section>
       <section id="view-activity" class="view" hidden><div class="page-heading"><div><p class="eyebrow">KEEP AN EYE ON THINGS</p><h1>Activity</h1><p class="subtitle">Recent requests and their confirmed outcomes.</p></div></div><div class="surface" id="activity-list"></div></section>
-      <section id="view-network" class="view" hidden><div class="page-heading"><div><p class="eyebrow">BEHIND YOUR DEVICES</p><h1>Network</h1><p class="subtitle">Your local gateway at a glance.</p></div></div><div class="network-layout"><div class="surface network-details" id="network-details"></div>
+      <section id="view-network" class="view" hidden><div class="page-heading"><div><p class="eyebrow">BEHIND YOUR DEVICES</p><h1>Network</h1><p class="subtitle">Your local gateway at a glance.</p></div></div><div class="network-layout">
+        <section class="surface firmware-panel" aria-labelledby="firmware-title">
+          <div class="firmware-heading"><div><p class="eyebrow">YOUR RADIO SOFTWARE</p><h2 id="firmware-title">Gateway firmware</h2></div><span id="firmware-status" class="badge">Checking</span></div>
+          <dl id="firmware-details" class="firmware-details"></dl>
+          <p id="firmware-reason" class="muted"></p>
+          <div id="firmware-job" role="status" aria-live="polite" hidden><p id="firmware-stage"></p><progress id="firmware-progress" max="100" aria-label="Firmware installation progress"></progress><p id="firmware-request" class="muted"></p></div>
+          <p id="firmware-error" class="form-error" role="alert" hidden></p>
+          <p id="firmware-recovery" class="firmware-recovery" hidden></p>
+          <details id="firmware-notes" hidden><summary>Release notes</summary><p id="firmware-notes-text"></p><a id="firmware-release-link" target="_blank" rel="noopener noreferrer" hidden>Read full release notes</a></details>
+          <div class="dialog-actions"><button type="button" class="button primary" id="firmware-review" disabled>Review update</button></div>
+        </section>
+        <div class="surface network-details" id="network-details"></div>
         <section class="surface mqtt-settings" aria-labelledby="mqtt-title">
           <div class="mqtt-heading"><div><p class="eyebrow">CONNECT YOUR AUTOMATIONS</p><h2 id="mqtt-title">MQTT settings</h2></div><span id="mqtt-status" class="badge">Connecting</span></div>
           <p class="muted" id="mqtt-intro">Connect Livolo to your MQTT broker. Changes apply without restarting the radio.</p>
@@ -64,6 +76,16 @@
   <dialog id="device-dialog" aria-labelledby="device-dialog-title"><form id="rename-form"><div class="dialog-heading"><div><p class="eyebrow">DEVICE DETAILS</p><h2 id="device-dialog-title">Manage device</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close device details">×</button></div><label class="field">Friendly name<input id="device-name" name="name" maxlength="100" required autocomplete="off"></label><div id="device-details" class="detail-grid"></div><p id="device-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button" id="pair-device">Pair device</button><button type="submit" class="button primary">Save name</button></div><div class="danger-area"><div><strong>Forget this device</strong><p>Removes it from this gateway. This does not reset or unpair the physical switch.</p></div><button type="button" class="button danger small" id="forget-device">Forget</button></div></form></dialog>
   <dialog id="add-dialog" aria-labelledby="add-title"><form id="add-form"><div class="dialog-heading"><div><p class="eyebrow">GROW YOUR NETWORK</p><h2 id="add-title">Add a device</h2></div><button type="button" class="icon-button close-dialog" aria-label="Close add device">×</button></div><p class="dialog-intro">Choose a detected switch or enter its device ID. Only the device you select will be allowed to pair.</p><div id="discoveries" class="discoveries"></div><div class="form-row"><label class="field">Device ID<input id="new-id" required pattern="[0-9a-fA-F]{8}" minlength="8" maxlength="8" spellcheck="false" placeholder="e.g. 46715621" autocomplete="off"><small>8 hexadecimal characters, in wire order</small></label><label class="field">Outputs<select id="new-outputs"><option value="2">2 outputs</option><option value="1">1 output</option></select></label></div><label class="field">Friendly name<input id="new-name" required maxlength="100" placeholder="e.g. Living room lights" autocomplete="off"></label><details class="advanced"><summary>Advanced device settings</summary><label class="field">Device suffix<input id="new-suffix" value="0002" required pattern="[0-9a-fA-F]{4}" minlength="4" maxlength="4" spellcheck="false"><small>Use the suffix reported by the device.</small></label></details><div class="pairing-help"><strong>Ready to pair?</strong><ol><li>If migrating, remove this switch from the old gateway and keep that gateway’s pairing disabled.</li><li>Choose “Save &amp; start pairing”, then follow your switch’s documented pairing procedure.</li><li>Wait for a device report to confirm pairing. The window closes after 2 minutes.</li></ol></div><p id="add-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="submit" class="button" value="save">Save only</button><button type="submit" class="button primary" value="pair">Save &amp; start pairing</button></div></form></dialog>
   <dialog id="forget-dialog" aria-labelledby="forget-title"><form id="forget-form"><div class="dialog-heading"><h2 id="forget-title">Forget device?</h2><button type="button" class="icon-button close-dialog" aria-label="Cancel forgetting">×</button></div><p id="forget-description"></p><p class="muted">The switch may retain its association. To join another gateway, use the model’s documented pairing or reset procedure.</p><p id="forget-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" class="button close-dialog">Keep device</button><button type="submit" class="button danger">Forget device</button></div></form></dialog>
+  <dialog id="firmware-dialog" aria-labelledby="firmware-dialog-title">
+    <form id="firmware-form">
+      <div class="dialog-heading"><h2 id="firmware-dialog-title">Install gateway firmware?</h2><button type="button" class="icon-button close-dialog" aria-label="Close firmware review">×</button></div>
+      <dl id="firmware-review-details" class="firmware-details"></dl>
+      <p class="dialog-intro">Device control and pairing will pause while the gateway updates. Keep the gateway powered and the radio connected until the daemon verifies the result.</p>
+      <p id="firmware-rollback" class="muted"></p>
+      <p id="firmware-review-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions"><button type="button" class="button close-dialog">Not now</button><button type="submit" class="button primary" id="firmware-install" disabled>Install firmware</button></div>
+    </form>
+  </dialog>
   <dialog id="login-dialog" aria-labelledby="login-title"><form id="login-form"><p class="eyebrow">LOCAL GATEWAY</p><h2 id="login-title">Connect to Livolo</h2><p class="muted">Enter the web access token configured on your gateway.</p><label class="field">Access token<input id="access-token" type="password" required autocomplete="current-password"></label><p id="login-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button class="button primary" type="submit">Connect</button></div></form></dialog>
   <div id="toasts" class="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
 </body>

@@ -236,7 +236,7 @@ class WebServer:
                     self.send(404, {"error": "Not found"})
 
             def do_POST(self):
-                """Accept authenticated same-origin commands and MQTT settings requests."""
+                """Accept protected commands, firmware installs and MQTT settings."""
                 if not self.check_host():
                     return
                 if not self.authorized():
@@ -263,7 +263,11 @@ class WebServer:
                         {"error": "Session expired. Refresh the page and try again."},
                     )
                     return
-                if self.path not in ("/api/command", "/api/settings/mqtt"):
+                if self.path not in (
+                    "/api/command",
+                    "/api/settings/mqtt",
+                    "/api/firmware/install",
+                ):
                     self.send(404, {"error": "Not found"})
                     return
                 try:
@@ -282,16 +286,33 @@ class WebServer:
                     body = json.loads(self.rfile.read(length))
                     if self.path == "/api/settings/mqtt":
                         body = {"action": "mqtt_settings", "payload": body}
+                    elif self.path == "/api/firmware/install":
+                        if (
+                            not isinstance(body, dict)
+                            or set(body) != {"request_id", "candidate_id"}
+                            or any(
+                                not isinstance(body[key], str)
+                                or not re.fullmatch(
+                                    rf"[A-Za-z0-9_.:-]{{1,{limit}}}", body[key]
+                                )
+                                for key, limit in (
+                                    ("request_id", 128),
+                                    ("candidate_id", 256),
+                                )
+                            )
+                        ):
+                            raise ValueError("Expected request_id and candidate_id")
+                        body = {"action": "firmware_install", "payload": body}
                     if not isinstance(body, dict) or set(body) != {"action", "payload"}:
                         raise ValueError("Expected action and payload")
                     if (
                         not isinstance(body["action"], str)
                         or body["action"]
-                        not in (
-                            ACTIONS | {"mqtt_settings"}
-                            if self.path == "/api/settings/mqtt"
-                            else ACTIONS
-                        )
+                        not in {
+                            "/api/command": ACTIONS,
+                            "/api/settings/mqtt": {"mqtt_settings"},
+                            "/api/firmware/install": {"firmware_install"},
+                        }[self.path]
                         or not isinstance(body["payload"], dict)
                     ):
                         raise ValueError("Invalid action or payload")
@@ -325,6 +346,8 @@ class WebServer:
             value = self.service.api_snapshot()
         elif action == "mqtt_settings":
             value = self.service.configure_mqtt(payload)
+        elif action == "firmware_install":
+            value = self.service.start_firmware_update(payload)
         elif action == "result":
             value = self.service.command_result(payload)
             if value is None:

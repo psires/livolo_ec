@@ -43,6 +43,14 @@ const busyDevices = new Set();
 const watched = new Map();
 const localResults = new Map();
 const finalErrors = new Set(['rejected', 'unknown', 'unconfirmed', 'busy', 'timeout']);
+const firmwareUi = {
+  review: null,
+  request: null,
+  storageKey: null,
+  submitting: false,
+  result: null,
+  error: '',
+};
 /**
  * Allocate a browser command identifier for durable daemon deduplication.
  *
@@ -205,6 +213,7 @@ async function refresh() {
       connected = true;
       showError('#connection-error', '');
       for (const result of [...snapshot.results].reverse()) observeResult(result);
+      await reconcileFirmwareRequest();
       render();
       return true;
     } catch (error) {
@@ -256,6 +265,7 @@ function observeResult(result) {
  */
 async function command(action, fields) {
   if (!connected || !snapshot) throw new Error('Connect to the gateway before making changes.');
+  if (firmwareBusy()) throw new Error('Device changes are paused for firmware maintenance.');
   const payload = { ...fields, request_id: requestId() };
   const local = {
     request_id: payload.request_id,
@@ -300,14 +310,31 @@ async function command(action, fields) {
  */
 function render() {
   const ready = connected && snapshot?.ready;
+  const maintenance = firmwareBusy();
   const connection = $('#connection');
   connection.className = 'connection' + (ready ? ' online' : connected ? '' : ' error');
   connection.innerHTML =
     '<span class="dot"></span>' +
-    (ready ? 'Gateway connected' : connected ? 'Radio reconnecting' : 'Gateway disconnected');
+    (connected && maintenance
+      ? 'Firmware maintenance'
+      : ready
+        ? 'Gateway connected'
+        : connected
+          ? 'Radio reconnecting'
+          : 'Gateway disconnected');
+  $('#maintenance-banner').hidden = !maintenance;
+  $('#maintenance-message').textContent = snapshot?.firmware_update?.recovery
+    ? 'Firmware recovery is required. Device changes remain unavailable.'
+    : 'Firmware maintenance is in progress. Device changes are temporarily unavailable.';
   $('#refresh-label').textContent = connected ? 'Updates automatically' : 'Connection interrupted';
   $('#simulation').hidden = !snapshot?.simulated;
-  $('#add-device').disabled = !connected || $('#add-form').dataset.busy === 'true';
+  $('#add-device').disabled = !connected || maintenance || $('#add-form').dataset.busy === 'true';
+  for (const id of ['#add-form', '#rename-form', '#forget-form']) {
+    const form = $(id);
+    $$('input,select,button[type="submit"]', form).forEach(
+      (control) => (control.disabled = !connected || maintenance || form.dataset.busy === 'true'),
+    );
+  }
   if (!snapshot) {
     $('#empty-state h2').textContent = 'Waiting for your gateway';
     $('#empty-state p').textContent =
@@ -344,14 +371,17 @@ function renderDevices() {
       const controlsDisabled = snapshot.diagnostics?.output_mode === 'disabled';
       const disabled =
         controlsDisabled ||
+        firmwareBusy() ||
         !connected ||
         !snapshot.ready ||
         !online ||
         busyDevices.has(d.id) ||
         snapshot.pairing?.device === d.id;
-      const disabledReason = controlsDisabled
-        ? 'Output controls are disabled in gateway configuration'
-        : 'Requires an online device and available radio';
+      const disabledReason = firmwareBusy()
+        ? 'Device changes are paused for firmware maintenance'
+        : controlsDisabled
+          ? 'Output controls are disabled in gateway configuration'
+          : 'Requires an online device and available radio';
       const outputs = Array.from({ length: d.outputs }, (_, n) => {
         const value =
           state.outputs?.[String(n + 1)] ??
@@ -405,7 +435,7 @@ function renderPairing() {
     `Waiting for ${deviceName(pair.device)} · ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')} remaining`;
   $('#pairing-description').textContent =
     'Put this switch into pairing mode using its documented procedure. A device report confirms success.';
-  $('#stop-pairing').disabled = !connected || !snapshot.ready;
+  $('#stop-pairing').disabled = !connected || !snapshot.ready || firmwareBusy();
 }
 /**
  * Show recent command outcomes from the browser and daemon activity history.
@@ -422,6 +452,7 @@ function renderActivity() {
     set: 'Set output',
     pair: 'Pair device',
     snapshot: 'Refresh state',
+    firmware_update: 'Firmware update',
   };
   $('#activity-list').innerHTML = results.length
     ? results
@@ -440,7 +471,16 @@ function renderNetwork() {
   const rows = [
     ['Gateway ID', snapshot.gateway],
     ['Network tag', snapshot.tag],
-    ['Radio', !connected ? 'Unknown' : snapshot.ready ? 'Ready' : 'Reconnecting'],
+    [
+      'Radio',
+      !connected
+        ? 'Unknown'
+        : firmwareBusy()
+          ? 'Maintenance'
+          : snapshot.ready
+            ? 'Ready'
+            : 'Reconnecting',
+    ],
     [
       'MQTT',
       !connected
@@ -463,6 +503,7 @@ function renderNetwork() {
     `<dl>${rows.map(([label, value]) => `<dt>${label}</dt><dd>${escapeHTML(value)}</dd>`).join('')}</dl><p>Device names and membership are stored on this gateway. The radio’s device table is restored by the daemon after a restart.</p><details><summary>Radio diagnostics</summary><pre>${escapeHTML(JSON.stringify(snapshot.diagnostics || {}, null, 2))}</pre></details>`;
   $('#network-details details').open = diagnosticsOpen;
   renderMqtt();
+  renderFirmware();
 }
 /**
  * Refresh the selected device dialog and disable unavailable management actions.
@@ -485,7 +526,7 @@ function renderDeviceDetails() {
   $('#device-details').innerHTML = rows
     .map(([key, value]) => `<div><span>${key}</span><strong>${escapeHTML(value)}</strong></div>`)
     .join('');
-  const busy = $('#rename-form').dataset.busy === 'true';
+  const busy = $('#rename-form').dataset.busy === 'true' || firmwareBusy();
   $('#pair-device').disabled = busy || !connected || !snapshot.ready || Boolean(snapshot.pairing);
   $('#forget-device').disabled = busy || !connected || busyDevices.has(d.id);
 }
@@ -846,7 +887,7 @@ function renderMqtt() {
     : 'Transport: plain MQTT. TLS certificates can be configured on the gateway.';
   $('#mqtt-topic-help').textContent =
     'Example state topic: ' + (settings?.base_topic || 'livolo') + '/<device-id>/state';
-  const busy = $('#mqtt-form').dataset.busy === 'true';
+  const busy = $('#mqtt-form').dataset.busy === 'true' || firmwareBusy();
   $$('input,select,button', $('#mqtt-form')).forEach(
     (el) => (el.disabled = busy || !connected || !settings?.editable),
   );
@@ -877,6 +918,10 @@ $('#mqtt-reset').addEventListener('click', () => {
  */
 $('#mqtt-form').addEventListener('submit', (event) => {
   event.preventDefault();
+  if (firmwareBusy()) {
+    showError('#mqtt-error', 'Settings changes are paused for firmware maintenance.');
+    return;
+  }
   const fields = {
     host: $('#mqtt-host').value.trim(),
     port: Number($('#mqtt-port').value),
@@ -899,4 +944,333 @@ $('#mqtt-form').addEventListener('submit', (event) => {
     mqttInitialized = false;
     await refresh();
   });
+});
+
+/**
+ * Keep conflicting device changes disabled while maintenance owns or may own the radio.
+ *
+ * @returns {boolean} Whether firmware work is active or its submission is unresolved.
+ */
+function firmwareBusy() {
+  return Boolean(
+    firmwareUi.submitting ||
+      firmwareUi.request ||
+      snapshot?.firmware_update?.in_progress ||
+      snapshot?.firmware_update?.recovery ||
+      snapshot?.firmware_update?.status === 'pending',
+  );
+}
+
+/**
+ * Explain why the daemon's currently advertised artifact cannot be installed.
+ *
+ * @returns {string} Blocking reason, or empty text for an eligible candidate.
+ */
+function firmwareBlockedReason() {
+  const firmware = snapshot?.firmware_update;
+  if (!connected) return 'Reconnect to the gateway to check firmware availability.';
+  if (!firmware) return 'This daemon does not provide firmware installation through the web UI.';
+  if (firmware.recovery) return 'Firmware recovery is required before device changes can resume.';
+  if (firmwareBusy()) return 'An update is in progress or its outcome is being checked.';
+  if (firmware.blocked_reason) {
+    const reasons = {
+      board_identity_unknown: 'The gateway has not identified the connected radio board.',
+      bundle_missing: 'No firmware bundle is installed on this gateway.',
+      bundle_invalid: 'The installed firmware bundle did not pass validation.',
+      artifact_missing: 'No firmware payload is installed for this exact board.',
+      artifact_invalid: 'The firmware payload did not pass integrity or signature checks.',
+      artifact_unqualified: 'This firmware has not been qualified for installation.',
+      incompatible_host: 'The firmware bundle does not match the installed daemon release.',
+      incompatible_baudrate: 'The firmware does not support the configured serial rate.',
+      unsupported_board: 'Firmware installation is not supported for this board.',
+      backend_unavailable: 'The required firmware installation backend is unavailable.',
+      bootloader_install_required: 'This radio needs its one-time bootloader installation first.',
+      signing_key_mismatch: 'The firmware signing key does not match the trusted key.',
+      radio_offline: 'Connect the radio and wait for it to become ready.',
+      simulation: 'Firmware installation is disabled in simulation mode.',
+      candidate_stale: 'The firmware candidate changed. Review the current update.',
+      recovery_required: 'Firmware recovery is required before another installation.',
+      update_in_progress: 'A firmware update is already in progress.',
+    };
+    return reasons[firmware.blocked_reason] || String(firmware.blocked_reason).replaceAll('_', ' ');
+  }
+  if ((firmware.status || firmwareUi.result?.status) === 'unknown')
+    return 'The previous update needs recovery before another install.';
+  if (firmware.install_supported !== true)
+    return 'Firmware installation is unavailable for this radio.';
+  if (
+    firmware.update_available !== true ||
+    !firmware.candidate_id ||
+    !firmware.latest_version ||
+    !firmware.board
+  )
+    return 'No verified firmware candidate is available for this radio.';
+  return '';
+}
+
+/**
+ * Remember only the request identity so a reload can resolve an uncertain submission.
+ *
+ * @param {string|null} id - Durable request ID, or null after a definitive outcome.
+ */
+function rememberFirmwareRequest(id) {
+  firmwareUi.request = id;
+  try {
+    if (id) sessionStorage.setItem(firmwareUi.storageKey, id);
+    else sessionStorage.removeItem(firmwareUi.storageKey);
+  } catch {
+    // Private browsing can deny storage; the daemon snapshot still owns job state.
+  }
+}
+
+/**
+ * Apply an outcome only to the request this browser submitted, without replaying it.
+ *
+ * @param {Object} result - Durable result or matching firmware snapshot summary.
+ */
+function acceptFirmwareResult(result) {
+  if (!result || result.request_id !== firmwareUi.request) return;
+  if (!['pending', 'confirmed', 'rejected', 'unknown'].includes(result.status)) return;
+  firmwareUi.result = result;
+  firmwareUi.error = result.error || '';
+  if (result.status !== 'pending') rememberFirmwareRequest(null);
+  if (result.status === 'unknown')
+    firmwareUi.error ||=
+      'The update outcome is unknown. Follow the recovery instructions before retrying.';
+}
+
+/**
+ * Recover the same durable request after a lost POST response or page reload.
+ *
+ * @returns {Promise<void>} Completion of read-only reconciliation; never submits firmware.
+ */
+async function reconcileFirmwareRequest() {
+  const key = 'livolo-firmware:' + apiUrl('/') + ':' + snapshot.gateway + ':' + snapshot.tag;
+  if (firmwareUi.storageKey !== key) {
+    firmwareUi.storageKey = key;
+    firmwareUi.request = null;
+    firmwareUi.result = null;
+    firmwareUi.error = '';
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (saved && /^[A-Za-z0-9_.:-]{1,128}$/.test(saved)) firmwareUi.request = saved;
+    } catch {
+      // Missing storage cannot authorize a second submission; consult the snapshot.
+    }
+  }
+  if (!firmwareUi.request || firmwareUi.submitting) return;
+  const summary = snapshot.firmware_update;
+  if (summary?.request_id === firmwareUi.request) {
+    acceptFirmwareResult(summary);
+    if (summary.status === 'pending' && summary.in_progress) return;
+  }
+  if (!firmwareUi.request) return;
+  const stored = snapshot.results.find((result) => result.request_id === firmwareUi.request);
+  if (stored) acceptFirmwareResult(stored);
+  if (!firmwareUi.request) return;
+  try {
+    const result = await api('/api/commands/' + encodeURIComponent(firmwareUi.request));
+    if (result?.request_id !== firmwareUi.request) throw new Error('Firmware request ID mismatch.');
+    acceptFirmwareResult(result);
+  } catch {
+    firmwareUi.error =
+      'The update request could not be resolved. Its status will be checked again; it will not be submitted again.';
+  }
+}
+
+/**
+ * Render an artifact's exact identity as escaped labels shared by the card and review.
+ *
+ * @param {Object} firmware - Public firmware status or the pinned review candidate.
+ * @returns {string} Definition-list contents with no executable release content.
+ */
+function firmwareDetails(firmware) {
+  return [
+    ['Board', firmware.board || 'Unknown'],
+    ['Installed', firmware.installed_version || 'Unknown'],
+    ['Available', firmware.latest_version || 'No verified candidate'],
+    ['Artifact', firmware.candidate_id || 'None'],
+  ]
+    .map(([label, value]) => `<dt>${label}</dt><dd>${escapeHTML(value)}</dd>`)
+    .join('');
+}
+
+/**
+ * Keep confirmation pinned to the artifact and board the user actually reviewed.
+ *
+ * @returns {boolean} Whether the current candidate still matches the open review.
+ */
+function firmwareReviewMatches() {
+  const firmware = snapshot?.firmware_update;
+  return Boolean(
+    firmwareUi.review &&
+      firmware &&
+      ['board', 'candidate_id', 'latest_version', 'installed_version', 'rollback_supported'].every(
+        (key) => firmware[key] === firmwareUi.review[key],
+      ),
+  );
+}
+
+/**
+ * Show daemon-owned eligibility, genuine progress and durable recovery information.
+ */
+function renderFirmware() {
+  const firmware = snapshot?.firmware_update || {};
+  const local = firmwareUi.result;
+  const status = firmware.status || local?.status;
+  const busy = firmwareBusy();
+  $('#firmware-details').innerHTML = firmwareDetails({
+    ...firmware,
+    installed_version:
+      firmware.installed_version || snapshot?.diagnostics?.firmware?.running_version,
+  });
+  $('#firmware-status').textContent = !connected
+    ? 'Disconnected'
+    : firmware.recovery || status === 'unknown'
+      ? 'Needs recovery'
+      : busy
+        ? firmware.in_progress
+          ? 'Updating'
+          : 'Checking outcome'
+        : status === 'confirmed'
+          ? 'Verified'
+          : status === 'unknown'
+            ? 'Needs recovery'
+            : status === 'rejected'
+              ? 'Not installed'
+              : firmwareBlockedReason()
+                ? 'Unavailable'
+                : 'Update available';
+  $('#firmware-status').className =
+    'badge' + (connected && !busy && status === 'confirmed' ? ' online' : '');
+  $('#firmware-reason').textContent =
+    firmwareBlockedReason() || 'A verified update is ready for review.';
+  $('#firmware-review').disabled = Boolean(firmwareBlockedReason());
+  const request = firmware.request_id || firmwareUi.request || local?.request_id;
+  $('#firmware-job').hidden = !request && !busy;
+  const stages = {
+    idle: 'Ready',
+    preparing: 'Preparing the update',
+    preflight: 'Checking the radio and firmware',
+    disarm: 'Pausing radio control',
+    begin: 'Starting firmware transfer',
+    transfer: 'Transferring firmware',
+    transferring: 'Transferring firmware',
+    transferred: 'Firmware transfer finished; verification is still required',
+    commit: 'Committing the firmware',
+    committed: 'Firmware committed; verification is still required',
+    activate: 'Activating the new firmware',
+    bootloader_entry: 'Entering the radio bootloader',
+    flash: 'Writing firmware',
+    restoring: 'Reconnecting and verifying the radio',
+    confirmed: 'Firmware installation verified',
+    failed: 'Firmware installation failed',
+    interrupted: 'Firmware installation was interrupted',
+    restored_previous: 'Previous firmware restored; the update was not installed',
+  };
+  let stage =
+    stages[firmware.stage] ||
+    (firmware.stage ? String(firmware.stage).replaceAll('_', ' ') : status || 'Checking request');
+  if (
+    ['transfer', 'transferring'].includes(firmware.stage) &&
+    Number.isFinite(firmware.transfer_percent) &&
+    firmware.transfer_percent >= 0 &&
+    firmware.transfer_percent <= 100
+  )
+    stage += ' · Transfer: ' + firmware.transfer_percent + '%';
+  $('#firmware-stage').textContent = !connected
+    ? 'Connection interrupted. Last reported stage: ' + stage
+    : stage;
+  $('#firmware-request').textContent = request ? 'Request: ' + request : '';
+  const progress = $('#firmware-progress');
+  progress.hidden = !firmware.in_progress;
+  if (
+    Number.isFinite(firmware.progress_percent) &&
+    firmware.progress_percent >= 0 &&
+    firmware.progress_percent <= 100
+  ) {
+    progress.value = firmware.progress_percent;
+  } else progress.removeAttribute('value');
+  showError('#firmware-error', firmwareUi.error || firmware.error || '');
+  const recovery = firmware.recovery || local?.recovery;
+  $('#firmware-recovery').textContent =
+    recovery === 'recovery_required'
+      ? 'The daemon could not verify a safe completion. Follow the emergency recovery procedure for this exact board before restarting device control.'
+      : recovery ||
+        (firmware.board === 'nordic-pca10059'
+          ? 'Automatic Nordic installation is unavailable. Use the documented PCA10059 USB DFU recovery procedure.'
+          : '');
+  $('#firmware-recovery').hidden = !$('#firmware-recovery').textContent;
+  $('#firmware-notes-text').textContent = firmware.release_notes || '';
+  const link = $('#firmware-release-link');
+  link.hidden = true;
+  link.removeAttribute('href');
+  if (typeof firmware.release_url === 'string') {
+    try {
+      const url = new URL(firmware.release_url);
+      if (url.protocol === 'https:' && !url.username && !url.password) {
+        link.href = url.href;
+        link.hidden = false;
+      }
+    } catch {
+      // Malformed release links must not become navigation targets.
+    }
+  }
+  $('#firmware-notes').hidden = !firmware.release_notes && link.hidden;
+  if ($('#firmware-dialog').open) {
+    const reason = !firmwareReviewMatches()
+      ? 'The firmware candidate changed. Close this dialog and review the current update.'
+      : firmwareBlockedReason();
+    $('#firmware-install').disabled = Boolean(reason);
+    showError('#firmware-review-error', reason);
+  }
+}
+
+/** Pin exact artifact details before asking for an explicit installation decision. */
+$('#firmware-review').addEventListener('click', () => {
+  if (firmwareBlockedReason()) return;
+  firmwareUi.review = { ...snapshot.firmware_update };
+  $('#firmware-review-details').innerHTML = firmwareDetails(firmwareUi.review);
+  $('#firmware-rollback').textContent = firmwareUi.review.rollback_supported
+    ? 'This radio supports trial rollback. Installation is complete only after the daemon verifies it.'
+    : 'This radio has no automatic rollback. If installation is interrupted, bootloader recovery may be required.';
+  openDialog('#firmware-dialog');
+  renderFirmware();
+});
+
+/**
+ * Submit the reviewed artifact once and leave completion tracking to durable status.
+ *
+ * @param {SubmitEvent} event - Explicit firmware-install confirmation.
+ */
+$('#firmware-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!firmwareReviewMatches() || firmwareBlockedReason()) {
+    renderFirmware();
+    return;
+  }
+  const payload = { request_id: requestId(), candidate_id: firmwareUi.review.candidate_id };
+  rememberFirmwareRequest(payload.request_id);
+  firmwareUi.submitting = true;
+  firmwareUi.result = null;
+  firmwareUi.error = '';
+  $('#firmware-dialog').close();
+  render();
+  try {
+    const result = await api('/api/firmware/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Livolo-Token': snapshot.csrf_token },
+      body: JSON.stringify(payload),
+    });
+    if (result?.request_id !== payload.request_id) throw new Error('Firmware request ID mismatch.');
+    acceptFirmwareResult(result);
+    observeResult({ ...result, action: 'firmware_update' });
+  } catch {
+    firmwareUi.error =
+      'The update submission could not be confirmed. Checking the same request; do not start another install.';
+  } finally {
+    firmwareUi.submitting = false;
+    await refresh();
+    render();
+  }
 });
