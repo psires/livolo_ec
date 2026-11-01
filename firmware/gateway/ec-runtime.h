@@ -28,4 +28,10 @@ unsigned ec_uart_free(void);
  */
 unsigned long ec_uart_dropped(void);
 
+/** @brief Initialize the UART gateway once after platform startup. */
+void ec_gateway_start(void);
+
+/** @brief Drain commands and service leases/status from main-loop context. */
+void ec_gateway_poll(void);
+
 #endif

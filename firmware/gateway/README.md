@@ -1,8 +1,18 @@
 # CC2652P volatile radio adapter — UART v3
 
+Release **0.12** uses the same gateway core on this TI module, the
+[Sonoff ZBDongle-E and ZB-GW04 v1.2](../mg21/README.md), and the
+[Nordic PCA10059](../nrf52840/README.md). All three families implement volatile
+peer tables, timed queues, heartbeats, complete state-query transactions,
+heartbeat-aligned output transactions and phase-stamped automatic replies.
+See [third-party notices](../THIRD_PARTY_NOTICES.md) for pinned build inputs.
+Dated release sections below preserve implementation and qualification history.
+The build, GPIO and signed-update instructions on this page are TI-specific.
+
 The TI module owns radio timing and bounded volatile execution state. The Pi owns
 all authoritative network/device records, pairing and routing decisions, command
-transactions, state tracking and MQTT integration. No application network state
+intent, state tracking and MQTT integration. The MCU executes the host-authorized
+bounded transactions. No application network state
 is written to flash. The factory CCFG and ROM bootloader remain intact.
 
 **Host integration:** [UART_PROTOCOL.md](UART_PROTOCOL.md) is the current contract.
@@ -12,10 +22,40 @@ independent ACK masks. NETWORK/boot disarm; peer-table edits require disarmed
 state. ARM, ACK and SEND carry the session so an old send fails after reset or
 session replacement. All leases expire within 60 seconds without renewal.
 
-The radio boots unconfigured on channel 11, 0 dBm, UART 115200 8N1. It receives raw
+The radio boots unconfigured on channel 11, 0 dBm, UART 115200 8N1 by default. It receives raw
 frames without IEEE address filtering or automatic IEEE ACKs. Transmit framing is
 currently restricted to the verified EC envelopes and self-addressed diagnostics;
-it is not an unrestricted radio API. Pairing, routing and heartbeats are host work.
+it is not an unrestricted radio API. Pairing and routing remain host policy. Scheduler-capable TI executes a
+host-authorized heartbeat cadence under the existing lease.
+
+## Timed queues and heartbeats — release 0.6
+
+The TI build enables `SCHEDULER=1` by default; `SCHEDULER=0` retains the older
+host-driven path for controlled comparisons. MG21 gained the shared scheduler
+in 0.7, and Nordic in 0.12.
+The [UART contract](UART_PROTOCOL.md#ti-timed-queues-and-heartbeat-ownership--release-06)
+describes queue commands, credits, deadlines, cancellation and heartbeat ownership.
+Completed jobs retain their results in RAM until drained. Reset, session replacement,
+disarm or lease expiry flushes pending work. No network records are stored in flash.
+
+The first stage schedules process dispatch with the TI hardware timer; RF CCA and
+transmission still use the existing radio driver. It does not promise an exact
+RF SFD deadline. Heartbeats advance from an absolute ten-second epoch, preserving
+the four-attempt CCA limit and 25/50/75 ms backoff. Release 0.7 also moves complete
+query rounds and fresh-state stopping onto the MCU. Release 0.12 adds separate
+heartbeat-grid output transactions; earlier output transactions were host-driven.
+One-shot queue jobs are restricted to
+self-addressed diagnostics and read-only queries; output commands cannot be queued.
+
+The daemon negotiates heartbeat ownership and verifies a first live phase anchor
+before readiness or trial confirmation. Its periodic status polls observe the
+schedule; they do not drive transmission. Unsupported adapters retain their
+existing behavior. `hardware_scheduler.py` tests queued probes during host silence,
+heartbeats under UART traffic and lease cancellation; it is an explicit on-air
+hardware test and requires the daemon to release the UART first.
+`hardware_query.py` verifies complete read-only query execution during host silence
+and continuous UART traffic. It also requires exclusive UART access and restores
+no network authority on its own after exit; its caller must restart the daemon.
 
 ## Sources
 
@@ -24,6 +64,8 @@ it is not an unrestricted radio API. Pairing, routing and heartbeats are host wo
 - `ec-protocol.c/.h`: captured EC packet/checksum rules and response construction.
 - `ec-mac.c`: promiscuous raw RX integration with Contiki's radio driver.
 - `uart0-arch.c`: nonblocking UART ring/callback implementation.
+- `ec-scheduler.c/.h`: eight volatile timed jobs, retained outcomes and periodic heartbeats.
+- `ec-scheduler-ti.c`: hardware timer wakeup into Contiki process context.
 
 Automatic ACKs run before UART logging. Eligible native packets must match a
 configured immediate source, subject and network tag. Each peer mask selects
@@ -97,7 +139,7 @@ CRC32 `a2597eb0`, preserved remotely as `backups/ec-gateway-v3-pre-phase.bin`.
 Its factory CCFG is unchanged. The ELF uses text 46876, data
 1120, BSS 14200 bytes on the actual 352 KiB flash / 80 KiB SRAM CC2652P module.
 
-The installed phase-extension image is SHA-256
+The earlier phase-extension image was SHA-256
 `c15d9b87cdec11761526cbac674eff3732b26b755251b23318a9ed315fe2a69f`, ROM-verified
 CRC32 `f7c0613b`, with identical factory CCFG. Its ELF text/data/BSS are
 48198 / 1120 / 14216 bytes. It adds explicit `tx_entry_v1` stamping and a
@@ -154,11 +196,11 @@ make -C firmware/gateway UPDATE_SUPPORT=1 CONTIKI=/absolute/path/to/contiki-ng \
   build/simplelink/launchpad/codm-cc2652p/ec-gateway.bin
 python3 tools/firmware_package.py sign \
   firmware/gateway/build/simplelink/launchpad/codm-cc2652p/ec-gateway.bin \
-  --version 0.2 --key .local/firmware-keys/signing.pem --output gateway-0.2.ecupd
-python3 tools/firmware_package.py verify gateway-0.2.ecupd \
+  --version 0.4 --key .local/firmware-keys/signing.pem --output gateway-0.4.ecupd
+python3 tools/firmware_package.py verify gateway-0.4.ecupd \
   --public-key .local/firmware-keys/public.key
 python3 tools/firmware_package.py factory \
-  --bootloader firmware/bootloader/build/ec-boot.bin --package gateway-0.2.ecupd \
+  --bootloader firmware/bootloader/build/ec-boot.bin --package gateway-0.4.ecupd \
   --original backups/original-module.bin --public-key .local/firmware-keys/public.key \
   --output first-install.bin
 ```
@@ -178,7 +220,7 @@ software activation, daemon restart and confirmation check:
 
 ```sh
 sudo /opt/livolod/bin/livolod-firmware --config /etc/livolod/config.json \
-  --package gateway-0.2.ecupd --public-key gateway-public.key --service livolod
+  --package gateway-0.4.ecupd --public-key gateway-public.key --service livolod
 ```
 
 Run it on the gateway, for example over SSH. There is no GPIO dependency.
@@ -194,7 +236,59 @@ requires the matching daemon to restore and confirm promptly. Network/device dat
 remain in host SQLite; MCU flash stores only software, keys and update metadata.
 Bootloader updates remain separate from normal application updates.
 
-### Verification
+#### Development TI query application 0.7 — 2026-10-24
+
+The development CC2652P runs **0.7 at 460800**, with host 0.7 and the preserved
+0.2 signed-update bootloader. `query=transaction_v1` adds one retained, volatile
+complete state-query transaction beside the existing timed jobs and heartbeat.
+Both opcodes, CCA retries, round timing, deadline and fresh native-report stopping
+execute on the MCU. The Pi independently validates the retained frame and owns
+all authoritative persistent state. MG21 retains the host query fallback.
+
+The build uses 66915 bytes text, 1120 data and 16624 BSS, an additional 288 bytes
+BSS over 0.6. Package SHA-256:
+`9b0e13ee019f2b36c2a660fae3b823430bd12ce93ddde809ce5deefe1bc9c8ce`.
+See the [transaction contract](UART_PROTOCOL.md#complete-ti-state-query-transactions--release-07)
+and [Nordic comparison](../../analysis/development/ti-query-mcu-comparison-20261024.md).
+
+#### Earlier TI scheduler application 0.6 — 2026-10-24
+
+The preceding scheduler comparison ran **0.6 at 460800**, with host 0.6 and its original
+signed-update bootloader 0.2. The production UART updater transferred and confirmed
+the application without GPIO or ROM bootloader entry. The image uses 64963 bytes
+text, 1120 data and 16336 BSS; this is the verified 352 KiB / 80 KiB CC2652P.
+The package SHA-256 is
+`1396e9b652f28a73e6b9799085e30a604480252ab8d84fdcc1860c534e48f959`.
+
+Hardware checks cover 6000 UART requests, eight retained queue slots, cancellation,
+lease expiry, twelve seconds of host silence and twelve seconds of UART load.
+The [scheduler comparison](../../analysis/development/ti-scheduler-comparison-20261024.md)
+records the independent Nordic timing and bounded query results. This stage
+provides timed one-shot queues and autonomous heartbeats; query retry/freshness
+logic remains on the Pi. It does not reserve RF-core SFD deadlines.
+
+#### Earlier development TI application 0.4 — 2026-10-24
+
+The preceding comparison ran the update-enabled **0.4 application at 460800**.
+Its resident **0.2 bootloader** is preserved. A signed application-only transfer
+from the previous 115200 application was followed by a coordinated daemon baud
+migration and successful trial confirmation. This one-time migration used an
+explicit controller; the ordinary updater still requires baud-preserving updates.
+
+The package SHA-256 is
+`4ff851b26ec830a03cd7a7f80252387f27fd7ecef2ebccaf860a51ac0dcb49ce`.
+The verified board remains CC2652P, 352 KiB flash / 80 KiB SRAM; the build's
+text/data/BSS sizes are 61914 / 1120 / 14596 bytes. It advertises
+`phase_queries=10_ac_v1` and a 65536 Hz phase clock.
+
+The dry UART-v3 checks passed, followed by **6000/6000** alternating long CAPS
+replies and maximum-size CHECK requests, with no mismatches, timeouts or new
+reported input/drop counters. TI does not yet expose the MG21-specific hardware
+RX error counters, so this is a bounded transport check, not proof against every
+UART failure mode. See the [TI query comparison](../../analysis/development/ti-query-comparison-20261024.md)
+for on-air results and the final deployment state.
+
+## Verification
 
 ```sh
 python3 -m unittest discover -s firmware/update/tests -v
@@ -208,7 +302,7 @@ transaction step, invalid manifests, transfer bounds/replays and confirmation.
 They do not substitute for hardware power-fault qualification. Live deployment
 and rollback evidence is recorded separately in `analysis/development`.
 
-Release `0.2` is installed on the development CC2652P. Hardware checks passed
+Release `0.2` introduced signed updates on the development CC2652P. Hardware checks passed
 for signed UART transfer, daemon confirmation, timeout rollback, incomplete
 transfer reset and persistence across a confirmed software reboot. Routine
 checks used no GPIO operations or switch output commands. The initial trial
@@ -249,3 +343,39 @@ cleared configuration, all peers and the session, and rejected the old SEND.
 
 See [verification and handover](../../analysis/development/gateway-v3.md). The
 host-side agent has been given the v3 contract and exclusive radio ownership.
+
+## Application UART baud
+
+Both TI and MG21 accept `UART_BAUD=115200|230400|460800|921600` at build time.
+The default is 115200; use a clean TI build when changing it so the UART driver
+and shared capability response agree. The standalone v3 hardware checker takes
+`--baud 460800`; host hardware tools use the daemon configuration. Set the daemon JSON `serial_baudrate` to
+the same value. Startup and `CAPS baud=` report the compiled application rate.
+No live negotiation or network persistence is introduced. Higher rates require
+validation on each board/USB bridge; accepting a build value is not a hardware
+qualification. MG21 460800 verification is in `host/DEPLOYMENT.md`.
+
+ROM/Gecko bootloader transport stays at 115200. The TI signed updater communicates
+with the running application at its configured rate; ordinary application
+updates must preserve that rate. Changing it requires a coordinated host config
+migration, including the matching rate for any rollback image.
+
+## TI release 0.12 qualification (2026-11-01)
+
+The cod.m CC2652P build enables `EC_AUTO_ACK_PHASE=1`, matching the MG21
+profiles. It uses the shared MCU heartbeat, state-query and aligned output
+transaction implementation with TI's **65,536 Hz** scheduler clock. The
+200 ms grid uses fractional tick positions; output limits remain six attempts
+and four seconds. The Pi retains authoritative network and device state.
+
+`tests/test_output_grid_ti.py` exercises the native-clock fractional slots,
+32-bit wraparound, confirmation cancellation and automatic ACK phase stamps.
+The build and signed application package remain release **0.12**. This board
+is CC2652P (352 KiB flash / 80 KiB SRAM), not CC2652P7.
+
+See [the dated TI hardware verification](../../analysis/development/ti-012-20261101.md)
+for results and the deployment handoff. For the Docker deployment, stop/start
+with `livolodctl`; the updater's native `--service livolod` option must not
+start a second daemon. After trial activation, start the matching Docker
+release promptly so it restores the volatile radio configuration and confirms
+the image within the bootloader's 60-second trial window.

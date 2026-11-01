@@ -84,6 +84,11 @@ def heartbeat():
 
 
 class FirmwareUART(unittest.TestCase):
+    baudrate = 115200
+    scheduler = False
+    auto_ack_phase = False
+    rtimer_hz = 65536
+
     @classmethod
     def setUpClass(cls):
         """Build the real firmware core with deterministic platform test adapters."""
@@ -96,7 +101,7 @@ typedef uint32_t rtimer_clock_t;
 extern uint32_t test_clock;
 extern uint32_t test_rtimer;
 #define CLOCK_SECOND 128
-#define RTIMER_SECOND 65536
+#define RTIMER_SECOND TEST_RTIMER_HZ
 #define RTIMER_NOW() test_rtimer
 /**
  * @brief Expose the deterministic scheduler clock to firmware.
@@ -224,7 +229,7 @@ uint32_t test_clock;
 uint32_t test_rtimer;
 static char output[32768];
 static size_t used;
-static unsigned radio_sends;
+static unsigned radio_sends, radio_settings;
 static int radio_result;
 static uint32_t radio_latency;
 static uint8_t sent_raw[125];
@@ -242,15 +247,22 @@ static int setting(int a, int b)
 {
 	(void)a;
 	(void)b;
+	radio_settings++;
 	return 0;
+}
+
+/** @brief Count radio configuration changes.
+ * @return Configuration calls since fixture reset.
+ */
+unsigned test_settings(void)
+{
+	return radio_settings;
 }
 
 /**
  * @brief Record a radio transmission and expose the configured outcome.
- *
- * @param p Frame bytes to transmit.
- * @param n Number of frame bytes.
- *
+ * @param p Borrowed frame bytes to copy into the last-send buffer.
+ * @param n Number of frame bytes, at most 125.
  * @return Configured synthetic radio result.
  */
 static int send_raw(const void *p, unsigned n)
@@ -321,12 +333,32 @@ unsigned long ec_uart_dropped(void)
             + ("#undef section\n" if sys.platform == "darwin" else "")
             + """
 struct test_radio NETSTACK_RADIO = { setting, send_raw };
+#ifdef EC_ENABLE_SCHEDULER
+/** @brief Expose the fixture clock. @return Current precise ticks. */
+uint32_t ec_scheduler_now(void)
+{
+	return test_rtimer;
+}
+/**
+ * @brief Ignore real wake scheduling; tests explicitly advance and poll.
+ * @param active Whether a wake is required.
+ * @param due Absolute timer deadline.
+ */
+void ec_scheduler_alarm(int active, uint32_t due)
+{
+	(void)active;
+	(void)due;
+}
+#endif
 
 /**
  * @brief Restore a clean gateway and deterministic radio fixture.
  */
 void test_reset(void)
 {
+#ifdef EC_ENABLE_SCHEDULER
+	memset(&ec_scheduler, 0, sizeof(ec_scheduler));
+#endif
 	memset(&network, 0, sizeof(network));
 	memset(session, 0, sizeof(session));
 	legacy = ack_enabled = lease_seconds = metadata_enabled = revision =
@@ -336,7 +368,7 @@ void test_reset(void)
 	command_head = command_tail = input_pos = discard_line = last_id = 0;
 	memset(last_command, 0, sizeof(last_command));
 	memset(last_reply, 0, sizeof(last_reply));
-	test_clock = radio_sends = used = 0;
+	test_clock = radio_sends = radio_settings = used = 0;
 	output[0] = 0;
 	test_rtimer = radio_latency = sent_len = phase_valid =
 		phase_generation = 0;
@@ -363,12 +395,16 @@ const char *test_request(const char *text)
 	return output;
 }
 
+/** @brief Inject transport loss so the parser discards the partial line. */
+void test_rx_loss(void)
+{
+	input_byte(0);
+}
+
 /**
  * @brief Exercise UART framing and command queuing with a byte stream.
- *
- * @param text NUL-terminated stream of UART input bytes.
- *
- * @return Captured UART responses.
+ * @param text Borrowed NUL-terminated stream of UART input bytes.
+ * @return Captured UART responses in the fixture-owned static buffer.
  */
 const char *test_feed(const char *text)
 {
@@ -409,7 +445,7 @@ const char *test_receive(const uint8_t *raw, unsigned len)
 void test_advance(uint32_t ticks)
 {
 	test_clock += ticks;
-	test_rtimer += ticks * 512u;
+	test_rtimer += (uint64_t)ticks * RTIMER_SECOND / CLOCK_SECOND;
 }
 
 /**
@@ -462,6 +498,11 @@ unsigned test_sends(void)
             [
                 shutil.which("cc") or "cc",
                 "-std=c99",
+                f"-DEC_UART_BAUD={cls.baudrate}",
+                f"-DTEST_RTIMER_HZ={cls.rtimer_hz}",
+                f"-DEC_SCHED_HZ={cls.rtimer_hz}",
+                *(["-DEC_ENABLE_SCHEDULER=1"] if cls.scheduler else []),
+                *(["-DEC_AUTO_ACK_PHASE=1"] if cls.auto_ack_phase else []),
                 "-Wall",
                 "-Wextra",
                 "-Werror",
@@ -475,6 +516,7 @@ unsigned test_sends(void)
                 str(ROOT / "ec-peers.c"),
                 str(ROOT / "ec-protocol.c"),
                 str(ROOT / "ec-phase.c"),
+                *([str(ROOT / "ec-scheduler.c")] if cls.scheduler else []),
                 "-o",
                 str(library),
             ],
@@ -537,21 +579,50 @@ unsigned test_sends(void)
         """Handle phase clock wrap and replay the original transmitted bytes."""
         self.configured()
         self.arm()
-        self.lib.test_set_rtimer(0xFFFF0000)
+        self.lib.test_set_rtimer((-self.rtimer_hz) & 0xFFFFFFFF)
         self.lib.test_radio(0, 100)
         self.cmd(f"SEND {EPOCH} " + heartbeat().hex())
-        self.lib.test_set_rtimer(32768)  # 1.5 seconds across timer wrap.
+        self.lib.test_set_rtimer(self.rtimer_hz // 2)  # 1.5 seconds across timer wrap.
         command = f"SEND_PHASE {EPOCH} " + phased_frame().hex()
         response = self.cmd(command, request_id=1000)
         self.assertIn("timestamp=tx_entry", response)
-        self.assertIn("age_ticks=98304", response)
-        self.assertIn("entry_ticks=32768 return_ticks=32868", response)
+        self.assertIn(f"age_ticks={self.rtimer_hz * 3 // 2}", response)
+        self.assertIn(
+            f"entry_ticks={self.rtimer_hz // 2} return_ticks={self.rtimer_hz // 2 + 100}",
+            response,
+        )
         self.assertEqual(self.sent()[-3:].hex(), "ee7f01")
-        self.lib.test_set_rtimer(65536)
+        self.lib.test_set_rtimer(self.rtimer_hz)
         self.assertEqual(self.cmd(command, request_id=1000), response)
         self.assertEqual(self.lib.test_sends(), 2)
         self.cmd(command)
         self.assertEqual(self.sent()[-3:].hex(), "000002")
+
+    def test_phase_queries_require_observed_payload_and_preserve_replay_cache(self):
+        """Stamp only supported query forms and never retransmit a cached UART request."""
+        self.configured()
+        self.arm()
+        self.assertIn("phase_queries=10_ac_v1", self.cmd("CAPS"))
+        self.cmd(f"SEND {EPOCH} " + heartbeat().hex())
+        self.lib.test_set_rtimer(self.rtimer_hz // 2)
+        for index, opcode in enumerate((0x10, 0xAC)):
+            raw = bytearray(phased_frame())
+            raw[22] = opcode
+            raw[29:37] = bytes(7) + b"\x01"
+            raw[37] = sum(raw[21:37]) & 255
+            command = f"SEND_PHASE {EPOCH} " + raw.hex()
+            reply = self.cmd(command, request_id=1000 + index)
+            self.assertEqual(self.sent()[:38], raw[:38])
+            self.assertEqual(self.sent()[-3:].hex(), "ee7f00")
+            count = self.lib.test_sends()
+            self.assertEqual(self.cmd(command, request_id=1000 + index), reply)
+            self.assertEqual(self.lib.test_sends(), count)
+            for offset in (22, 29, 36):
+                invalid = bytearray(raw)
+                invalid[offset] ^= 1
+                invalid[37] = sum(invalid[21:37]) & 255
+                self.cmd(f"SEND_PHASE {EPOCH} " + invalid.hex(), "ERR FRAME_POLICY")
+            self.assertEqual(self.lib.test_sends(), count)
 
     def test_phase_probe_is_self_addressed_non_ec_and_cached(self):
         """Keep phase probes self-addressed, diagnostic-only, and replay-safe."""
@@ -585,7 +656,7 @@ unsigned test_sends(void)
         self.lib.test_radio(2, 0)
         self.cmd(f"SEND {EPOCH} " + heartbeat().hex(), "ERR TX 2")
         result = self.cmd(f"SEND_PHASE {EPOCH} " + phased_frame().hex(), "ERR TX 2")
-        self.assertIn("age_ticks=32768", result)
+        self.assertIn(f"age_ticks={self.rtimer_hz // 2}", result)
         self.assertIn("anchor_gen=1", result)
         self.lib.test_radio(1, 0)
         self.cmd(f"SEND {EPOCH} " + heartbeat().hex(), "ERR TX 1")
@@ -663,6 +734,7 @@ unsigned test_sends(void)
         """Advertise capabilities while keeping an unconfigured gateway inactive."""
         self.cmd("PING", "OK EC-GATEWAY 3")
         self.assertIn("peers=256", self.cmd("CAPS"))
+        self.assertIn(f"baud={self.baudrate} ", self.cmd("CAPS"))
         self.assertIn("configured=0", self.cmd("STATUS"))
         self.cmd(f"ARM {EPOCH} 1", "ERR NOT_CONFIGURED")
         self.assertNotIn("ACKTX", self.receive(report()))
@@ -790,6 +862,18 @@ unsigned test_sends(void)
         self.cmd("META 1")
         self.assertIn("RXMETA", self.receive(report()))
 
+    def test_transport_loss_discards_partial_command_through_newline(self):
+        """Lost bytes must not turn a damaged command into an executable one."""
+        self.configured()
+        self.arm()
+        self.lib.test_feed(b"901 DIS")
+        self.lib.test_rx_loss()
+        self.assertEqual(self.lib.test_feed(b"ARM\n"), b"")
+        self.assertIn("armed=1", self.cmd("STATUS"))
+        self.assertIn("input_errors=1", self.cmd("STATUS"))
+        self.assertIn(b"RSP 902 OK", self.lib.test_feed(b"902 DISARM\n"))
+        self.assertIn("armed=0", self.cmd("STATUS"))
+
     def test_malformed_queue_and_overflow_do_not_transmit(self):
         """Reject oversized or excess UART requests without radio transmission."""
         self.configured()
@@ -815,6 +899,12 @@ unsigned test_sends(void)
         self.assertNotIn("ACKTX", self.receive(bytes(bad)))
         for opcode in (1, 7, 0xFA):
             self.assertNotIn("ACKTX", self.receive(report(opcode=opcode)))
+
+
+class FastFirmwareUART(FirmwareUART):
+    """Exercise the same radio/parser contract at the alternate application rate."""
+
+    baudrate = 460800
 
 
 if __name__ == "__main__":

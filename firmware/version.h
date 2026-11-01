@@ -4,7 +4,7 @@
 #define EC_VERSION_MAJOR 0
 #endif
 #ifndef EC_VERSION_MINOR
-#define EC_VERSION_MINOR 2
+#define EC_VERSION_MINOR 12
 #endif
 #define EC_STRINGIFY_(x) #x
 #define EC_STRINGIFY(x) EC_STRINGIFY_(x)

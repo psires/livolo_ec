@@ -2,13 +2,45 @@
  * UART commands run in process context. Fast responses run in MAC input before
  * any logging. Boot/configuration/lease expiry all leave RF transmission off.
  */
+#ifdef EC_PLATFORM_MG21
+#include "ec-mg21-platform.h"
+#define EC_PLATFORM_POLL
+#define ec_platform_status ec_mg21_status
+#define ec_platform_bootloader ec_mg21_bootloader
+#elif defined(EC_PLATFORM_NRF52840)
+#include "ec-nrf-platform.h"
+#define EC_PLATFORM_POLL
+#define ec_platform_status ec_nrf_status
+#define ec_platform_bootloader ec_nrf_bootloader
+#else
 #include "contiki.h"
 #include "net/netstack.h"
 #include "dev/uart0-arch.h"
+#include <ti/drivers/dpl/HwiP.h>
+#define EC_BOARD_NAME "codm-cc2652p"
+#endif
 #include "ec-runtime.h"
+#include "ec-uart-config.h"
 #include "ec-protocol.h"
 #include "ec-peers.h"
 #include "ec-phase.h"
+#ifdef EC_ENABLE_SCHEDULER
+#include "ec-scheduler.h"
+#if EC_SCHED_HZ != RTIMER_SECOND
+#error Scheduler and phase timestamps must use the same clock
+#endif
+#define EC_SCHED_CAPS                                                          \
+	" scheduler=timed_v1 scheduler_slots=8 scheduler_hz=" EC_STRINGIFY(    \
+		EC_SCHED_HZ) " scheduler_horizon_ms=30000 "                    \
+			     "scheduler_late_ms=20 "                           \
+			     "tx_sequence=adapter_when_hb "                    \
+			     "query=transaction_v1 query_slots=1 "             \
+			     "query_ac=slot_preserved_v1 "                     \
+			     "query_grid=heartbeat_200ms_v1 "                  \
+			     "output_grid=transaction_200ms_v1"
+#else
+#define EC_SCHED_CAPS ""
+#endif
 #include "../version.h"
 #ifdef EC_ENABLE_UPDATES
 #include "ec-update-uart.h"
@@ -16,17 +48,24 @@
 #else
 #define EC_UPDATE_CAPS " update=none boot_version=unknown"
 #endif
-#include <ti/drivers/dpl/HwiP.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+
+#ifdef EC_AUTO_ACK_PHASE
+#define EC_ACK_PHASE_CAPS " auto_ack_phase=tx_entry_or_zero_v1"
+#else
+#define EC_ACK_PHASE_CAPS ""
+#endif
 
 #define LINE_SIZE 320
 #define COMMAND_SLOTS 4
 __attribute__((section(".fw_version"), used)) const char ec_build_version[] =
 	"EC-FW-VERSION=" EC_VERSION;
+#ifndef EC_PLATFORM_POLL
 PROCESS(gateway_process, "EC UART gateway");
 AUTOSTART_PROCESSES(&gateway_process);
+#endif
 static ec_network_t network;
 static uint8_t session[8];
 static unsigned legacy, ack_enabled, lease_seconds, metadata_enabled;
@@ -39,7 +78,7 @@ static char commands[COMMAND_SLOTS][LINE_SIZE];
 static volatile unsigned command_head, command_tail, input_pos, discard_line;
 static volatile unsigned long input_errors;
 static uint32_t last_id;
-static char last_command[LINE_SIZE], last_reply[768];
+static char last_command[LINE_SIZE], last_reply[1024];
 static unsigned phase_valid;
 static rtimer_clock_t phase_anchor_ticks;
 static clock_time_t phase_anchor_clock;
@@ -117,15 +156,16 @@ static int own_heartbeat(const uint8_t *raw, unsigned len)
  *
  * @return Nonzero for an eligible frame, otherwise zero.
  */
-static int phase_output_allowed(const uint8_t *raw, unsigned len)
+static int phase_frame_allowed(const uint8_t *raw, unsigned len)
 {
 	/* The network policy enforces identities, tag and checksum. */
 	return len == 41 && ec_network_tx_allowed(&network, raw, len) &&
 	       memcmp(raw + 3, network.gateway, 4) &&
 	       memcmp(raw + 3, "\xff\xff\xff\xff", 4) && zeros(raw + 11, 4) &&
 	       !memcmp(raw + 15, raw + 3, 4) && raw[20] == 0x1e &&
-	       raw[22] == 2 && !memcmp(raw + 23, raw + 3, 4) &&
-	       zeros(raw + 38, 3);
+	       (raw[22] == 2 || ((raw[22] == 0x10 || raw[22] == 0xac) &&
+				 zeros(raw + 29, 7) && raw[36] == 1)) &&
+	       !memcmp(raw + 23, raw + 3, 4) && zeros(raw + 38, 3);
 }
 
 /**
@@ -141,6 +181,9 @@ static int armed(void)
 		lease_seconds = 0;
 		ack_enabled = 0;
 		phase_clear();
+#ifdef EC_ENABLE_SCHEDULER
+		ec_scheduler_clear();
+#endif
 	}
 	return network.configured && lease_seconds != 0;
 }
@@ -155,19 +198,31 @@ static int armed(void)
  * @param fast Nonzero to bypass clear-channel assessment for a prompt reply.
  * @param phase Optional phase result; requests a trailer using the current
  *   reference.
+ * @param ack_wire Mutable automatic-reply bytes, or NULL for other sends.
+ *   With EC_AUTO_ACK_PHASE, stamp in place so ACKTX logs actual wire bytes.
  *
  * @return Radio status, -1 when disarmed, or -2 without a usable phase
  *   reference.
  */
 static int radio_send_impl(const uint8_t *raw, unsigned len, int fast,
-			   phase_tx_t *phase)
+			   phase_tx_t *phase, uint8_t *ack_wire)
 {
 	rtimer_clock_t entry;
 	clock_time_t entry_clock;
 	int result;
+#ifdef EC_ENABLE_SCHEDULER
+	uint8_t wire[125];
+#endif
 
 	if (!armed())
 		return -1;
+#ifdef EC_ENABLE_SCHEDULER
+	if (!fast && ec_scheduler.heartbeat_active) {
+		memcpy(wire, raw, len);
+		wire[2] = ++ec_scheduler.sequence;
+		raw = wire;
+	}
+#endif
 	if (!fast)
 		NETSTACK_RADIO.set_value(RADIO_PARAM_TX_MODE,
 					 RADIO_TX_MODE_SEND_ON_CCA);
@@ -192,6 +247,15 @@ static int radio_send_impl(const uint8_t *raw, unsigned len, int fast,
 		}
 		raw = phase->raw;
 	}
+#ifdef EC_AUTO_ACK_PHASE
+	/* Keep the immediate, no-CCA ACK path. Missing/stale references retain
+	 * the existing zero trailer rather than delaying or dropping the ACK. */
+	if (fast && ack_wire && phase_live(entry))
+		ec_phase_encode(entry - phase_anchor_ticks, RTIMER_SECOND,
+				ack_wire + len - 3);
+#else
+	(void)ack_wire;
+#endif
 	tx_attempts++;
 	result = NETSTACK_RADIO.send(raw, len);
 	if (phase)
@@ -224,7 +288,7 @@ static int radio_send_impl(const uint8_t *raw, unsigned len, int fast,
  */
 static int radio_send(const uint8_t *raw, unsigned len, int fast)
 {
-	return radio_send_impl(raw, len, fast, NULL);
+	return radio_send_impl(raw, len, fast, NULL, NULL);
 }
 
 /**
@@ -240,7 +304,7 @@ static void phase_send_reply(const uint8_t *raw, unsigned len, char *result,
 {
 	phase_tx_t tx;
 	char hex[251];
-	int r = radio_send_impl(raw, len, 0, &tx);
+	int r = radio_send_impl(raw, len, 0, &tx, NULL);
 
 	if (r == -2) {
 		snprintf(result, cap, "ERR PHASE_REFERENCE");
@@ -259,6 +323,109 @@ static void phase_send_reply(const uint8_t *raw, unsigned len, char *result,
 		 (unsigned long)tx.generation, (unsigned long)tx.age, hex);
 }
 
+#ifdef EC_ENABLE_SCHEDULER
+int ec_scheduler_phase_reference(uint32_t *anchor, uint32_t *generation)
+{
+	if (!phase_live(RTIMER_NOW()))
+		return 0;
+	*anchor = phase_anchor_ticks;
+	*generation = phase_generation;
+	return 1;
+}
+
+void ec_scheduler_transmit(ec_sched_tx_t *tx, int phase)
+{
+	phase_tx_t stamped = { 0 };
+
+	tx->entry = RTIMER_NOW();
+	tx->result = radio_send_impl(tx->raw, tx->len, 0,
+				     phase ? &stamped : NULL, NULL);
+	tx->returned = RTIMER_NOW();
+	if (phase && tx->result >= 0) {
+		tx->entry = stamped.entry;
+		tx->returned = stamped.returned;
+		tx->anchor = stamped.anchor;
+		tx->age = stamped.age;
+		tx->generation = stamped.generation;
+		memcpy(tx->raw, stamped.raw, stamped.len);
+	} else if (!phase && ec_scheduler.heartbeat_active) {
+		tx->raw[2] = ec_scheduler.sequence;
+	}
+}
+
+/**
+ * @brief Format retained queue and heartbeat diagnostics without draining jobs.
+ * @param out Output buffer.
+ * @param cap Output capacity including NUL.
+ */
+static void scheduler_status(char *out, size_t cap)
+{
+	unsigned i, pending = 0, done = 0;
+
+	for (i = 0; i < EC_SCHED_SLOTS; i++) {
+		pending += ec_scheduler.jobs[i].state == EC_SCHED_PENDING;
+		done += ec_scheduler.jobs[i].state == EC_SCHED_DONE;
+	}
+	snprintf(out, cap,
+		 "OK now=%lu free=%u pending=%u done=%u full=%lu late=%lu "
+		 "cancelled=%lu hb_active=%u hb_due=%lu hb_sent=%lu "
+		 "hb_missed=%lu hb_retries=%lu hb_late_max=%lu hb_last_due=%lu "
+		 "hb_last_entry=%lu hb_result=%d phase_valid=%u "
+		 "phase_anchor_ticks=%lu phase_anchor_gen=%lu",
+		 (unsigned long)RTIMER_NOW(), EC_SCHED_SLOTS - pending - done,
+		 pending, done, (unsigned long)ec_scheduler.full,
+		 (unsigned long)ec_scheduler.late,
+		 (unsigned long)ec_scheduler.cancelled,
+		 ec_scheduler.heartbeat_active,
+		 (unsigned long)ec_scheduler.heartbeat_due,
+		 (unsigned long)ec_scheduler.heartbeat_sent,
+		 (unsigned long)ec_scheduler.heartbeat_missed,
+		 (unsigned long)ec_scheduler.heartbeat_retries,
+		 (unsigned long)ec_scheduler.heartbeat_late_max,
+		 (unsigned long)ec_scheduler.heartbeat_last_due,
+		 (unsigned long)ec_scheduler.heartbeat_last_entry,
+		 ec_scheduler.heartbeat_result, phase_live(RTIMER_NOW()),
+		 (unsigned long)phase_anchor_ticks,
+		 (unsigned long)phase_generation);
+}
+/**
+ * @brief Read the retained transaction, latest TX and native confirmation.
+ * @param out Output buffer, never consumes the result.
+ * @param cap Available bytes including terminating NUL.
+ */
+static void query_status(char *out, size_t cap)
+{
+	ec_query_t *q = &ec_scheduler.query;
+	char tx[251], rx[79];
+
+	ec_hex(q->tx.raw, q->tx.len, tx);
+	ec_hex(q->report, q->report_len, rx);
+	snprintf(
+		out, cap,
+		"OK QUERY id=%lu state=%s outcome=%u started=%lu deadline=%lu "
+		"due=%lu rounds=%u sent=%u attempts=%u retries=%u late_max=%lu "
+		"tx_result=%d entry_ticks=%lu return_ticks=%lu "
+		"anchor_ticks=%lu "
+		"anchor_gen=%lu age_ticks=%lu raw=%s rx_ticks=%lu "
+		"rx_sequence=%lu "
+		"rssi=%d lqi=%u report=%s grid=%u grid_wait_ticks=%lu "
+		"grid_skips=%lu output=%u",
+		(unsigned long)q->id,
+		q->state == EC_SCHED_DONE ? "done" : "pending", q->outcome,
+		(unsigned long)q->started, (unsigned long)q->deadline,
+		(unsigned long)q->due, q->rounds, q->sent, q->attempts,
+		q->retries, (unsigned long)q->late_max, q->tx.result,
+		(unsigned long)q->tx.entry, (unsigned long)q->tx.returned,
+		(unsigned long)q->tx.anchor, (unsigned long)q->tx.generation,
+		(unsigned long)q->tx.age, q->tx.len ? tx : "-",
+		(unsigned long)q->rx_ticks, (unsigned long)q->rx_sequence,
+		q->rssi, q->lqi, q->report_len ? rx : "-", q->grid,
+		(unsigned long)q->grid_wait_ticks, (unsigned long)q->grid_skips,
+		q->output);
+}
+
+#endif
+
 void ec_receive(const uint8_t *raw, unsigned len, int rssi, unsigned lqi)
 {
 	uint8_t ack[41];
@@ -273,12 +440,17 @@ void ec_receive(const uint8_t *raw, unsigned len, int rssi, unsigned lqi)
 		ack_len = ec_network_ack(&network, raw, len, ack, sizeof(ack));
 		if (ack_len) {
 			ack_attempts++;
-			ack_result = radio_send(ack, ack_len, 1);
+			ack_result =
+				radio_send_impl(ack, ack_len, 1, NULL, ack);
 			if (ack_result == RADIO_TX_OK)
 				ack_ok++;
 			elapsed = RTIMER_NOW() - start;
 		}
 	}
+#ifdef EC_ENABLE_SCHEDULER
+	if (armed())
+		ec_query_receive(raw, len, start, received, rssi, lqi);
+#endif
 	/* Bulk receive logs may be dropped, but never stall an acknowledgement. */
 	if (len <= 125) {
 		int n = snprintf(line, sizeof(line), "RX %lu %lu %d %u %u ",
@@ -336,7 +508,9 @@ static int input_byte(unsigned char c)
 		} else if (input_pos) {
 			commands[command_head][input_pos] = 0;
 			command_head = next;
+#ifndef EC_PLATFORM_POLL
 			process_poll(&gateway_process);
+#endif
 		}
 		discard_line = 0;
 		input_pos = 0;
@@ -447,6 +621,9 @@ static void status(char *out, size_t cap)
 		 (unsigned long)clock_time(), phase_live(RTIMER_NOW()),
 		 (unsigned long)phase_anchor_ticks,
 		 (unsigned long)phase_generation);
+#ifdef EC_PLATFORM_POLL
+	ec_platform_status(out + strlen(out), cap - strlen(out));
+#endif
 }
 
 /**
@@ -457,7 +634,7 @@ static void status(char *out, size_t cap)
  */
 static void command(char *line)
 {
-	char original[LINE_SIZE], result[640] = "ERR SYNTAX";
+	char original[LINE_SIZE], result[896] = "ERR SYNTAX";
 	char *tok[8], *save = line;
 	char *t;
 	unsigned count = 0;
@@ -488,24 +665,37 @@ static void command(char *line)
 	}
 	if (count == 2 && !strcmp(tok[1], "PING")) {
 		strcpy(result, "OK EC-GATEWAY 3");
+#ifdef EC_PLATFORM_POLL
+	} else if (count == 2 && !strcmp(tok[1], "BOOTLOADER")) {
+		lease_seconds = 0;
+		ack_enabled = 0;
+		phase_clear();
+		NETSTACK_RADIO.off();
+		strcpy(result, "OK BOOTLOADER");
+#endif
 	} else if (count == 2 && !strcmp(tok[1], "VERSION")) {
-		strcpy(result, "OK fw_version=" EC_VERSION
-			       " board=codm-cc2652p proto=3" EC_UPDATE_CAPS);
+		strcpy(result,
+		       "OK fw_version=" EC_VERSION " board=" EC_BOARD_NAME
+		       " proto=3" EC_UPDATE_CAPS);
 	} else if (count == 2 && !strcmp(tok[1], "CAPS")) {
 		snprintf(result, sizeof(result),
 			 "OK proto=3 peers=%u ack_mask=1f max_raw=125 "
 			 "max_line=319 "
 			 "command_slots=3 request_cache=1 lease_max=60 "
 			 "session_bytes=8 "
-			 "channel=11 power_dbm=0 baud=115200 ticks_hz=%lu "
+			 "channel=11 power_dbm=0 baud=%lu ticks_hz=%lu "
 			 "ticks_bits=%u "
 			 "rtimer_hz=%lu rtimer_bits=%u rx_timestamp=callback "
 			 "meta=1 "
 			 "tx_policy=ec8c legacy_config=1 persistence=none "
 			 "phase=tx_entry_v1 phase_scale=65500 "
 			 "phase_max_ms=12000 phase_probe=1 "
-			 "fw_version=" EC_VERSION EC_UPDATE_CAPS,
-			 EC_PEER_CAPACITY, (unsigned long)CLOCK_SECOND,
+			 "phase_queries=10_ac_v1 "
+			 "board=" EC_BOARD_NAME
+			 " fw_version=" EC_VERSION EC_UPDATE_CAPS EC_SCHED_CAPS
+				 EC_ACK_PHASE_CAPS,
+			 EC_PEER_CAPACITY, (unsigned long)EC_UART_BAUD,
+			 (unsigned long)CLOCK_SECOND,
 			 (unsigned)(8 * sizeof(clock_time_t)),
 			 (unsigned long)RTIMER_SECOND,
 			 (unsigned)(8 * sizeof(rtimer_clock_t)));
@@ -516,6 +706,9 @@ static void command(char *line)
 		ack_enabled = 0;
 		lease_seconds = 0;
 		phase_clear();
+#ifdef EC_ENABLE_SCHEDULER
+		ec_scheduler_clear();
+#endif
 		strcpy(result, "OK DISARMED");
 #ifdef EC_ENABLE_UPDATES
 	} else if (!strncmp(tok[1], "UPDATE_", 7)) {
@@ -549,6 +742,10 @@ static void command(char *line)
 			ack_enabled = 0;
 			lease_seconds = 0;
 			phase_clear();
+#ifdef EC_ENABLE_SCHEDULER
+			ec_scheduler_clear();
+			ec_scheduler.last_id = 0;
+#endif
 			memcpy(session, epoch, 8);
 			revision++;
 			strcpy(result, "OK NETWORK DISARMED");
@@ -626,6 +823,10 @@ static void command(char *line)
 			ec_network_set(&network, candidate.gateway,
 				       candidate.tag);
 			ec_peer_set(&network, 0, candidate.device, EC_ACK_MASK);
+#ifdef EC_ENABLE_SCHEDULER
+			ec_scheduler_clear();
+			ec_scheduler.last_id = 0;
+#endif
 			memset(session, 0, 8);
 			legacy = 1;
 			revision++;
@@ -665,6 +866,160 @@ static void command(char *line)
 				strcpy(result, "ERR DISARMED");
 			}
 		}
+#ifdef EC_ENABLE_SCHEDULER
+	} else if (!strcmp(tok[1], "SCHED") || !strcmp(tok[1], "QUEUE") ||
+		   !strcmp(tok[1], "QGET") || !strcmp(tok[1], "QDROP") ||
+		   !strcmp(tok[1], "QCANCEL") || !strcmp(tok[1], "HEARTBEAT") ||
+		   !strcmp(tok[1], "QUERY") || !strcmp(tok[1], "QUERY_GRID") ||
+		   !strcmp(tok[1], "OUTPUT_GRID") ||
+		   !strcmp(tok[1], "QUERY_GET") ||
+		   !strcmp(tok[1], "QUERY_CANCEL") ||
+		   !strcmp(tok[1], "QUERY_DROP")) {
+		uint32_t job_id, due, grace, mode;
+		uint8_t raw[125];
+		int len, r;
+		ec_sched_job_t *job;
+
+		if (count < 3 || !session_valid(tok[2])) {
+			strcpy(result, "ERR SESSION");
+		} else if (!armed()) {
+			strcpy(result, "ERR DISARMED");
+		} else if (count == 3 && !strcmp(tok[1], "SCHED")) {
+			scheduler_status(result, sizeof(result));
+		} else if (count == 7 && !strcmp(tok[1], "OUTPUT_GRID")) {
+			uint8_t baseline[3];
+			len = ec_unhex(tok[6], raw, sizeof(raw));
+			if (!number(tok[3], &job_id) ||
+			    !number(tok[4], &mode) ||
+			    ec_unhex(tok[5], baseline, sizeof(baseline)) != 3) {
+				strcpy(result, "ERR SYNTAX");
+			} else if (len != 41 ||
+				   !phase_frame_allowed(raw, len) ||
+				   raw[22] != 2) {
+				strcpy(result, "ERR FRAME_POLICY");
+			} else if (!ec_scheduler.heartbeat_active) {
+				strcpy(result, "ERR HEARTBEAT_REQUIRED");
+			} else {
+				r = ec_output_begin(job_id, mode, baseline,
+						    raw);
+				strcpy(result, r == 0	 ? "OK OUTPUT"
+					       : r == -2 ? "ERR QUERY_BUSY"
+					       : r == -3 ? "ERR JOB_ID"
+							 : "ERR SCHEDULE");
+			}
+		} else if (count == 8 && (!strcmp(tok[1], "QUERY") ||
+					  !strcmp(tok[1], "QUERY_GRID"))) {
+			len = ec_unhex(tok[7], raw, sizeof(raw));
+			if (!number(tok[3], &job_id) || !number(tok[4], &due) ||
+			    !number(tok[5], &grace) || !number(tok[6], &mode)) {
+				strcpy(result, "ERR SYNTAX");
+			} else if (len != 41 ||
+				   !phase_frame_allowed(raw, len) ||
+				   (raw[22] != 0x10 && raw[22] != 0xac) ||
+				   (!strcmp(tok[1], "QUERY_GRID") &&
+				    raw[22] != 0xac)) {
+				strcpy(result, "ERR FRAME_POLICY");
+			} else if (!ec_scheduler.heartbeat_active) {
+				strcpy(result, "ERR HEARTBEAT_REQUIRED");
+			} else {
+				r = ec_query_begin(
+					job_id, due, grace, mode, raw,
+					!strcmp(tok[1], "QUERY_GRID"));
+				strcpy(result, r == 0	 ? "OK QUERY"
+					       : r == -2 ? "ERR QUERY_BUSY"
+					       : r == -3 ? "ERR JOB_ID"
+							 : "ERR SCHEDULE");
+			}
+		} else if (count == 4 && number(tok[3], &job_id) &&
+			   (!strcmp(tok[1], "QUERY_GET") ||
+			    !strcmp(tok[1], "QUERY_CANCEL") ||
+			    !strcmp(tok[1], "QUERY_DROP"))) {
+			ec_query_t *q = &ec_scheduler.query;
+			if (!q->state || q->id != job_id) {
+				strcpy(result, "ERR JOB_UNKNOWN");
+			} else if (!strcmp(tok[1], "QUERY_DROP")) {
+				if (q->state != EC_SCHED_DONE)
+					strcpy(result, "ERR JOB_PENDING");
+				else {
+					memset(q, 0, sizeof(*q));
+					strcpy(result, "OK DROPPED");
+				}
+			} else {
+				if (!strcmp(tok[1], "QUERY_CANCEL"))
+					ec_query_cancel();
+				query_status(result, sizeof(result));
+			}
+		} else if (count == 5 && !strcmp(tok[1], "HEARTBEAT")) {
+			len = ec_unhex(tok[4], raw, sizeof(raw));
+			if (!number(tok[3], &due) || len != 41 ||
+			    !own_heartbeat(raw, len))
+				strcpy(result, "ERR FRAME_POLICY");
+			else if (!ec_scheduler_heartbeat(due, raw))
+				strcpy(result, "ERR SCHEDULE");
+			else
+				strcpy(result, "OK HEARTBEAT");
+		} else if (count == 8 && !strcmp(tok[1], "QUEUE")) {
+			len = ec_unhex(tok[7], raw, sizeof(raw));
+			if (!number(tok[3], &job_id) || !number(tok[4], &due) ||
+			    !number(tok[5], &grace) || !number(tok[6], &mode)) {
+				strcpy(result, "ERR SYNTAX");
+			} else if (len < 3 || mode > 1 ||
+				   !ec_network_tx_allowed(&network, raw, len) ||
+				   (mode == 1
+					    ? (!phase_frame_allowed(raw, len) ||
+					       (raw[22] != 0x10 &&
+						raw[22] != 0xac))
+					    : (memcmp(raw + 3, network.gateway,
+						      4) ||
+					       memcmp(raw + 7, network.gateway,
+						      4)))) {
+				strcpy(result, "ERR FRAME_POLICY");
+			} else {
+				r = ec_scheduler_add(job_id, due, grace, mode,
+						     raw, len);
+				strcpy(result, r == 0	 ? "OK QUEUED"
+					       : r == -2 ? "ERR QUEUE_FULL"
+					       : r == -3 ? "ERR JOB_ID"
+							 : "ERR SCHEDULE");
+			}
+		} else if (count == 4 && number(tok[3], &job_id) &&
+			   (!strcmp(tok[1], "QGET") ||
+			    !strcmp(tok[1], "QCANCEL") ||
+			    !strcmp(tok[1], "QDROP"))) {
+			job = ec_scheduler_find(job_id);
+			if (!job) {
+				strcpy(result, "ERR JOB_UNKNOWN");
+			} else if (!strcmp(tok[1], "QDROP")) {
+				if (job->state != EC_SCHED_DONE)
+					strcpy(result, "ERR JOB_PENDING");
+				else {
+					memset(job, 0, sizeof(*job));
+					strcpy(result, "OK DROPPED");
+				}
+			} else {
+				char hex[251];
+				if (!strcmp(tok[1], "QCANCEL"))
+					ec_scheduler_cancel(job);
+				ec_hex(job->tx.raw, job->tx.len, hex);
+				snprintf(
+					result, sizeof(result),
+					"OK JOB id=%lu state=%s due=%lu "
+					"result=%d "
+					"entry_ticks=%lu return_ticks=%lu "
+					"anchor_ticks=%lu "
+					"anchor_gen=%lu age_ticks=%lu raw=%s",
+					(unsigned long)job->id,
+					job->state == EC_SCHED_DONE ? "done"
+								    : "pending",
+					(unsigned long)job->due, job->tx.result,
+					(unsigned long)job->tx.entry,
+					(unsigned long)job->tx.returned,
+					(unsigned long)job->tx.anchor,
+					(unsigned long)job->tx.generation,
+					(unsigned long)job->tx.age, hex);
+			}
+		}
+#endif
 	} else if (count == 4 && !strcmp(tok[1], "SEND_PHASE")) {
 		uint8_t raw[125];
 		int len = ec_unhex(tok[3], raw, sizeof(raw));
@@ -675,7 +1030,7 @@ static void command(char *line)
 			strcpy(result, "ERR SESSION");
 		else if (!armed())
 			strcpy(result, "ERR DISARMED");
-		else if (len < 0 || !phase_output_allowed(raw, len))
+		else if (len < 0 || !phase_frame_allowed(raw, len))
 			strcpy(result, "ERR FRAME_POLICY");
 		else
 			phase_send_reply(raw, len, result, sizeof(result));
@@ -733,6 +1088,11 @@ static void command(char *line)
 			strcpy(result, "ERR DISARMED");
 		} else if (!ec_network_tx_allowed(&network, raw, len)) {
 			strcpy(result, "ERR FRAME_POLICY");
+#ifdef EC_ENABLE_SCHEDULER
+		} else if (ec_scheduler.heartbeat_active &&
+			   own_heartbeat(raw, len)) {
+			strcpy(result, "ERR HEARTBEAT_OWNED");
+#endif
 		} else {
 			int r = radio_send(raw, len, 0);
 
@@ -745,14 +1105,77 @@ static void command(char *line)
 	snprintf(last_reply, sizeof(last_reply), "RSP %lu %s\n",
 		 (unsigned long)id, result);
 	uart0_write(last_reply, strlen(last_reply));
+#ifdef EC_PLATFORM_POLL
+	if (!strcmp(result, "OK BOOTLOADER"))
+		ec_platform_bootloader();
+#endif
 }
 
+static clock_time_t status_at;
+
+void ec_gateway_start(void)
+{
+	char line[180];
+	int n;
+
+	uart0_set_callback(input_byte);
+	n = snprintf(line, sizeof(line),
+		     "EC-GATEWAY 3 board=" EC_BOARD_NAME
+		     " baud=%lu ticks=%lu rtimer_hz=%lu tx=disabled "
+		     "fw_version=" EC_VERSION "\n",
+		     (unsigned long)EC_UART_BAUD, (unsigned long)CLOCK_SECOND,
+		     (unsigned long)RTIMER_SECOND);
+	uart0_write(line, n);
+	status_at = clock_time();
+#ifdef EC_ENABLE_UPDATES
+	ec_update_init();
+#endif
+}
+
+void ec_gateway_poll(void)
+{
+#ifdef EC_ENABLE_UPDATES
+	ec_update_poll();
+#endif
+	/* Expire leases even when neither UART nor RF traffic is arriving. */
+	(void)armed();
+#ifdef EC_ENABLE_SCHEDULER
+	if (armed())
+		ec_scheduler_poll();
+#endif
+	while (command_tail != command_head) {
+		char line[LINE_SIZE];
+		uintptr_t key = HwiP_disable();
+
+		strcpy(line, commands[command_tail]);
+		command_tail = (command_tail + 1) % COMMAND_SLOTS;
+		HwiP_restore(key);
+		command(line);
+#ifdef EC_ENABLE_SCHEDULER
+		if (armed())
+			ec_scheduler_poll();
+#endif
+	}
+	if ((clock_time_t)(clock_time() - status_at) >= 5 * CLOCK_SECOND) {
+#ifdef EC_PLATFORM_POLL
+		char line[896];
+#else
+		char line[700];
+#endif
+
+		strcpy(line, "STATUS ");
+		status(line + 7, sizeof(line) - 9);
+		strcat(line, "\n");
+		uart0_write(line, strlen(line));
+		status_at = clock_time();
+	}
+}
+
+#ifndef EC_PLATFORM_POLL
 /**
- * @brief Service queued UART requests, update deadlines and periodic status.
- *
+ * @brief Run the shared gateway from the Contiki scheduler.
  * @param ev Contiki event that resumes the gateway process.
  * @param data Event-specific payload supplied by Contiki.
- *
  * @return Contiki protothread scheduling state.
  */
 PROCESS_THREAD(gateway_process, ev, data)
@@ -760,37 +1183,14 @@ PROCESS_THREAD(gateway_process, ev, data)
 	static struct etimer heartbeat;
 
 	PROCESS_BEGIN();
-	uart0_set_callback(input_byte);
-	printf("EC-GATEWAY 3 board=codm-cc2652p baud=115200 ticks=%lu "
-	       "rtimer_hz=%lu tx=disabled fw_version=" EC_VERSION "\n",
-	       (unsigned long)CLOCK_SECOND, (unsigned long)RTIMER_SECOND);
-	etimer_set(&heartbeat, 5 * CLOCK_SECOND);
-#ifdef EC_ENABLE_UPDATES
-	ec_update_init();
-#endif
+	ec_gateway_start();
+	etimer_set(&heartbeat, CLOCK_SECOND);
 	while (1) {
 		PROCESS_YIELD();
-#ifdef EC_ENABLE_UPDATES
-		ec_update_poll();
-#endif
-		while (command_tail != command_head) {
-			char line[LINE_SIZE];
-			uintptr_t key = HwiP_disable();
-
-			strcpy(line, commands[command_tail]);
-			command_tail = (command_tail + 1) % COMMAND_SLOTS;
-			HwiP_restore(key);
-			command(line);
-		}
-		if (etimer_expired(&heartbeat)) {
-			char line[700];
-
-			strcpy(line, "STATUS ");
-			status(line + 7, sizeof(line) - 9);
-			strcat(line, "\n");
-			uart0_write(line, strlen(line));
+		ec_gateway_poll();
+		if (etimer_expired(&heartbeat))
 			etimer_reset(&heartbeat);
-		}
 	}
 	PROCESS_END();
 }
+#endif

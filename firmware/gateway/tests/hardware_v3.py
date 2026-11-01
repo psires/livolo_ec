@@ -13,14 +13,15 @@ from test_uart_v3 import report, GW, DEV
 
 
 class Client:
-    def __init__(self, port, log):
+    def __init__(self, port, log, baudrate=115200):
         """Open an exclusive UART connection and a fresh timestamped log.
 
         @param port UART device path to open exclusively.
-        @param log Path for a new timestamped UART log."""
+        @param log Path for a new timestamped UART log.
+        @param baudrate Application baud matching the firmware build."""
         self.log = log.open("x")
         self.uart = serial.Serial(
-            port, 115200, timeout=0.05, write_timeout=1, exclusive=True
+            port, baudrate, timeout=0.05, write_timeout=1, exclusive=True
         )
         self.id = secrets.randbelow(0xFFFFFF00) + 1
         self.records = []
@@ -96,6 +97,9 @@ def main():
     """Run the selected bounded hardware checks and save their results."""
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--port", required=True)
+    p.add_argument(
+        "--baud", type=int, choices=(115200, 230400, 460800, 921600), default=115200
+    )
     p.add_argument("--log", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
     p.add_argument("--air", action="store_true")
@@ -104,10 +108,11 @@ def main():
     args = p.parse_args()
     if args.output.exists() or args.air and args.boot_only:
         p.error("Choose new output and one mode")
-    c = Client(args.port, args.log)
+    c = Client(args.port, args.log, args.baud)
     epoch = secrets.token_hex(8)
     result = {
         "session": epoch,
+        "baudrate": args.baud,
         "checks": [],
         "air": args.air,
         "boot_only": args.boot_only,
@@ -236,7 +241,11 @@ def main():
                 int(fields(c.command("STATUS"))["input_errors"]) >= 1,
             )
             before = fields(c.command("STATUS"))
-            check("no RF transmissions during dry checks", before["tx"] == "0")
+            check(
+                "no RF transmissions during dry checks",
+                before["tx"] == result["initial_status"]["tx"]
+                and before["ack_tx"] == result["initial_status"]["ack_tx"],
+            )
             if args.air:
                 c.command(f"PEER SET 255 {DEV} 1f")
                 c.command(f"ARM {epoch} 30")

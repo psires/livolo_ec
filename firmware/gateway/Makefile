@@ -6,6 +6,14 @@ BOARD = launchpad/codm-cc2652p
 MAKE_NET = MAKE_NET_NULLNET
 MAKE_MAC = MAKE_MAC_OTHER
 PROJECT_SOURCEFILES += ec-mac.c ec-protocol.c ec-peers.c ec-phase.c
+SCHEDULER ?= 1
+ifeq ($(SCHEDULER),1)
+CFLAGS += -DEC_ENABLE_SCHEDULER=1
+PROJECT_SOURCEFILES += ec-scheduler.c ec-scheduler-ti.c
+endif
+UART_BAUD ?= 115200
+CFLAGS += -DEC_UART_BAUD=$(UART_BAUD)
+CFLAGS += -DEC_AUTO_ACK_PHASE=1
 UPDATE_SUPPORT ?= 0
 ifeq ($(UPDATE_SUPPORT),1)
 KEY_DIR ?= ../../.local/firmware-keys

@@ -2,6 +2,12 @@
 #include "ec-protocol.h"
 #include <string.h>
 
+/**
+ * @brief Calculate the EC CRC-16/CCITT payload checksum.
+ * @param p Borrowed payload buffer with at least n readable bytes.
+ * @param n Number of payload bytes.
+ * @return CRC-16/CCITT with initial value 0xffff.
+ */
 uint16_t ec_crc16(const uint8_t *p, size_t n)
 {
 	uint16_t crc = 0xffff;

@@ -8,7 +8,8 @@ extern const struct mac_driver ec_gateway_mac_driver;
 #define IEEE802154_CONF_DEFAULT_CHANNEL 11
 #define IEEE_MODE_CONF_PROMISCOUS 1
 #define IEEE_MODE_CONF_AUTOACK 0
-#define TI_UART_CONF_BAUD_RATE 115200
+#include "ec-uart-config.h"
+#define TI_UART_CONF_BAUD_RATE EC_UART_BAUD
 #define TI_SPI_CONF_ENABLE 0
 #define TI_I2C_CONF_ENABLE 0
 #define TI_NVS_CONF_ENABLE 0

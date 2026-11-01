@@ -17,7 +17,8 @@ radio; the MAC FCS is removed from accepted frames before UART output.
 - CMSIS submodule `2b7495b8535bdcb306dac29b9ded4cfb679d7e5c`
 - Debian ARM GCC / newlib packages: `gcc-arm-none-eabi libnewlib-arm-none-eabi`
 
-The repository does not vendor these dependencies. Their upstream licenses apply.
+The repository does not vendor these dependencies. Their upstream licenses apply;
+see [third-party notices](../THIRD_PARTY_NOTICES.md).
 The generated board adapter copies the licensed CC1352P-2 BSP, retaining notices.
 That BSP already uses module UART RX DIO12 / TX DIO13 and the P2 antenna-switch
 mapping. The adapter removes LaunchPad external flash initialization/pins and
@@ -34,7 +35,8 @@ power configuration; the complete generated CCFG block was compared byte for byt
 `toolchain-compat.h` supplies a type-checked missing PRIx64 macro for Debian's
 newlib 4.5 headers, used by an upstream debug log that is disabled in this build.
 
-The normal build with the pin fix is flashed and running. Full-image ROM CRC32
+In the initial bring-up, the normal build with the pin fix ran successfully.
+Full-image ROM CRC32
 `7d1c9fe2` matched, startup completed, and channel-11 EC frames are received over
 UART. Periodic status confirms `rx_mode=0` (no address filtering or auto-ACK).
 See the development bring-up notes for capture comparison results and limitations.

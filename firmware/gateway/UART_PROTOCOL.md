@@ -1,8 +1,20 @@
 # EC radio UART protocol v3
 
-Host integration contract. UART: `/dev/ttyAMA0`, 115200 8N1, no flow control.
+Host integration contract. Application UART: 8N1, no flow control; default 115200.
+The firmware build selects `UART_BAUD=115200|230400|460800|921600`; the host
+`serial_baudrate` must match. `CAPS baud=` and the startup banner report the build
+rate. This is not live baud negotiation and does not persist a setting to flash.
+MG21 Gecko recovery and TI ROM recovery remain at 115200, independently of the
+application rate. A baud-changing release needs coordinated firmware/config
+migration; normal updates should preserve the installed rate.
 One exclusive owner, one outstanding request. No settings are written to flash.
 This is a guarded EC radio adapter, not a Zigbee coordinator or device database.
+
+MG21 additionally reports `radio_drops`, `uart_rx_errors`, `uart_rx_overruns`,
+`uart_framing_errors` and `uart_parity_errors` in STATUS. The three specific UART
+counters classify observed hardware flags; a single observation can contain more
+than one flag, and counts are not a byte-loss total. `board=zb-gw04-1v2` and
+`board=sonoff-zbdongle-e` identify the supported MG21 wiring profiles.
 
 ## Framing and lifecycle
 
@@ -59,7 +71,9 @@ reports. Mask `1f` is the currently verified profile. Bit `10` has no effect
 without bit `01`. Unknown bits are rejected. No broadcast keepalive, admission,
 announcement or ACK-of-ACK response is implemented. A valid checksum, configured
 tag, and matching immediate source AND subject are required for automatic ACKs.
-Existing ACK body/sequence construction and zero timing trailer are unchanged.
+Existing ACK body/sequence construction is unchanged. Profiles advertising
+`auto_ack_phase` stamp the timing trailer as described below; other profiles
+retain the zero trailer.
 
 Use a newly generated nonzero session per NETWORK installation. It is an opaque
 host-provided incarnation identifier, not a secret or authentication mechanism.
@@ -107,7 +121,7 @@ lease (configured duration, not remaining), rx/tx/tx_ok/ack_tx/ack_ok, rx_drops,
 uart_drops (bytes), meta_drops (records), input_errors and ticks. Counters wrap
 at 32 bits and reset at boot. Revision advances on successful network/table edits.
 Keep RX processing separate from outstanding command response handling. UART
-115200 is a throughput limit: all raw frames are exposed; this is not a lossless
+serialization (especially at the default 115200) limits throughput: all raw frames are exposed; this is not a lossless
 capture guarantee. Detect gaps and counter increases; a missing log does not mean
 the radio failed to ACK. Use Nordic timestamps for real over-air measurements.
 
@@ -137,10 +151,12 @@ RX/ACKTX formats remain compatible with existing capture tools.
 The example session is illustrative; generate a fresh one. No host heartbeats,
 pairing policy, route selection, device names, output state, transaction-token
 allocation, MQTT, or authoritative persistence belong in this firmware.
-# Experimental phase extension (flashed; diagnostic validation only)
+# Experimental phase extension
 
 The source now advertises the optional capability `phase=tx_entry_v1`, with
-`phase_scale=65500 phase_max_ms=12000 phase_probe=1`. Do not infer this capability
+`phase_scale=65500 phase_max_ms=12000 phase_probe=1`. Release 0.3 additionally
+advertises `phase_queries=10_ac_v1` for the observed read-only query forms.
+Do not infer these capabilities
 from `proto=3`: deployed older v3 firmware does not implement it. Runtime use
 must remain opt-in. The first independent Nordic diagnostic run passed; device
 output acceptance and timing under CCA contention remain unverified. See
@@ -157,12 +173,19 @@ timestamp. No fitted constant offset is applied.
 `ID SEND_PHASE SESSION RAWHEX`
 
 Requires the normal configured modern session and live lease. Only 41-byte,
-checksum-valid `8c/02` frames addressed directly to a configured peer are
-accepted: source/tag match the network, route A is zero, route B and subject
+checksum-valid `8c/02` frames, or `8c/10` and `8c/ac` with the exact data
+`0000000000000001` when `phase_queries=10_ac_v1` is advertised, are
+accepted. Frames must be addressed directly to a configured peer:
+source/tag match the network, route A is zero, route B and subject
 equal the destination, flags are `1e`, and the supplied trailer is zero. Other
 forms return `ERR FRAME_POLICY`; there is no fallback to raw transmission.
 The three trailer bytes are replaced at radio entry; application bytes and
 checksum remain unchanged.
+
+The extension does not schedule transmissions or add retries. The host retains
+the existing query rounds, response waits, heartbeat schedule and cancellation
+on fresh state. Missing/expired phase references are definite non-sends; once
+phase queries are selected, errors must not silently fall back to raw queries.
 
 `ID PHASE_PROBE SESSION SEQ2HEX NONCE8HEX`
 
@@ -311,3 +334,327 @@ The host confirms only its matching release, after capability, peer-table,
 ARM/ACK and (when enabled) heartbeat-reference checks. It then persists a fresh
 firmware status in SQLite for update orchestration. Firmware update metadata is
 not authoritative network state; the host still reconstructs all peers/sessions.
+
+## TI timed queues and heartbeat ownership — release 0.6
+
+This additive UART v3 capability was introduced by the TI scheduler build:
+` scheduler=timed_v1 scheduler_slots=8 scheduler_hz=65536
+scheduler_horizon_ms=30000 scheduler_late_ms=20 tx_sequence=adapter_when_hb`.
+MG21 also implements it in release 0.7, with `scheduler_hz=1000000`.
+All state below is volatile;
+NETWORK, reset, DISARM and lease expiry remove scheduled work and heartbeat
+ownership. Authoritative registry, admission/pairing, routing and persistence
+remain host responsibilities. The existing ARM/ACK session and lease rules apply.
+
+Times are wrapping unsigned 32-bit MCU ticks at the advertised `scheduler_hz`
+(**65536 ticks/s on TI, 1000000 on MG21**), matching `rtimer_hz`, not wall clock
+or RF SFD time. Targets must be strictly in the future and at most 30 seconds
+away, so signed-difference ordering is unambiguous across wrap. MG21's existing
+continuously runnable main loop polls RAIL time before and between UART commands;
+it does not sleep or need a wake timer. Adding sleep requires a timer wake adapter.
+The TI ClockP
+hardware timer wakes the Contiki process at the next deadline. The existing
+radio driver then sends in process context; this stage does **not** reserve an
+RF-core absolute SFD slot. CCA and radio-driver latency follow dispatch. Use
+reported timestamps and Nordic measurements to distinguish those intervals.
+
+Every command retains the ordinary decimal request-ID prefix and `RSP` envelope:
+
+| Command body | Meaning / response |
+| --- | --- |
+| `SCHED session` | `OK now=... free=... pending=... done=... full=... late=... cancelled=... hb_active=... hb_due=... hb_sent=... hb_missed=... hb_retries=... hb_late_max=... hb_last_due=... hb_last_entry=... hb_result=... phase_valid=... phase_anchor_ticks=... phase_anchor_gen=...` |
+| `QUEUE session job due grace mode hex` | Copy one validated frame to a free RAM slot; `OK QUEUED` means accepted, not transmitted or confirmed. |
+| `QGET session job` | Read a retained pending/done job; never consumes it. |
+| `QCANCEL session job` | Cancel only if pending, retaining the outcome; already completed jobs remain completed. |
+| `QDROP session job` | Free a completed slot; pending jobs return `ERR JOB_PENDING`. |
+| `HEARTBEAT session first_due hex` | Install a validated 41-byte heartbeat template; fixed ten-second period, `OK HEARTBEAT`. A second installation while active is rejected. |
+
+Queue jobs use strictly increasing nonzero 32-bit identities within a session.
+Reusing an identity, including after QDROP or disarm/rearm, returns `ERR JOB_ID`.
+Installing a fresh NETWORK session resets that high water mark. Normal UART
+request-ID replay still returns the cached acceptance without adding a second
+job. Queue-full rejection does not consume a job identity. The eight slots hold
+both pending jobs and terminal results; a slow host cannot lose a completion
+because a UART event queue overflowed. It must explicitly drain results to regain
+credits. Heartbeats have a separate slot and are not blocked by queue exhaustion.
+
+`grace` is 1–6553 ticks (at most approximately 100 ms) and bounds process-dispatch
+lateness, not radio completion. Expired jobs are completed without transmission.
+`mode=0` permits only already-approved self-addressed diagnostics; `mode=1`
+permits only the captured direct `10/ac` read-only query form with a zero input
+phase trailer. Output commands and extra heartbeat injections cannot be queued.
+Normal SEND/SEND_PHASE remain available. Their existing limits do not change.
+
+QGET/QCANCEL return:
+
+```
+OK JOB id=... state=pending|done due=... result=... entry_ticks=... return_ticks=... anchor_ticks=... anchor_gen=... age_ticks=... raw=...
+```
+
+Only `state=done` makes the result meaningful. Codes 0–3 preserve radio-driver
+semantics (0 sent, 2 definite CCA non-send, other failures have uncertain radio
+outcomes). Negative results are -1 disarmed, -2 missing phase reference, -3 late
+without sending, and -4 cancelled before dispatch. Phase jobs stamp at actual
+radio-call entry, with the same guarded metadata as SEND_PHASE. A successful TX
+is not a native state confirmation. In release 0.6 the daemon's query algorithm
+owned freshness checks, retry rounds and early stopping; release 0.7 adds the
+complete query transactions described below. Do not prequeue query retries without a suitable
+cancellation/freshness policy.
+
+A heartbeat's successive nominal deadlines are `first_due + n * 10 * scheduler_hz`, even
+after host stalls or radio failures. Its captured payload seconds counter advances
+by ten per slot, including skipped slots; no network records are written to
+flash. A dispatch more than 20 ms late skips the slot. Definite CCA busy retains
+the existing **four total attempts** and **25/50/75 ms** backoff (rounded upward
+to MCU ticks). Retry deadlines use the MCU timer and never shift the periodic
+epoch. Exhausted or other failed slots are reported as missed; there is no
+catch-up burst. ACKs remain handled before UART logging.
+
+While heartbeat ownership is active, firmware allocates MAC sequence bytes for
+all non-automatic-ACK transmissions so independent host/heartbeat counters do not
+collide. The host validates returned frames with only MAC byte 2 and the phase
+trailer permitted to change, gated by `tx_sequence=adapter_when_hb`. Automatic
+ACK sequence semantics remain unchanged. A host SEND of another heartbeat is
+rejected with `ERR HEARTBEAT_OWNED`.
+
+The daemon negotiates this capability only on its phase-capable path, installs
+one heartbeat schedule during session restoration, verifies the first live phase
+anchor before readiness/update confirmation, then monitors ownership and renews
+the existing lease. It polls status for diagnostics; those polls do not drive the
+ten-second cadence. Missing ownership triggers session recovery. Adapters lacking
+the capability use the existing host-driven heartbeat path. Query limits remain
+three rounds, a 14-second scheduling deadline and four CCA attempts per send;
+the production query waits remain 224 ms at 460800 and 4.000 seconds per round.
+
+## Complete TI state-query transactions — release 0.7
+
+TI and MG21 additionally advertise `query=transaction_v1 query_slots=1`. This is one
+separate retained RAM transaction slot, alongside the eight one-shot slots and
+heartbeat slot. The daemon's command worker already serializes operations. The
+Pi supplies the authorized peer/suffix, output mask and timing profile; registry,
+pairing, routing, desired state and persistence remain on the Pi. Older images
+without this capability retain their existing host-driven query fallback.
+
+| Command body | Meaning |
+| --- | --- |
+| `QUERY session id pair_ticks wait_ticks mask hex` | Accept one direct opcode-10 template; reply `OK QUERY` is acceptance only. Firmware generates opcode ac and all bounded retries. |
+| `QUERY_GET session id` | Read retained progress, final outcome, latest TX metadata and confirming native frame. |
+| `QUERY_CANCEL session id` | Stop pending execution and retain cancellation; a completed outcome is unchanged. |
+| `QUERY_DROP session id` | Release a terminal result; pending transactions return `ERR JOB_PENDING`. |
+
+Job IDs share the one-shot queue's strictly increasing session high-water mark.
+A retained slot returns `ERR QUERY_BUSY` to another transaction. Dropping a
+result does not permit ID reuse. NETWORK, DISARM, reset and lease expiry clear
+the entire transaction. The normal session/lease/frame-policy checks apply, and
+MCU heartbeat ownership is required. Neither output commands nor arbitrary
+query payloads can enter this engine.
+
+The fixed bounds are **three rounds**, **10 then ac**, **four total CCA attempts
+per opcode**, **25/50/75 ms** CCA backoff and a **14-second deadline from
+acceptance**. Successful logical sends are at most six; dispatch attempts at
+most 24. Every send checks the transaction state and deadline. Definite CCA
+exhaustion consumes that logical opcode; uncertain radio failures terminate with
+an error. A missing phase reference suppresses that opcode, as on the legacy
+host path. A radio call already in progress may finish after its deadline, but
+no subsequent call starts. A valid state report suppresses all remaining work,
+including a scheduled CCA retry or the second half of a pair.
+
+`pair_ticks` is a successful 10 TX-entry to ac TX-entry interval (approximately
+200–300 ms permitted). `wait_ticks` is ac TX-entry to the next round, or to final
+timeout (4.0–4.1 seconds permitted). Units follow `scheduler_hz`. CCA failures consume
+their bounded backoff before the next logical operation is scheduled. For a
+definite non-send/missing phase, the following interval starts at completion of
+that operation. Delayed dispatch is measured by `late_max`; it never extends the
+14-second limit. Heartbeats retain priority and their absolute epoch.
+
+On TI the host selects **15434 ticks** (235.504 ms) and **262930 ticks**
+(4.011993 s), matching the preceding TI capture's approximately 235.5 ms pair
+and 4.248 s round-start intervals. This replaces the former 224 ms host sleep
+plus UART round-trip overhead with explicit MCU timing. The experiment's extra
+23 ms response wait selects 264438 ticks instead. Retry limits are unchanged;
+`diagnostics.query_execution` distinguishes the MCU wire profile from the
+legacy host sleeps in `diagnostics.query_timing`.
+
+On MG21 the same time profile uses **235500** and **4012000** ticks, or
+**4035000** ticks for the experimental extra wait. The clock wraps after about
+71.6 minutes, handled by the same bounded modular comparisons. Release 0.7's
+Sonoff port has passed build, deterministic core/host tests, dry UART checks and
+a 24-request captured comparison (21 confirmed). An earlier interrupted run
+recorded one UART RX overrun, so UART robustness remains an open issue; see the
+[Sonoff evidence](../../analysis/development/sonoff-query-mcu-comparison-20261024.json).
+The MG21
+bootloader/update mechanism is unchanged: Gecko application upload at 115200,
+not TI's signed update or rollback protocol.
+
+The response format is:
+
+```
+OK QUERY id=... state=pending|done outcome=... started=... deadline=... due=... rounds=... sent=... attempts=... retries=... late_max=... tx_result=... entry_ticks=... return_ticks=... anchor_ticks=... anchor_gen=... age_ticks=... raw=... rx_ticks=... rx_sequence=... rssi=... lqi=... report=...
+```
+
+Outcomes are 0 pending, 1 confirmed, 2 timeout, 3 cancelled and 4 uncertain radio
+error. `tx_result` retains the underlying radio/phase result. `raw` is the latest
+attempt, or `-` before an attempt; `report` is the confirming 39-byte native
+frame, or `-`. Results survive UART logging drops until explicitly released.
+The engine runs from MCU timer wakes, never from host status polls. Timestamps
+still describe process/radio-call entry and receive callback, **not RF SFD**.
+
+Freshness preserves the existing read-query rule: a valid native 9e/05 callback
+after acceptance and before the deadline, matching the exact peer, subject,
+suffix, network tag, gateway/broadcast destination, CRC and allowed output bits.
+The body must start 01/00; mask zero is valid. A repeated or wrapped report
+counter is accepted because this is a fresh observation, not proof of an output
+transition. A query ACK (`fa/10` or `fa/ac`) cannot confirm. There is no wire nonce
+that proves the state report was caused by this query, and receive callback time
+does not prove RF arrival time for a frame already buffered by the driver.
+
+The host validates the retained frame independently before accepting/persisting
+state. It uses RX sequence ordering to avoid applying a retained frame twice or
+letting a delayed older RX log replace newer state. It drains completed results
+without creating additional radio retries. Loss of session/transport produces
+an unknown outcome and normal session reconciliation; it does not replay an
+uncertain transaction. Physical output control remains on the existing path.
+
+### Optional AC-only comparison — release 0.8
+
+`query_ac=slot_preserved_v1` permits an opcode-`ac` template in the existing
+`QUERY` command. All frame/session/peer/mask validation still applies. The
+normal opcode-`10` template retains release 0.7 behavior.
+
+An `ac` template leaves each round's preparation slot silent: at the round's
+start the MCU increments `rounds`, waits `pair_ticks`, then transmits `ac` with
+normal phase stamping. After that it waits `wait_ticks` before starting the
+next round. Thus removing `10` does not advance the nominal AC slots or shorten
+the round period. No transmission, attempt or CCA retry is counted for a silent
+slot. Radio contention can still delay actual transmission; an omitted `10`
+necessarily cannot experience CCA backoff.
+
+Limits remain three rounds, four CCA attempts per transmitted frame with
+25/50/75 ms backoff, and a 14-second transaction deadline. AC-only therefore has
+at most three successful query transmissions and twelve CCA attempts (nine
+retries), rather than reallocating the unused preparation budget to more ACs.
+Fresh native reports stop either sequence using the same validation. Identity,
+leases and all authoritative persistent state remain on the Pi.
+
+The host `SchedulerClient.start_query(..., ac_only=True)` gates this mode on the
+capability; default calls remain paired queries. No persistent configuration or
+automatic migration to AC-only is enabled by this release.
+
+### Heartbeat-relative AC grid — release 0.9
+
+`query_grid=heartbeat_200ms_v1` advertises the optional
+`QUERY_GRID session id pair_ticks wait_ticks mask hex` command. It accepts only
+a validated AC-only template, returns `OK QUERY`, and uses the same retained
+slot and `QUERY_GET/CANCEL/DROP` commands as `QUERY`. Ordinary paired and AC-only
+`QUERY` behavior is unchanged.
+
+The preparation slot and response-wait targets remain eligibility minima.
+Every eligible AC attempt, including a CCA retry, is deferred to the next
+200 ms boundary measured from the last successfully transmitted heartbeat's
+radio-entry timestamp. The current phase reference is checked again before
+sending; a new heartbeat updates the grid origin. A slot missed by more than
+1 ms is skipped, and a missing live reference ends the transaction with outcome
+4. No busy-wait or rounded/fabricated phase field is used: the existing send
+path stamps its actual radio-entry age. CCA-to-air delay remains observable
+rather than compensated speculatively.
+
+Three rounds, four CCA attempts per frame, 25/50/75 ms backoff minima and the
+14-second deadline remain unchanged. Actual CCA delays can grow to the next
+grid slot; normal AC-to-AC intervals grow from about 4.2475 to 4.4 seconds. No
+extra attempts or deadline extension compensate for alignment or missed slots.
+The retained result adds `grid`, accumulated `grid_wait_ticks` and `grid_skips`.
+These are volatile diagnostics, not persistent network state.
+
+The host opt-in is `start_query(..., ac_only=True, grid=True)`, gated on the
+capability. The normal daemon still defaults to paired queries. This release
+does not enable grid alignment persistently or claim that it reproduces every
+part of the original EC recovery schedule.
+
+
+### MG21 DMA receive diagnostics — release 0.10
+
+MG21 UART RX now uses a continuously linked 8 KiB LDMA ring, consumed in the
+main loop. STATUS adds `uart_rx_dma_errors`, `uart_rx_resyncs`,
+`uart_rx_highwater` (bytes) and `uart_rx_poll_gap_us` (microseconds). Hardware
+error counters count observations of sticky flags, not exact lost-byte totals.
+A DMA fault, UART RX error, observed overwrite, or polling gap long enough to
+hide a complete ring lap discards uncertain data and the current partial line
+through newline. The sender may see a timeout; it must use the existing exact
+ID/body retry and reconciliation rules, never assume an RF outcome.
+
+There is no query protocol, timing, retry-budget, UART baud or bootloader change.
+The Pi remains authoritative. This receive implementation is MG21-specific;
+TI keeps its existing UART driver.
+
+### Sonoff automatic ACK phase, release 0.11
+
+`CAPS auto_ack_phase=tx_entry_or_zero_v1` means automatic peer replies carry
+heartbeat age encoded at radio-call entry when the heartbeat reference is live.
+This capability is enabled for the Sonoff MG21 board and, from release 0.12,
+the ZB-GW04 v1.2 MG21 profile and cod.m CC2652P TI build. Automatic replies still
+bypass CCA and run before RX logging; no queue, wait or retry is added. With no
+live reference, the existing zero trailer is retained and the ACK is sent.
+`ACKTX` includes the transmitted trailer; `CHECK` still returns the unstamped
+ACK template. Query timing, retry bounds, reply filters and lease rules are
+unchanged. Firmware and host report release `0.11` through the existing version
+interfaces; the preserved Gecko bootloader continues to use 115200 baud.
+
+
+### Heartbeat-aligned output transactions — release 0.12
+
+`output_grid=transaction_200ms_v1` advertises:
+
+```
+OUTPUT_GRID session id full_mask baseline_hex raw_hex
+```
+
+`baseline_hex` contains the last state bits, report counter and command token
+(three bytes), or `ffffff` when unknown. `raw_hex` is the 41-byte opcode-02
+output template with a zero phase trailer; the Pi chooses its token, peer,
+selected mask and value. The normal session, route, peer and phase checks apply.
+Acceptance returns `OK OUTPUT`. This transaction shares the retained query slot
+and monotonically increasing job IDs; `QUERY_GET`, `QUERY_CANCEL` and
+`QUERY_DROP` retrieve, cancel and drain it. A retained result adds `output=1`.
+Query results carry `output=0`; their existing behavior is unchanged.
+
+The MCU schedules the first attempt and every retry on the next live
+heartbeat-relative 200 ms edge. A slot missed by more than 1 ms is skipped;
+heartbeat reference changes recompute the target. Actual radio-entry time is
+phase-stamped. There are at most six attempts, including busy-channel results,
+with no extra CCA retry budget. The four-second deadline starts at admission and
+is never extended. After attempt six the MCU only waits for confirmation.
+
+A valid native opcode-05 report must arrive after a transmission attempt and
+before the deadline, match the exact peer/tag/suffix, selected mask, requested
+bits and token, and differ from the supplied baseline. Reports addressed to
+this gateway or broadcast are eligible. Successful confirmation cancels further
+sends before UART logging. The retained result preserves the report and RX
+metadata for independent host validation. Cancellation and session reset stop
+execution; no transaction or device state is persisted on the MCU.
+
+The daemon uses this capability when available and falls back to its previous
+host-managed output path on older firmware. Its additional two-second result
+retrieval allowance cannot cause more RF attempts. Automatic ACKs remain
+immediate; query schedules, retry limits, UART and bootloader baud are unchanged.
+
+### Nordic native USB transport — release 0.12
+
+The official PCA10059 nRF52840 port uses the same protocol-v3 commands, volatile
+peer/session rules, scheduler capabilities and retry limits over native USB CDC.
+`VERSION` reports `board=nordic-pca10059 fw_version=0.12 update=none`;
+`CAPS baud=460800` preserves host configuration compatibility but does not
+represent a physical UART clock. USB line-coding requests do not change RF timing.
+`BOOTLOADER` disarms and enters the preserved factory USB DFU bootloader for an
+application-only update. This is separate from the TI signed update/rollback
+protocol and must not be treated as `update=signed_v1` support.
+
+`STATUS transport=usb_cdc` identifies this transport. `uart_drops` counts rejected
+software output bytes; `rx_drops` and `meta_drops` retain their shared-core meaning.
+`radio_drops` counts raw receive-queue exhaustion/invalid buffer lengths, and
+`radio_tx_timeouts` counts driver transmissions exceeding the 20 ms local bound.
+`radio_rx_errors` excludes intentional RX aborts; `radio_crc_errors`,
+`radio_filter_errors` and `radio_runtime_errors` distinguish CRC failures, frame
+filter/length rejection and driver runtime failures. Hardware UART error fields
+are zero because no UART is used. Air CRC failures are not USB transport errors.
+The adapter has no qualified autonomous stall watchdog; a nonresponsive image
+may require manual factory-DFU entry. See the board-specific build/recovery guide.

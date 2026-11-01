@@ -47,6 +47,14 @@ static int decimal(const char *s, uint32_t *n)
 	return 1;
 }
 
+/**
+ * @brief Handle a tokenized update command without transferring network authority.
+ * @param n Token count, at least two; token zero is the request identity.
+ * @param t Borrowed array of n NUL-terminated command tokens.
+ * @param out Caller-owned reply buffer, large enough for fixed error replies.
+ * @param cap Available reply-buffer bytes, including the NUL terminator.
+ * @return One for an update command, zero for an unrelated command.
+ */
 int ec_update_command(unsigned n, char **t, char *out, size_t cap)
 {
 	if (strncmp(t[1], "UPDATE_", 7))
