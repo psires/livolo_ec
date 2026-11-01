@@ -75,7 +75,9 @@ class UpdatePort:
         )
 
 
-def transfer(port, package, public, progress=lambda value: None, transaction=None):
+def transfer(
+    port, package, public, progress=lambda value: None, transaction=None, before=None
+):
     """Verify, transfer, and activate a newer signed firmware candidate.
 
     @param port UpdatePort connected to the installed adapter.
@@ -83,6 +85,8 @@ def transfer(port, package, public, progress=lambda value: None, transaction=Non
     @param public Ed25519 public key used to verify the package.
     @param progress Callback receiving progress dictionaries.
     @param transaction Optional mutable ownership and commit-state record for recovery.
+    @param before Optional blocking phase callback; must return before each destructive
+        boundary. A daemon worker uses this to await durable parent acknowledgement.
     @return Verified candidate package metadata; trial confirmation remains the daemon's
         responsibility.
     """
@@ -114,6 +118,8 @@ def transfer(port, package, public, progress=lambda value: None, transaction=Non
             )
         transaction["started"] = True
         transaction["commit_possible"] = True
+        if before:
+            before("activate")
         try:
             port.command("UPDATE_ACTIVATE", timeout=3, attempts=1)
         except TimeoutError:
@@ -122,9 +128,13 @@ def transfer(port, package, public, progress=lambda value: None, transaction=Non
     if status.get("trial") != "0" or status.get("state") in ("fffffffc", "ffffffe8"):
         raise RuntimeError("An earlier update must finish or recover first")
     # Preflight is read-only. Only this point transfers ownership to this update.
+    if before:
+        before("disarm")
     transaction["started"] = True
     port.command("DISARM")
     token = secrets.token_hex(8)
+    if before:
+        before("begin")
     port.command("UPDATE_ABORT")
     for offset in (0, 96):
         port.command(
@@ -141,6 +151,8 @@ def transfer(port, package, public, progress=lambda value: None, transaction=Non
         if percent != last_percent:
             progress(dict(stage="transfer", percent=percent))
             last_percent = percent
+    if before:
+        before("commit")
     transaction["commit_possible"] = True
     try:
         port.command(f"UPDATE_COMMIT {token}", timeout=30)
@@ -155,6 +167,8 @@ def transfer(port, package, public, progress=lambda value: None, transaction=Non
         raise RuntimeError("Candidate was not durably committed")
     progress(dict(stage="committed", version=info["version"]))
     # Do not blindly retry reset under a new ID: it may already have happened.
+    if before:
+        before("activate")
     try:
         port.command("UPDATE_ACTIVATE", timeout=3, attempts=1)
     except TimeoutError:
