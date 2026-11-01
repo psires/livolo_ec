@@ -49,6 +49,11 @@ def test_release_bundles_client_and_license(tmp_path):
     assert (context / "LICENSE").read_bytes() == license_text
     assert (context / "host/LICENSE").read_bytes() == license_text
     assert (ROOT / "client/LICENSE").read_bytes() == license_text
+    for relative in (
+        "host/docker/requirements-firmware.txt",
+        "host/livolod/firmware/manifest.json",
+    ):
+        assert (context / relative).read_bytes() == (ROOT / relative).read_bytes()
 
 
 def test_options_keep_secrets_out_of_daemon_json(tmp_path):
@@ -80,7 +85,15 @@ def test_short_api_token_rejected():
         app.configuration({"api_token": "short"})
 
 
-@pytest.mark.parametrize("name", ["daemon.json", "state.sqlite3", "state.sqlite3.lock"])
+@pytest.mark.parametrize(
+    "name",
+    [
+        "daemon.json",
+        "state.sqlite3",
+        "state.sqlite3.lock",
+        "state.sqlite3.firmware.lock",
+    ],
+)
 def test_privileged_bootstrap_rejects_symlinks(tmp_path, name):
     """Startup never follows data links to overwrite or chown outside files.
 

@@ -1,0 +1,50 @@
+{
+  "date": "2026-11-01",
+  "scope": "Source-only native firmware update implementation; synthetic candidates and mocked flashing jobs",
+  "versions": {
+    "integration": "0.2.0",
+    "client": "0.2.0",
+    "app": "0.2.0",
+    "home_assistant": "2026.10.4",
+    "python": "3.14.7",
+    "native_api": 1
+  },
+  "checks": {
+    "ha_client_packaging_tests_passed": 44,
+    "native_api_tests_passed": 16,
+    "failed": 0,
+    "black": "24.8.0",
+    "function_documentation": "All 19 assigned Python sources pass intent and parameter checks",
+    "hassfest": {
+      "official_core_tag": "2026.10.4",
+      "core_commit": "357cae5c598dfcd7a0ea7dc5b1facccd4ec6037b",
+      "invalid_integrations": 0
+    },
+    "client_sdist_and_wheel_built": true,
+    "client_wheel_version_and_bsd_license_verified": true,
+    "app_context_includes_flasher_requirements_and_firmware_manifest": true
+  },
+  "verified_behaviors": [
+    "Standard HA update.install awaits a verified durable result instead of submission acceptance",
+    "Real authenticated native HTTP and WebSocket snapshots connect HA to an isolated durable job ledger",
+    "Lost submission replies are resolved using the same request ID without another POST",
+    "Observation cancellation and timeout do not cancel or replay daemon firmware jobs",
+    "Rejected and unknown outcomes raise HA service errors",
+    "Daemon metadata remains readable without a firmware candidate or during radio maintenance",
+    "Web-started job state is restored after HA integration reload",
+    "Old daemons without firmware metadata retain switch support",
+    "Native firmware route rejects caller paths, URLs, extra fields and oversized bodies",
+    "Candidate IDs allow 256 characters, request IDs 128; 161-character catalog identities pass end to end",
+    "Native snapshots omit private worker data and disable controls during active or recovery-required maintenance",
+    "Only measured overall progress is displayed; optional backup and arbitrary version selection are unsupported",
+    "App bootstrap rejects symlinked firmware lock files"
+  ],
+  "not_performed": [
+    "Live HA installation or deployment",
+    "Physical radio firmware flashing or recovery",
+    "Rebuilding or running the updated app container",
+    "Firmware artifact publication",
+    "HACS or Marketplace installation"
+  ],
+  "payload_delivery": "The checked source manifest contains no firmware artifacts; no candidate means no installation capability"
+}

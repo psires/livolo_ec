@@ -73,6 +73,7 @@ def prepare_data(data_path, raw, uid=10001, gid=10001):
             "state.sqlite3-wal",
             "state.sqlite3-shm",
             "state.sqlite3.lock",
+            "state.sqlite3.firmware.lock",
         ):
             try:
                 descriptor = os.open(

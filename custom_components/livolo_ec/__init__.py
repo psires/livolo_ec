@@ -9,7 +9,7 @@ from ._client import AuthenticationError, Client, LivoloError
 from .const import CONF_TOKEN, CONF_URL, DOMAIN
 from .coordinator import LivoloCoordinator
 
-PLATFORMS = [Platform.SWITCH]
+PLATFORMS = [Platform.SWITCH, Platform.UPDATE]
 
 
 async def async_setup_entry(hass, entry):

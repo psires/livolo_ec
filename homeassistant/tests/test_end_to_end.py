@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import replace
 from pathlib import Path
 import time
+from unittest.mock import patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -94,3 +95,107 @@ async def test_broker_free_native_control(hass, tmp_path):
         await asyncio.wait_for(radio_task, 3)
         await api.close()
         store.close()
+
+
+async def test_firmware_job_through_native_api_and_ha(hass, tmp_path):
+    """HA awaits a durable firmware result through real HTTP and push snapshots.
+
+    @param hass Actual HA instance.
+    @param tmp_path Isolated command ledger; no firmware payload or radio is opened.
+    """
+    root = Path(__file__).resolve().parents[2]
+    config = replace(
+        load(root / "host/config.example.json"),
+        database=str(tmp_path / "firmware.db"),
+        mqtt={"enabled": False},
+    )
+    store = Store(config.database, config.gateway + ":" + config.tag)
+    service = Service(config, store, simulated=True)
+    firmware = {
+        "board": "zb-gw04-1v2",
+        "installed_version": "0.12",
+        "latest_version": "0.13",
+        "candidate_id": "a" * 96 + ":" + "b" * 64,
+        "install_supported": True,
+        "in_progress": False,
+        "progress_percent": None,
+    }
+    submissions = []
+    accepted = asyncio.Event()
+
+    def submit(payload):
+        """Model worker acceptance using the real durable ledger, without flashing.
+
+        @param payload Exact candidate and request identifiers from the native route.
+        @return Persisted pending outcome for the same job ID.
+        """
+        assert payload["candidate_id"] == firmware["candidate_id"]
+        submissions.append(payload)
+        request_id = payload["request_id"]
+        store.begin(request_id, dict(action="firmware_update", **payload))
+        firmware.update(request_id=request_id, in_progress=True, stage="transfer")
+        accepted.set()
+        return service.result(request_id, "pending", action="firmware_update")
+
+    api = NativeAPI(service, token="firmware-test-token", port=0)
+    loaded = False
+    task = None
+    with (
+        patch.object(service, "start_firmware_update", side_effect=submit),
+        patch.object(
+            service, "firmware_update_snapshot", side_effect=lambda: dict(firmware)
+        ),
+    ):
+        await api.start()
+        entry = MockConfigEntry(
+            domain="livolo_ec",
+            title="Firmware test",
+            unique_id=config.gateway + ":" + config.tag,
+            data={
+                "url": f"http://127.0.0.1:{api.port}",
+                "token": "firmware-test-token",
+                "allow_simulated": True,
+            },
+        )
+        entry.add_to_hass(hass)
+        try:
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            loaded = True
+            await eventually(
+                lambda: hass.states.async_all("update")
+                and hass.states.async_all("update")[0].state == "on"
+            )
+            entity_id = hass.states.async_all("update")[0].entity_id
+            task = asyncio.create_task(
+                hass.services.async_call(
+                    "update", "install", {"entity_id": entity_id}, blocking=True
+                )
+            )
+            await asyncio.wait_for(accepted.wait(), 3)
+            await eventually(
+                lambda: hass.states.get(entity_id).attributes.get("stage") == "transfer"
+            )
+            assert not task.done()
+            assert hass.states.get(entity_id).attributes["in_progress"]
+            assert not service.ready
+            firmware.update(
+                installed_version="0.13", in_progress=False, stage="confirmed"
+            )
+            service.result(
+                submissions[0]["request_id"], "confirmed", action="firmware_update"
+            )
+            await asyncio.wait_for(task, 3)
+            await eventually(lambda: hass.states.get(entity_id).state == "off")
+            assert len(submissions) == 1
+            assert (
+                store.command_result(submissions[0]["request_id"])["status"]
+                == "confirmed"
+            )
+        finally:
+            if task and not task.done():
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+            if loaded:
+                await hass.config_entries.async_unload(entry.entry_id)
+            await api.close()
+            store.close()

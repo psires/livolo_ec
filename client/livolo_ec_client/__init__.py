@@ -151,6 +151,10 @@ class Client:
                     raise AuthenticationError("API authentication failed")
                 if response.status == 404 and path.startswith("/api/v1/commands/"):
                     return None
+                if response.status == 404 and path == "/api/v1/firmware/install":
+                    raise IncompatibleError(
+                        "Daemon does not support firmware installation"
+                    )
                 if response.status != 200:
                     raise LivoloError(f"API returned HTTP {response.status}")
                 value = await response.json()
@@ -220,6 +224,47 @@ class Client:
         request = dict(payload)
         request.setdefault("request_id", str(uuid.uuid4()))
         request_id = request["request_id"]
+        return await self._submit_and_wait(
+            "/api/v1/commands",
+            {"action": action, "payload": request},
+            request_id,
+            timeout,
+            ("confirmed", "pairing") if action == "pair" else ("confirmed",),
+        )
+
+    async def install_firmware(self, candidate_id, request_id=None, timeout=600):
+        """Request one daemon-owned firmware job and await its verified outcome.
+
+        @param candidate_id Opaque validated candidate identifier advertised by the daemon.
+        @param request_id Optional caller-owned durable ID; generated once if omitted.
+        @param timeout Maximum seconds to observe the job, including submission.
+        @return Confirmed job result; failures/uncertainty raise CommandFailed.
+        """
+        if not isinstance(candidate_id, str) or not re.fullmatch(
+            r"[A-Za-z0-9_.:-]{1,256}", candidate_id
+        ):
+            raise ValueError("Invalid firmware candidate ID")
+        request_id = str(uuid.uuid4()) if request_id is None else request_id
+        return await self._submit_and_wait(
+            "/api/v1/firmware/install",
+            {"request_id": request_id, "candidate_id": candidate_id},
+            request_id,
+            timeout,
+            ("confirmed",),
+        )
+
+    async def _submit_and_wait(self, path, body, request_id, timeout, accepted):
+        """Submit once and observe the same durable ID without replaying work.
+
+        Cancellation or a local deadline only stops observation, never the daemon job.
+
+        @param path Native API submission endpoint.
+        @param body Exact JSON submission envelope.
+        @param request_id Validated durable identifier to recover after a lost reply.
+        @param timeout Total observation deadline in seconds.
+        @param accepted Tuple of successful terminal statuses for this operation.
+        @return Durable accepted outcome, or raise CommandFailed on failure/uncertainty.
+        """
         if not isinstance(request_id, str) or not re.fullmatch(
             r"[A-Za-z0-9_.:-]{1,128}", request_id
         ):
@@ -230,9 +275,7 @@ class Client:
         result = None
         try:
             result = await asyncio.wait_for(
-                self._request(
-                    "POST", "/api/v1/commands", {"action": action, "payload": request}
-                ),
+                self._request("POST", path, body),
                 timeout,
             )
         except (AuthenticationError, IncompatibleError):
@@ -245,7 +288,7 @@ class Client:
                 if result.get("request_id") != request_id:
                     raise IncompatibleError("Command result ID mismatch")
                 status = result.get("status")
-                if status == "confirmed" or (action == "pair" and status == "pairing"):
+                if status in accepted:
                     return result
                 if status != "pending":
                     raise CommandFailed(result)

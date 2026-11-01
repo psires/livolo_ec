@@ -7,8 +7,9 @@ The independent daemon continues running during HA reloads/restarts.
 
 This preview implements native control and commissioning, broker-free daemon
 startup, push updates, ingress support, and local HA app packaging. Radio
-firmware installation remains a separate board-specific operation. Automatic
-flashing, a firmware update entity, network backup/import UI, automatic app
+firmware updates use a standard HA firmware entity backed by the daemon's durable
+maintenance jobs. Initial conversion from stock adapter firmware remains a
+separate board-specific operation. Network backup/import UI, automatic app
 installation, socket profiles and curtain profiles are not implemented here.
 Do not publish this preview as a fully qualified plug-and-play release.
 
@@ -27,7 +28,7 @@ Build an archive from the repository root:
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.1.1.zip` into the HA configuration directory so
+Extract `dist/livolo-ec-ha-0.2.0.zip` into the HA configuration directory so
 `custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
@@ -124,6 +125,42 @@ needed; actual HA OS hotplug behavior still requires hardware qualification.
 There is no radio-readiness watchdog that repeatedly restarts an otherwise
 healthy daemon when the adapter is unplugged.
 
+## Radio firmware updates
+
+Integration and client 0.2.0 add a **Firmware** update entity to the existing
+Livolo EC gateway device. It reports the running version and the daemon's selected
+compatible candidate. Use HA's standard update dialog or the `update.install`
+action. The daemon also exposes the same job through its web interface; neither
+HA Core nor the browser opens the serial device or selects a filesystem path.
+
+The daemon must have a validated firmware bundle for the exact board and baud,
+with the required installation backend available. Without a candidate, the entity
+retains the installed version and blocking reason but has an unknown update state
+and no install capability. Older daemons without firmware-update metadata keep
+their switches working and expose the firmware entity as unavailable.
+
+The initial backend scope is signed TI UART updates and the exact supported
+Sonoff/ZB-GW04 MG21 profiles. Nordic installation remains disabled with a recovery
+reason. Firmware delivery and backend prerequisites are described in the
+[daemon documentation](../host/README.md#firmware-updates); installing the
+integration does not download a radio image. No public firmware release or live
+flash qualification is implied by these
+source changes.
+
+An install remains pending until the daemon verifies the resulting board,
+application baud and firmware version, including the expected TI image hash.
+During maintenance, switch controls are unavailable while the API and firmware
+job remain readable. Job phase, request ID, failure and recovery guidance come
+from the daemon. Percentage progress is shown only when a genuine overall
+measurement is supplied; transfer progress alone does not imply completion.
+
+The client submits once and uses the same durable request ID to resolve lost
+responses. A local observation timeout or HA reload does not cancel or restart
+the firmware job. Check its reported status and recovery instructions before
+retrying an uncertain outcome. Jobs started through the web interface remain
+visible after HA reload. Arbitrary version selection and HA's optional backup
+flag are not advertised; firmware rollback is board-specific.
+
 The ARM64 app was built and installed on a Raspberry Pi 5 running HA OS 18.4
 and Core 2026.10.4 on 2026-11-01. The ZB-GW04 gateway became ready, both switches
 and all three native outputs loaded, and integration reload preserved the running
@@ -202,17 +239,26 @@ These tests assemble the actual distribution and use real HA classes. They cover
 configuration, identities, per-output commands, dynamic devices, unavailable and
 unknown states, unload, HTTP/WebSocket auth, lost command replies, and the full
 simulator → native API → HA path. The suite opens loopback sockets only.
-Final source validation on 2026-11-01 passed **28 tests**, including the reload
-regression, firmware diagnostic allowlist and license/client packaging checks.
+The earlier 0.1.1 source validation on 2026-11-01 passed **28 tests**, including
+the reload regression, firmware diagnostic allowlist and license/client packaging checks.
 The isolated native API and ingress suites also passed **14** and **10** tests,
 respectively. The official HA 2026.10.4 **hassfest** validator passed with zero
 invalid integrations. See the
 [public verification summary](verification/native-preview-20261101.json).
-These source checks are separate from the earlier live deployment: the final
-diagnostics and packaging changes have not been deployed or flashed. CI runs
+That record predates the 0.2.0 firmware update implementation. Firmware tests
+add standard update-service behavior, job deduplication after lost responses,
+terminal failures, maintenance visibility and restoration of externally started
+jobs after reload. All update tests use mocked jobs; no live HA actions or radio
+flashes are part of the source checks. CI runs
 hassfest and packages the integration/local app artifacts; no remote CI run is
 claimed by these local results.
 
+The 0.2.0 source checks pass **44 HA/client/packaging tests**, **16 native API
+tests**, Black 24.8.0, function documentation checks and HA 2026.10.4 hassfest.
+The [firmware-update verification](verification/firmware-update-20261101.json)
+records the scope: the source bundle has no firmware artifacts, and this change
+has not been deployed or used to flash a physical radio.
+
 The [native API contract](../host/NATIVE_API.md) and
 [architecture plan](../analysis/development/home-assistant-native-integration.md)
-record the boundaries for future firmware jobs, backup/import and device profiles.
+record the API boundaries and plans for backup/import and additional device profiles.

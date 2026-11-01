@@ -131,6 +131,7 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
                 "/api/v1/info",
                 "/api/v1/snapshot",
                 "/api/v1/commands/missing",
+                "/api/v1/firmware/install",
                 "/api/v1/events",
                 "/missing",
             ]:
@@ -149,6 +150,106 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
         ) as response:
             self.assertEqual(response.status, 400)
         self.assertEqual(self.store.recent_results(), [])
+
+    async def test_firmware_install_envelope_and_policy_delegation(self):
+        """Firmware accepts only opaque candidate/job IDs and delegates policy once."""
+        endpoint = self.base + "/api/v1/firmware/install"
+        result = {
+            "request_id": "fw-1",
+            "candidate_id": "candidate-1",
+            "action": "firmware_update",
+            "status": "rejected",
+            "error": "No qualified candidate",
+        }
+        with patch.object(
+            self.service, "start_firmware_update", return_value=result, create=True
+        ) as start:
+            for value in (
+                [],
+                {},
+                {"request_id": "fw-1"},
+                {"request_id": "fw-1", "candidate_id": 1},
+                {"request_id": "fw-1", "candidate_id": "c" * 257},
+                {"request_id": "r" * 129, "candidate_id": "candidate-1"},
+                {"request_id": "fw-1", "candidate_id": "/tmp/image.gbl"},
+                {"request_id": "fw-1", "candidate_id": "https://example/image"},
+                {
+                    "request_id": "fw-1",
+                    "candidate_id": "candidate-1",
+                    "version": "0.13",
+                },
+            ):
+                async with self.client.post(endpoint, json=value) as response:
+                    self.assertEqual(response.status, 400)
+            async with self.client.post(
+                endpoint,
+                data=b"x" * 4097,
+                headers={"Content-Type": "application/json"},
+            ) as response:
+                self.assertEqual(response.status, 413)
+            async with self.client.post(endpoint, data="{}") as response:
+                self.assertEqual(response.status, 400)
+            async with aiohttp.ClientSession() as unauthenticated:
+                async with unauthenticated.post(
+                    endpoint, json={"request_id": "fw-1", "candidate_id": "candidate-1"}
+                ) as response:
+                    self.assertEqual(response.status, 401)
+            start.assert_not_called()
+            payload = {"request_id": "fw-1", "candidate_id": "candidate-1"}
+            async with self.client.post(endpoint, json=payload) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(await response.json(), result)
+            start.assert_called_once_with(payload)
+            long_candidate = "a" * 96 + ":" + "b" * 64
+            payload = {"request_id": "fw-2", "candidate_id": long_candidate}
+            async with self.client.post(endpoint, json=payload) as response:
+                self.assertEqual(response.status, 200)
+            start.assert_called_with(payload)
+
+    async def test_firmware_snapshots_keep_status_during_radio_maintenance(self):
+        """Firmware job changes reach subscribers while raw worker data stays private."""
+        firmware = {
+            "board": "zb-gw04-1v2",
+            "installed_version": "0.12",
+            "latest_version": "0.13",
+            "candidate_id": "candidate-1",
+            "install_supported": True,
+            "in_progress": False,
+            "stage": "idle",
+            "progress_percent": None,
+            "raw": "secret-worker-output",
+            "path": "/private/firmware.gbl",
+        }
+        with patch.object(
+            self.service,
+            "firmware_update_snapshot",
+            side_effect=lambda: dict(firmware),
+            create=True,
+        ):
+            async with self.client.ws_connect(self.base + "/api/v1/events") as ws:
+                initial = await ws.receive_json()
+                self.assertEqual(initial["data"]["firmware_update"]["stage"], "idle")
+                firmware.update(in_progress=True, stage="transfer", request_id="fw-1")
+                self.service.notify_changed()
+                event = await self.next_matching(
+                    ws, lambda value: value["data"]["firmware_update"]["in_progress"]
+                )
+                self.assertFalse(event["data"]["ready"])
+                self.assertFalse(event["data"]["controls_enabled"])
+                self.assertIsNone(event["data"]["firmware_update"]["progress_percent"])
+                self.assertNotIn("secret-worker-output", json.dumps(event))
+                self.assertNotIn("/private/firmware.gbl", json.dumps(event))
+                self.assertEqual((await self.get("/health"))[0], 200)
+                firmware.update(
+                    in_progress=False, status="unknown", recovery="recovery_required"
+                )
+                self.service.notify_changed()
+                event = await self.next_matching(
+                    ws,
+                    lambda value: value["data"]["firmware_update"].get("recovery"),
+                )
+                self.assertFalse(event["data"]["controls_enabled"])
+                self.assertFalse(event["data"]["firmware_update"]["in_progress"])
 
     async def test_offline_health_info_and_secret_free_snapshot(self):
         """Liveness works before radio readiness and snapshots expose only public fields."""

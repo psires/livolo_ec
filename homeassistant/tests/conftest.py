@@ -21,6 +21,9 @@ sys.path.insert(0, str(STAGE))
 sys.path.insert(0, str(ROOT / "client"))
 sys.path.insert(0, str(ROOT / "host"))
 atexit.register(shutil.rmtree, STAGE, ignore_errors=True)
+# Load the assembled namespace before HA's test import mocks are installed.
+# Standalone end-to-end runs must not depend on another test module importing it.
+importlib.import_module("custom_components.livolo_ec")
 
 
 @pytest.fixture(autouse=True)

@@ -68,6 +68,7 @@ def main():
             "VERSION",
             "host/pyproject.toml",
             "host/docker/smoke.py",
+            "host/docker/requirements-firmware.txt",
         ):
             destination = app / relative
             destination.parent.mkdir(parents=True, exist_ok=True)

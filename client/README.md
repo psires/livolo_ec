@@ -17,6 +17,14 @@ uncertain submissions through the same request ID and reports unconfirmed
 outcomes as errors. See the repository's `host/NATIVE_API.md` for the API contract
 and `homeassistant/README.md` for configuration and supported hardware limits.
 
+Version 0.2.0 adds `Client.install_firmware(candidate_id, request_id=None,
+timeout=600)`. Pass the opaque candidate ID advertised in `firmware_update`,
+optionally retaining your own durable request ID. The method submits once, then
+waits for a confirmed outcome through the existing command-result endpoint.
+It raises `CommandFailed` for rejection or uncertainty. Cancellation and local
+timeouts stop observation only; they do not stop or replay the daemon's job.
+Firmware paths, download URLs and arbitrary target versions are not accepted.
+
 The HA release builder bundles this module as `livolo_ec._client`; the source
 custom component alone is not an installable distribution.
 

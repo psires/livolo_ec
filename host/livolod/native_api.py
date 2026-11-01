@@ -16,6 +16,25 @@ from . import __version__
 API_VERSION = 1
 ACTIONS = {"set", "refresh", "add", "rename", "remove", "pair"}
 MAX_BODY = 4096
+FIRMWARE_FIELDS = {
+    "board",
+    "installed_version",
+    "latest_version",
+    "candidate_id",
+    "update_available",
+    "install_supported",
+    "blocked_reason",
+    "in_progress",
+    "stage",
+    "progress_percent",
+    "request_id",
+    "status",
+    "error",
+    "recovery",
+    "rollback_supported",
+    "release_notes",
+    "release_url",
+}
 DIAGNOSTIC_FIELDS = {
     "rx_gaps",
     "invalid_rx",
@@ -105,6 +124,9 @@ def native_snapshot(service):
         "value",
         "attempts",
         "counter",
+        "candidate_id",
+        "stage",
+        "recovery",
     }
     results = [
         {k: v for k, v in result.items() if k in result_fields}
@@ -130,6 +152,17 @@ def native_snapshot(service):
         discoveries=discoveries,
         results=results,
     )
+    firmware_snapshot = getattr(service, "firmware_update_snapshot", None)
+    firmware = firmware_snapshot() if firmware_snapshot else None
+    if isinstance(firmware, dict):
+        data["firmware_update"] = {
+            key: value
+            for key, value in firmware.items()
+            if key in FIRMWARE_FIELDS
+            and isinstance(value, (str, int, float, bool, type(None)))
+        }
+        if firmware.get("in_progress") or firmware.get("recovery"):
+            data["controls_enabled"] = False
     return json.loads(json.dumps(data))
 
 
@@ -219,6 +252,7 @@ class NativeAPI:
                 web.get("/api/v1/snapshot", self.snapshot),
                 web.get("/api/v1/events", self.events),
                 web.post("/api/v1/commands", self.command),
+                web.post("/api/v1/firmware/install", self.install_firmware),
                 web.get("/api/v1/commands/{request_id}", self.result),
             ]
         )
@@ -349,6 +383,44 @@ class NativeAPI:
         ):
             return web.json_response({"error": "Invalid command envelope"}, status=400)
         return web.json_response(self.service.submit(value["action"], value["payload"]))
+
+    async def install_firmware(self, request):
+        """Submit a catalog candidate without accepting paths or flashing in the API.
+
+        @param request Authenticated bounded JSON request with two opaque IDs.
+        @return Durable service result, or HTTP 400/413 for an invalid envelope.
+        """
+        if request.content_type != "application/json":
+            return web.json_response({"error": "Expected application/json"}, status=400)
+        try:
+            body = await asyncio.wait_for(request.read(), 5)
+            if len(body) > MAX_BODY:
+                raise web.HTTPRequestEntityTooLarge(
+                    max_size=MAX_BODY, actual_size=len(body)
+                )
+            value = json.loads(body)
+        except (ValueError, UnicodeError, RecursionError):
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+        except asyncio.TimeoutError:
+            raise web.HTTPRequestTimeout() from None
+        if (
+            not isinstance(value, dict)
+            or set(value) != {"request_id", "candidate_id"}
+            or any(
+                not isinstance(item, str)
+                or not re.fullmatch(
+                    (
+                        r"[A-Za-z0-9_.:-]{1,128}"
+                        if key == "request_id"
+                        else r"[A-Za-z0-9_.:-]{1,256}"
+                    ),
+                    item,
+                )
+                for key, item in value.items()
+            )
+        ):
+            return web.json_response({"error": "Invalid firmware envelope"}, status=400)
+        return web.json_response(self.service.start_firmware_update(value))
 
     async def result(self, request):
         """Read an existing durable result without re-executing its command.
