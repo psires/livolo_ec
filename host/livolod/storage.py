@@ -71,6 +71,40 @@ class Store:
             self.lock.close()
             raise
 
+    def firmware_job(self):
+        """Read the update journal independently of the command restart policy."""
+        row = self.db.execute(
+            "SELECT value FROM meta WHERE key='firmware_job'"
+        ).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def save_firmware_job(self, job):
+        """Durably record a firmware boundary and its matching command outcome.
+
+        @param job Internal update journal without bundle bytes or credentials.
+        """
+        result = {
+            key: job.get(key)
+            for key in (
+                "request_id",
+                "candidate_id",
+                "status",
+                "error",
+                "stage",
+                "recovery",
+            )
+        }
+        result["action"] = "firmware_update"
+        with self.db:
+            self.db.execute(
+                "INSERT OR REPLACE INTO meta VALUES ('firmware_job', ?)",
+                (json.dumps(job),),
+            )
+            self.db.execute(
+                "UPDATE commands SET result=?,updated=? WHERE id=?",
+                (json.dumps(result), time.time(), job["request_id"]),
+            )
+
     def mqtt_settings(self, seed):
         """Restore saved broker settings or use installation defaults.
 

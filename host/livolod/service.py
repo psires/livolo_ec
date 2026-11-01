@@ -6,6 +6,7 @@ from dataclasses import asdict, replace
 import heapq
 import json
 import logging
+import os
 import re
 import secrets
 import time
@@ -18,6 +19,7 @@ from .phase import PhaseClient
 from .scheduler import SchedulerClient
 from . import __version__
 from .version import firmware_info
+from .firmware_manager import FirmwareManager, radio_guard
 from .uart import CommandError, Gateway, LinkError
 
 LOG = logging.getLogger(__name__)
@@ -124,6 +126,20 @@ class Service:
         self.discoveries = {}
         self.started = time.monotonic()
         self.change_listeners = set()
+        self.command_inflight = None
+        self.firmware_manager = FirmwareManager(self)
+
+    def start_firmware_update(self, payload):
+        """Start an explicitly selected update through the shared durable manager.
+
+        @param payload Mapping containing only request_id and candidate_id.
+        @return Durable command result; acceptance is not firmware confirmation.
+        """
+        return self.firmware_manager.start(payload)
+
+    def firmware_update_snapshot(self):
+        """Expose public update eligibility and the latest persisted job."""
+        return self.firmware_manager.snapshot()
 
     def notify_changed(self):
         """Schedule API observations on the owner loop without waiting on clients."""
@@ -288,6 +304,8 @@ class Service:
             if previous:
                 self.publish("bridge/result", previous)
                 return previous
+            if self.firmware_manager.busy and action != "snapshot":
+                raise ValueError("Firmware maintenance blocks conflicting commands")
             values = self.validate_action(action, request)
             self.store.begin(request_id, recorded)
             self.notify_changed()
@@ -368,6 +386,7 @@ class Service:
             ],
             "results": self.store.recent_results(),
             "mqtt": self.mqtt_summary(),
+            "firmware_update": self.firmware_update_snapshot(),
         }
 
     api_snapshot = web_snapshot
@@ -415,6 +434,8 @@ class Service:
         from .mqtt_settings import updated_settings
 
         async with self.mqtt_lock:
+            if self.firmware_manager.busy:
+                raise ValueError("Firmware maintenance blocks configuration changes")
             if not self.mqtt_enabled or self.mqtt_factory is None or self.simulated:
                 raise ValueError("MQTT settings are unavailable in this demo")
             settings = updated_settings(self.config.mqtt, request, self.config.gateway)
@@ -630,6 +651,7 @@ class Service:
         except ValueError as error:
             raise LinkError("Malformed firmware release version") from error
         self.diagnostics["host_version"] = __version__
+        self.firmware_manager.observe(caps)
         if caps.get("fw_version"):
             reported = key_values(await self.gateway.command("VERSION"))
             if reported.get("fw_version") != caps["fw_version"]:
@@ -716,8 +738,10 @@ class Service:
                 self.ready = False
                 raise
         firmware = self.diagnostics["firmware"]
+        update = None
         if firmware["update_supported"]:
             update = key_values(await self.gateway.command("UPDATE_STATUS"))
+            self.firmware_manager.before_confirm(caps, update)
             if update.get("trial") not in ("0", "1"):
                 raise LinkError("Invalid update trial status")
             if update["trial"] == "1":
@@ -738,6 +762,7 @@ class Service:
                 (json.dumps(firmware),),
             )
         self.ready = True
+        self.firmware_manager.restored(caps, update)
         self.last_rx = None
         self.snapshot()
         LOG.info(
@@ -1180,6 +1205,7 @@ class Service:
                     error="command expired or radio session changed",
                 )
                 continue
+            self.command_inflight = request_id
             try:
                 if action == "set":
                     if self.pairing and self.pairing["device"] == values["device"]:
@@ -1218,6 +1244,8 @@ class Service:
                     request_id, "unknown", error="radio session ended before completion"
                 )
                 raise
+            finally:
+                self.command_inflight = None
 
     async def refresh_state(self, request_id, device):
         """Retry read-only query pairs until fresh state or bounded exhaustion.
@@ -1722,11 +1750,16 @@ class Service:
         """Keep the gateway reconciled across failures until shutdown is requested."""
         delay = 1
         while not self.stop.is_set():
+            self.firmware_manager.check_deadline()
             tasks = []
             stop_task = None
             reconfigure_task = None
+            firmware_task = None
+            guard = None
+            handoff = False
             try:
                 self.reconfigure.clear()
+                guard = radio_guard(self.config.database)
                 self.gateway = self.gateway_factory()
                 await self.restore()
                 delay = 1
@@ -1736,8 +1769,12 @@ class Service:
                 ]
                 stop_task = asyncio.create_task(self.stop.wait())
                 reconfigure_task = asyncio.create_task(self.reconfigure.wait())
+                firmware_task = asyncio.create_task(
+                    self.firmware_manager.requested.wait()
+                )
                 done, _ = await asyncio.wait(
-                    tasks + [self.gateway.fault, stop_task, reconfigure_task],
+                    tasks
+                    + [self.gateway.fault, stop_task, reconfigure_task, firmware_task],
                     return_when=asyncio.FIRST_COMPLETED,
                 )
                 for task in done:
@@ -1746,9 +1783,12 @@ class Service:
                     task.result()
             except (OSError, LinkError, CommandError, ValueError) as error:
                 LOG.warning("Radio unavailable: %s; reconnecting", error)
+            except asyncio.CancelledError:
+                self.stop.set()
+                raise
             finally:
                 self.ready = False
-                waiters = [t for t in (stop_task, reconfigure_task) if t]
+                waiters = [t for t in (stop_task, reconfigure_task, firmware_task) if t]
                 for task in tasks + waiters:
                     task.cancel()
                 await asyncio.gather(*tasks, *waiters, return_exceptions=True)
@@ -1763,9 +1803,44 @@ class Service:
                 self.seen.clear()
                 self.state_received.clear()
                 self.snapshot()
-                if self.gateway:
-                    await self.gateway.close()
-                    self.gateway = None
+                try:
+                    if self.gateway:
+                        verified = False
+                        try:
+                            if self.firmware_manager.requested.is_set():
+                                try:
+                                    if self.stop.is_set():
+                                        raise LinkError(
+                                            "Shutdown before firmware handoff"
+                                        )
+                                    await self.firmware_manager.preflight(self.gateway)
+                                    await self.gateway.command("DISARM")
+                                    status = key_values(
+                                        await self.gateway.command("STATUS")
+                                    )
+                                    if (
+                                        status.get("armed") != "0"
+                                        or status.get("ack") != "0"
+                                    ):
+                                        raise LinkError("Radio disarm was not verified")
+                                    verified = True
+                                except (OSError, LinkError, CommandError):
+                                    self.firmware_manager.failed(
+                                        "Radio handoff could not be verified",
+                                        uncertain=False,
+                                    )
+                                    self.firmware_manager.requested.clear()
+                        finally:
+                            await self.gateway.close()
+                            self.gateway = None
+                        handoff = verified
+                finally:
+                    if not handoff and guard is not None:
+                        os.close(guard)
+                        guard = None
+            if handoff:
+                await self.firmware_manager.execute(guard)
+                continue
             if not self.stop.is_set():
                 try:
                     await asyncio.wait_for(self.stop.wait(), delay)

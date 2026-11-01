@@ -14,13 +14,15 @@ dependencies = ["pyserial>=3.5,<4", "aiohttp>=3.12.15,<4"]
 [project.optional-dependencies]
 mqtt = ["paho-mqtt>=2.1,<3"]
 update = ["cryptography>=46.0.3,<47"]
+flash = ["cryptography>=46.0.3,<47", "universal-silabs-flasher==0.0.31"]
 
 [project.scripts]
 livolod = "livolod.__main__:main"
 livolod-firmware = "livolod.firmware_update:main"
+livolod-firmware-manage = "livolod.firmware_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["livolod*"]
 
 [tool.setuptools.package-data]
-livolod = ["static/*.html", "static/*.css", "static/*.js"]
+livolod = ["static/*.html", "static/*.css", "static/*.js", "firmware/*", "firmware/**/*"]

@@ -30,6 +30,7 @@ def firmware_info(caps):
     if running is not None:
         parse_version(running)
     return {
+        "board": caps.get("board"),
         "running_version": running,
         "target_version": __version__,
         "update_available": (

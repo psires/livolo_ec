@@ -260,13 +260,26 @@ For a later daemon release, load/build its image, change `LIVOLO_VERSION` in
 Keep the old image and a pre-upgrade data backup for rollback. Do not delete the
 data directory during an image upgrade.
 
-Updating the daemon image **does not update radio firmware**. This minimal image
-omits the optional signing/updater dependencies and has no systemd or GPIO access.
-For a signed radio update, stop the container, use the matching host updater
-outside Docker without its `--service` option, then start the matching container
-promptly to validate/confirm the trial. Follow the board-specific
-[firmware update procedure](../../firmware/gateway/README.md); this task did not
-perform or change any firmware update.
+Updating the daemon image **does not update radio firmware**. New source builds
+include the integrated TI and MG21 workers, invoked only by an explicit web/API
+installation of a qualified bundled candidate. The current manifest is empty,
+so no radio update can be offered. The original 0.12 archive predates these
+workers and remains unchanged. No systemd, Docker socket or GPIO access is needed
+inside the container. See [daemon update and emergency CLI instructions](../README.md#firmware-updates)
+and [board recovery](../../docs/FIRMWARE_RECOVERY.md).
+
+`requirements-firmware.txt` pins the separate helper dependency graph, including
+the Linux-only GPIO dependency. Python 3.13 helper import/CLI checks and ARM64
+wheel resolution have passed; these are not a new image build or hardware flash
+qualification. Nordic DFU remains disabled because its separate helper and
+changing USB device mapping are not qualified for this container.
+
+The GPL-3.0 `universal-silabs-flasher` 0.0.31 runs as a separate program. Installed
+package license files remain present, and its exact source sdist is retained at
+`/usr/share/livolo-ec/sources/`, verified against a pinned SHA-256 during build.
+Distribute that matching source alongside exported images. Project BSD licensing
+does not replace dependency or firmware SDK obligations; release notice/source
+review remains required.
 
 Docker details: [device mappings, supplemental groups and host networking](https://docs.docker.com/reference/compose-file/services/),
 [ARM builds](https://docs.docker.com/build/building/multi-platform/), and the

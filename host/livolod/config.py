@@ -106,6 +106,7 @@ class Config:
     api: dict = field(
         default_factory=lambda: {"enabled": False, "host": "127.0.0.1", "port": 8090}
     )
+    firmware_bundle_dir: str = str(Path(__file__).parent / "firmware")
 
 
 def load(path):
@@ -125,7 +126,7 @@ def parse(raw):
     """
     fields(
         raw,
-        "network serial_port serial_baudrate database mqtt devices offline_after web output_mode api",
+        "network serial_port serial_baudrate database mqtt devices offline_after web output_mode api firmware_bundle_dir",
         "configuration",
     )
     output_mode = raw.get("output_mode", "disabled")
@@ -194,6 +195,13 @@ def parse(raw):
     ):
         raise ValueError("A non-loopback web host requires token_env")
     integer(web["port"], 1, 65535, "web.port")
+    bundle_dir = raw.get("firmware_bundle_dir", Config.firmware_bundle_dir)
+    if (
+        not isinstance(bundle_dir, str)
+        or not Path(bundle_dir).is_absolute()
+        or "\0" in bundle_dir
+    ):
+        raise ValueError("firmware_bundle_dir must be an absolute local directory")
     return Config(
         gateway,
         tag,
@@ -209,6 +217,7 @@ def parse(raw):
         output_mode,
         uart_baudrate(raw.get("serial_baudrate", 115200)),
         api_config(raw.get("api", {})),
+        bundle_dir,
     )
 
 

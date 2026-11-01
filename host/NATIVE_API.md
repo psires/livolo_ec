@@ -35,6 +35,43 @@ Heartbeat-only protocol frames need not each cause an HA event. State,
 availability, registry, readiness, pairing and result changes must be delivered.
 Snapshots omit MQTT configuration, credentials, raw packets and browser tokens.
 
+### Firmware maintenance
+
+Newer daemons add `data.firmware_update` to HTTP/WebSocket snapshots. Older
+daemons may omit it; clients must tolerate absent optional fields. The object
+contains `board`, `installed_version`, `latest_version`, `candidate_id`,
+`update_available`, `install_supported`, `blocked_reason`, `in_progress`, `stage`,
+`progress_percent`, `request_id`, `status`, `error`, `recovery`,
+`rollback_supported`, and optional `release_notes`/`release_url`. Null latest
+version/candidate means no validated bundled artifact is available. Overall
+progress remains null. The separate browser snapshot may expose measured transfer
+progress, which does not imply installation or trial confirmation. `recovery`
+may block controls even when `in_progress` is false.
+
+`POST /api/v1/firmware/install` uses the same bearer authentication and accepts
+exactly:
+
+```json
+{"request_id":"firmware-1","candidate_id":"qualified-artifact:full-sha256-from-status"}
+```
+
+Request IDs match `[A-Za-z0-9_.:-]{1,128}`; candidate IDs match
+`[A-Za-z0-9_.:-]{1,256}` and are opaque hash-bound selections. No paths, uploads,
+URLs, caller-selected versions or arbitrary commands are accepted. The daemon
+validates eligibility, exclusive ownership and the actual artifact again.
+The response uses the existing durable result envelope with
+`action="firmware_update"`, `candidate_id`, `request_id`, `status`, and available
+`stage`, `error`, `recovery`. HTTP acceptance is not firmware success. Inspect
+`GET /api/v1/commands/{request_id}` and snapshots for completion. Reuse the same
+request ID after an uncertain response; never create a new automatic flash retry.
+
+`confirmed` requires restored exact-board firmware and normal network readiness;
+`rejected` may describe a verified return to the previous image; `unknown` with
+recovery required needs the documented maintenance procedure. The APIs stay
+available while the radio is paused. No candidate, unsupported backend, active
+radio work or uncertain recovery state prevents installation. Generic MQTT
+commands do not gain a firmware-install action.
+
 `POST /api/v1/commands` accepts:
 
 ```json

@@ -10,6 +10,7 @@
 !host/docker/Dockerfile
 !host/docker/Dockerfile.dockerignore
 !host/docker/smoke.py
+!host/docker/requirements-firmware.txt
 **/__pycache__/
 **/*.pyc
 **/*.sqlite*

@@ -346,6 +346,67 @@ set commands generate reports; the simulator is not an RF, mesh or pairing model
 
 ## Firmware updates
 
+The web UI and native API share a daemon-owned firmware update manager. Installing
+a new host package or image **never flashes the radio automatically**. An explicit
+install selects one validated, exact-board candidate bundled with that host
+release. The shipped `livolod/firmware/manifest.json` is currently empty: no
+official payload is included, so installation is unavailable. Development images
+built with dummy signing keys are not release candidates.
+
+Integrated backends cover the codm CC2652P signed updater and the Sonoff
+ZBDongle-E / ZB-GW04 v1.2 application-only Gecko upload. The first qualified
+bundle contract uses 460800 application baud. TI retains signed-image checking
+and trial rollback; MG21 has no last-good application rollback. Nordic integrated
+DFU remains disabled pending a qualified helper and USB re-enumeration access.
+See the [board recovery procedures](../docs/FIRMWARE_RECOVERY.md).
+
+Install `./host[flash]` for both integrated backends, or `./host[update]` for TI
+only. Container builds use the pinned helper dependency file in `host/docker`.
+The default bundle directory is immutable package data. A local operator may
+set an absolute `firmware_bundle_dir` in JSON for an independently supplied,
+trusted release bundle; HTTP clients cannot supply files, URLs or paths. Bundle
+hashes bind the selected bytes to that manifest and do not independently prove
+who published it. The same validated payload files are intended to accompany
+the matching GitHub Release.
+
+Updates reject active commands, pairing and conflicting registry/configuration
+changes. The daemon disarms and closes the radio before a bounded worker takes
+over; web/API listeners remain available. Progress and destructive boundaries
+are recorded in SQLite before execution. The worker and its helper inherit a
+radio ownership lock, preventing restart from racing an orphaned flasher.
+Success requires exact board/version/baud and normal peer/session/heartbeat
+restoration; TI additionally checks the selected digest before confirming trial.
+Switch-query success is not an upgrade readiness requirement.
+
+After interruption, the daemon reconciles the saved job without replaying a
+transfer. A verified TI rollback releases maintenance with a rejected result;
+uncertain hardware remains in `recovery_required`. Retrying an existing request
+ID returns its durable result rather than running the update again.
+
+### Emergency local CLI
+
+`livolod-firmware-manage --config /etc/livolod/config.json status` reads the saved
+job without stopping the daemon. For `install` or `recover`, first stop the actual
+owner (systemd service, Docker container or HA app). Run the tool as the daemon's
+user with its current configuration, database and serial device accessible:
+
+```sh
+livolod-firmware-manage --config /etc/livolod/config.json install \
+  --candidate-id 'candidate-id-from-the-firmware-status'
+livolod-firmware-manage --config /etc/livolod/config.json recover
+```
+
+The CLI uses the same database/radio locks and manager. It starts a temporary
+radio service without MQTT/web listeners, restores the network and confirms a
+successful TI trial itself, then closes/disarms. Restart the normal owner after
+completion. `recover` applies only to a journaled TI update: it checks the board,
+key and digests, aborts/reboots an incomplete receive, activates only the matching
+committed candidate, or resumes trial confirmation. It never aborts a committed
+candidate. A failed application that cannot answer UART, and interrupted MG21 or
+Nordic flashes, require the board-specific bootloader procedure linked above.
+
+### Existing signed UART command
+
 Host and application releases use `major.minor` (currently `0.12`). The daemon
 exposes `diagnostics.host_version` and `diagnostics.firmware` in `/api/state`,
 including `running_version`, `target_version`, `update_available`,
@@ -379,7 +440,8 @@ same package; a committed matching package resumes activation.
 `--service livolod` controls the native systemd service only. For Docker or a
 Home Assistant app, stop the actual owner first, omit `--service`, and arrange
 for the matching daemon to restart within the trial confirmation window. The
-standalone Docker image does not include the optional updater dependencies.
+original standalone 0.12 Docker archive does not include updater dependencies;
+new source builds include the integrated TI/MG21 backends.
 
 No RESET/FLASH GPIO wiring is required for routine updates. Configurable GPIO
 recovery and the original buttons remain available for initial installation or
