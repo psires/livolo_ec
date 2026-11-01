@@ -213,6 +213,57 @@ and notices. Publish bootstrap/installer material separately, with explicit
 factory-configuration preservation and recovery steps. Never substitute a full
 flash or merged factory image for a routine application update.
 
+### Agreed delivery model
+
+The owner selected bundled firmware for Docker and the HA companion app, with
+the same built firmware published as GitHub Release assets for standalone users.
+Build and qualify each board artifact once, then distribute identical bytes and
+hashes through both channels. HA's custom integration remains an API client;
+the companion app contains the firmware bundle.
+
+Each container release should carry the latest **qualified, compatible** firmware
+set at image build time, pinned by its manifest. It must not resolve an arbitrary
+moving `latest` during installation. For the present TI confirmation contract,
+the bundled application and daemon versions must match. New container releases
+can carry new firmware sets without rewriting older image tags or release assets.
+
+Proposed read-only image layout:
+
+```text
+/usr/share/livolo-ec/firmware/
+  manifest.json
+  <board-profile>/<firmware-version>/application.<ecupd|gbl|zip>
+  notices/<input-or-component>/...
+```
+
+The manifest supplies board/revision identity, versions, host compatibility,
+bootloader/update requirements, artifact hashes and lengths, and notice paths.
+Container assembly must verify it against the exact files being copied; CI must
+compare image-extracted hashes with the GitHub Release assets. The bundle needs
+no compiler, SDK checkout or signing private key at runtime. These firmware data
+files are host-architecture independent; their flashing tools still need host
+architecture and Python/runtime qualification.
+
+The first updater should resolve artifacts from this local bundle. Standalone
+users can download the matching release bundle, including manifest and notices,
+or select a board-specific asset and its accompanying metadata. Both paths feed
+the same board selection and installation logic. This permits offline operation
+after the container or release bundle has been obtained. Authenticated remote
+discovery can follow when updating independently of the host package is needed.
+
+Bundling supplies the firmware payload, but the current Dockerfile does not yet
+include these files or a universal flasher. Installation still requires the
+shared maintenance job and qualified board adapters described below. Upgrading
+the container/app must not implicitly flash the radio; expose the available
+compatible update and require an explicit installation request. Preserve a
+supported host/firmware pairing during host rollback as well as upgrade.
+
+The [binary licence packaging requirements](../firmware/THIRD_PARTY_NOTICES.md)
+apply equally to firmware inside container layers and GitHub Release assets.
+Complete the notices and identified vendor-terms review before distributing
+either bundle. The seven validation builds used test inputs, including a dummy
+TI public key; they are not the official release payloads.
+
 Build CI must explicitly select board, baud, memory layout and update options.
 TI currently defaults to update support disabled; MG21 defaults to ZB-GW04 and
 115200. Qualification used 460800 application UART on the tested serial boards;
@@ -220,8 +271,9 @@ Gecko/ROM loaders use 115200. Nordic CDC baud is metadata, not a physical UART
 clock. Verify both qualified binaries and repeat-build output from pinned GCC
 and SDK inputs; documented pinned revisions alone do not prove reproducibility.
 
-Use GitHub Releases for immutable firmware assets and an authenticated release
-catalog for discovery. Prefer a maintained TUF implementation, hosting metadata
+Use GitHub Releases for immutable firmware assets. When remote update discovery
+is added, use an authenticated release catalog. Prefer a maintained TUF
+implementation, hosting metadata
 on a stable HTTPS origin such as GitHub Pages. Bundle trusted root metadata with
 the installed software; fetching a key alongside an unsigned index establishes
 no trust. TUF authenticates discovery/download and addresses stale/rolled-back
@@ -302,11 +354,12 @@ tested compatibility contract before the catalog can offer them safely.
 | A. Release baseline | Maintainer with all specialists | Owner selects licence; reviewed source commits, notices and scoped evidence; documentation/style and clean CI pass; unique versions and compatibility table |
 | B. Standalone preview | Unix | Reproducible ARM64 image/package workflow; fresh Docker/native installation, persistence, backup/restore and anonymous GHCR pull; no ambiguous 0.12 artifacts |
 | C. HA distribution | HA | Generated integration and app repositories; HACS/hassfest checks; real install/upgrade/reload, including Marketplace on 2026.11; declared minimum Core tested |
-| D. Firmware downloads | ZigBee | Four explicit build profiles, notices and immutable artifacts; bootstrap/recovery guides; signing/key policy; downloads and manual install verified per profile |
+| D. Firmware bundles | ZigBee + Unix + HA | Four explicit build profiles, notices and immutable artifacts; identical firmware hashes in Docker/HA images and GitHub Releases; bootstrap/recovery guides and signing policy; offline install verified per profile |
 | E. Integrated updates | Unix + ZigBee + Web + HA | Shared catalog/job API, adapters, web panel and HA entity; concurrency, interruption, restart reconciliation, re-enumeration and TI rollback tests on each supported host/board |
 | F. Broader support | ZigBee with host/HA qualification | Longer endurance/larger-network tests; each new radio gets a reviewed profile and separate qualification before stable promotion |
 
-Stages B/C can proceed after A; D need not wait for the integrated updater.
+Stages B/C can proceed after A, with D required before claiming bundled firmware
+delivery; D need not wait for the integrated updater.
 Publish a preview with manual board-specific firmware installation first. Do not
 make public source availability depend on completing automatic updates, but do
 make every advertised artifact and feature satisfy its own release gate.
@@ -316,6 +369,28 @@ Add pin/oscillator/RF front-end/layout and transport definitions, license inputs
 bootstrap/recovery instructions, CI target and qualification evidence. Use support
 tiers such as experimental, qualified preview and stable per profile; a new chip
 or adapter must not inherit support from a shared VID/PID or MCU family alone.
+
+### Sharing chip support across dongles
+
+Use the additional modules to separate three concerns: shared Livolo protocol,
+peer and scheduling behavior; MCU-family radio/timer/transport adapters; and
+small explicit board profiles for pins, oscillators, RF front ends, USB bridges,
+memory layouts and bootloader entry. Extend those layers instead of cloning a
+complete implementation for every dongle.
+
+Sonoff ZBDongle-E and ZB-GW04 v1.2 are the current MG21 example: they should share
+the MG21 implementation and regression fixes while retaining separate profile
+selection, artifacts and hardware qualification. Their different USB bridges and
+preserved bootloaders are installation constraints even with the same MCU.
+Do not turn multiple boards into one generic binary unless their layouts and
+reliable board identification have been deliberately established. A shared MCU
+implementation is already useful without requiring a universal image.
+
+For each newly received module, qualify serial integrity, scheduling/control,
+software bootloader entry, recovery and container/HA device transitions against
+the existing chip-family regression suite. Report board-specific deviations in
+the profile and support matrix, so a fix can be shared without silently assuming
+that all boards have received the same hardware validation.
 
 ## Assessment verification and evidence
 
