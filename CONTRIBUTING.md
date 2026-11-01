@@ -47,9 +47,9 @@ local results and CI consistent:
 ```sh
 python3 -m venv .venv
 . .venv/bin/activate
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements-dev.txt -e './host[mqtt,update]'
 python tools/check_documentation.py
-black --check tools host firmware
+black --check tools host firmware client custom_components homeassistant wireshark
 find firmware -path '*/third_party' -prune -o \( -name '*.c' -o -name '*.h' \) -exec clang-format --dry-run --Werror {} +
 python tools/project_version.py
 npx --yes prettier@3.3.3 --check host/livolod/static/app.js
@@ -63,7 +63,9 @@ git diff --check
 
 The JavaScript checks require Node.js and npm (`npx`).
 
-To apply layout fixes, run `black tools host firmware` and replace the
+To apply layout fixes, run
+`black tools host firmware client custom_components homeassistant wireshark`
+and replace the
 `clang-format --dry-run --Werror` options with `clang-format -i`. Review the diff
 before committing. Use `npx --yes prettier@3.3.3 --write host/livolod/static/app.js`
 for JavaScript. The Python documentation check verifies presence and parameter
@@ -79,8 +81,11 @@ See [gateway build instructions](firmware/gateway/README.md) for target builds.
 
 Keep signing keys, local configuration, databases and generated firmware outside
 Git. Monocypher's license and upstream provenance travel with its source.
-The project owner must select a license for the project-owned code before a
-public open-source release; the third-party license does not license this project.
+Project-owned code is licensed under BSD-2-Clause; see [LICENSE](LICENSE).
+Contributions must be compatible with that licence. Preserve existing third-party
+copyright and licence notices; the root licence does not replace them. Include
+the licence in source and binary distributions and retain package-local copies
+when a package is built independently of the repository root.
 
 Development captures and logs are experimental evidence, not required release
 artifacts. Only the development captures used by offline regression tests are

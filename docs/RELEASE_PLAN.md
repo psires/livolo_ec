@@ -3,6 +3,10 @@
 Assessment date: 2026-11-01. Status: proposed release design; nothing has been
 published, deployed or flashed by this assessment.
 
+Follow-up: the owner selected **BSD-2-Clause** on 2026-11-01. The root `LICENSE`
+now records that decision. References below to selecting a licence describe the
+assessment baseline; dependency notices and release checks remain separate work.
+
 The current implementation is viable for a **board-specific developer preview**
 after the release gates below. It does not yet support a general plug-and-play
 release or a common end-user firmware updater. This assessment combines source
