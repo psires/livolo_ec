@@ -57,6 +57,7 @@ npx --yes prettier@3.3.3 --check host/livolod/static/app.js
 node --check host/livolod/static/app.js
 python -m unittest discover -s tools -p 'test_*.py'
 PYTHONPATH=host python -m unittest discover -s host/tests -p 'test_*.py'
+node --test host/tests/test_web_firmware.js
 python -m unittest discover -s firmware/gateway/tests -p 'test_*.py'
 python -m unittest discover -s firmware/update/tests -p 'test_*.py'
 python -m unittest discover -s firmware/mg21/tests -p 'test_*.py'

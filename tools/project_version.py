@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check or propagate root VERSION (major.minor) into release build metadata."""
 import argparse
+import json
 from pathlib import Path
 import re
 
@@ -19,6 +20,17 @@ def main():
     ):
         raise SystemExit("VERSION must be major.minor, each component <=65535")
     major, minor = release.split(".")
+    bundle_path = ROOT / "host/livolod/firmware/manifest.json"
+    bundle = json.loads(bundle_path.read_text())
+    if bundle.get("host_version") != release:
+        if not args.write:
+            raise SystemExit("Firmware bundle version drift; rebuild for this release")
+        if bundle.get("artifacts") != []:
+            raise SystemExit(
+                "Refusing to relabel firmware artifacts; build and qualify a new bundle"
+            )
+        bundle["host_version"] = release
+        bundle_path.write_text(json.dumps(bundle, indent=2) + "\n")
     rules = [
         ("host/pyproject.toml", r'(?m)^version = "[^"]+"', f'version = "{release}"'),
         (

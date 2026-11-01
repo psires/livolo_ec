@@ -10,9 +10,20 @@ The subsequent [source finalization record](SOURCE_VALIDATION.md) documents the
 committed implementation, passing source checks, tests and target builds, while
 preserving the outstanding binary-distribution and publication work.
 
+The owner subsequently requested a daemon-owned firmware updater shared by the
+web UI, HA's standard update entity and an emergency command-line procedure.
+The Unix and ZigBee specialists agreed that no MCU protocol change is needed
+for the initial TI signed-UART and exact-board MG21 Gecko backends. Nordic
+installation remains gated on a qualified DFU runtime and USB device tracking.
+The baseline gaps below describe the original assessment; they are not a claim
+that completed source/licence work is still missing. The updater's validation
+record and remaining hardware gates are recorded separately when finalized.
+
 The current implementation is viable for a **board-specific developer preview**
 after the release gates below. It does not yet support a general plug-and-play
-release or a common end-user firmware updater. This assessment combines source
+release with qualified firmware bundles. The shared updater implementation is
+described below; real installation/recovery qualification remains outstanding.
+This assessment combines source
 inspection with the ZigBee Specialist, Unix Sepcialist, Web Specialist and
 HomeAssistent Specialist reviews. Hardware results are existing qualification
 records, not new tests performed for this document.
@@ -113,11 +124,12 @@ use Trusted Publishing instead of a permanent upload token. A Debian package is
 a later convenience, after filesystem paths and upgrade behavior stabilize.
 [GitHub Releases][releases] [PyPI Trusted Publishing][pypi]
 
-The standard runtime currently omits the `[update]` extra and external flashing
-tools. Document this explicitly. For the preview, distribute a separate pinned
-maintenance environment for qualified board-specific manual updates. Do not
-claim the runtime image already installs firmware. Validate the declared Python
-minimum against resolved dependencies and tests before promising a support range.
+The updated Docker recipe includes the TI cryptography dependency and pinned
+MG21 helper; native installations select the `[flash]` extra. The revised image
+still needs a real build and board-specific installation/recovery qualification.
+Nordic manual DFU retains a separate maintenance environment. Validate the
+declared Python minimum against resolved dependencies and tests before promising
+a support range.
 
 An upgrade must back up configuration and SQLite consistently, preserve network
 identity, pairing data and token history, and document database compatibility
@@ -312,11 +324,11 @@ port or submit arbitrary command lines/download URLs.
    responses, reconcile the existing job instead of replaying activation or
    actuator commands. Preserve recovery logs without secrets.
 
-The existing CLI's `--service` systemd stop/start wrapper cannot be called from
-inside the serving HA app as the integrated solution. For the preview, manual
-maintenance stays a separate environment. For integrated updates, choose a
-packaged worker/helper that the daemon controls without stopping its API, and
-qualify least-privilege access to both application and bootloader devices.
+The older CLI's `--service` systemd stop/start wrapper cannot be called from
+inside the serving HA app as the integrated solution. The new daemon-owned
+worker keeps its API running and shares an inherited radio lock with the parent
+and external flasher. Qualify least-privilege access to both application and
+bootloader devices in the actual packaged deployment.
 
 Platform-specific work still required:
 
@@ -333,8 +345,10 @@ Platform-specific work still required:
 
 ### Version compatibility is an implementation constraint
 
-`host/livolod/version.py` currently calls firmware older than the installed daemon
-an available update; it does not consult a release catalog. The service confirms
+The legacy diagnostics in `host/livolod/version.py` call firmware older than the
+installed daemon an available update. Installation clients must use the new
+`firmware_update` snapshot, which selects a validated local candidate instead.
+The service confirms
 a TI trial only when firmware equals the host's exact version. The signed format
 also encodes two 16-bit version components. Keep numeric `major.minor` firmware
 versions and matching host/firmware release sets for the first preview. Advance
@@ -348,6 +362,40 @@ Independent host/firmware schedules require replacing the equality rule with a
 tested compatibility contract before the catalog can offer them safely.
 
 ## Implementation sequence and acceptance
+
+### Daemon updater implementation scope
+
+The agreed updater keeps the daemon's HTTP services running while it gives a
+single worker exclusive radio ownership. Both the web UI and HA `UpdateEntity`
+submit a candidate ID and a durable request ID to that service. They do not open
+serial ports or supply filenames, downloads or commands. Retries observe the
+same job rather than starting another transfer. The emergency CLI uses the
+authoritative configuration/database and requires the serving daemon to be
+stopped before direct radio maintenance.
+
+Initial integrated backends cover `codm-cc2652p` with its provisioned signed
+updater and the exact `sonoff-zbdongle-e`/`zb-gw04-1v2` MG21 profiles. Nordic
+remains explicitly unavailable for integrated installation until its DFU runtime
+and USB handoff are qualified. Each deployment still needs compatible device
+permissions and its own recovery qualification.
+
+Candidates come from an operator-trusted local manifest installed with the host.
+They bind exact board, gateway role, host/firmware version, transport rate,
+application layout and payload hash. TI also validates the package signature and
+installed signing key. Manifest checksums alone are not publisher authentication
+for unsigned MG21 artifacts: trust comes from the installed release bundle and
+its distribution channel. No qualified payload is included in the source-only
+baseline, so installing this code must not advertise a firmware download that
+does not exist.
+
+Before enabling this in a public binary release, qualify the actual packaged
+image and candidate on each board: successful install, lost response, daemon
+termination, power loss, recovery and exclusive device ownership. Verify that
+the GitHub firmware asset and the copy inside the container have identical
+hashes. A mocked transport test cannot establish flash timing, electrical
+reliability, rollback behavior on the real board or container device access.
+
+### Remaining release stages
 
 | Stage | Suggested lead | Deliverable and exit check |
 | --- | --- | --- |

@@ -13,6 +13,16 @@ confirms a trial image only after restoring the radio session. Unconfirmed trial
 images roll back. See [firmware build and update instructions](firmware/gateway/README.md)
 and [host update operations](host/README.md#firmware-updates).
 
+The daemon also owns a shared firmware installation job for the web UI and
+Home Assistant's standard firmware update entity. It validates an exact-board
+local bundle, pauses radio operations, records progress and verifies the restored
+session before reporting success. Initial backends cover TI signed UART and the
+two MG21 profiles; integrated Nordic DFU remains disabled pending runtime and USB
+handoff qualification. No qualified release firmware is bundled yet, so the
+source-only installation reports that no candidate is available. See the
+[emergency recovery procedure](docs/FIRMWARE_RECOVERY.md) before qualifying updates
+on hardware.
+
 The gateway supports three MCU families through four board profiles: cod.m
 CC2652P, Sonoff ZBDongle-E, ZB-GW04 v1.2 and official Nordic PCA10059. They share
 the packet, peer, scheduler and protocol-v3 core, with MCU queues, heartbeats,

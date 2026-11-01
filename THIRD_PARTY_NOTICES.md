@@ -20,6 +20,17 @@ inputs, runtime dependencies or tools.
   their own terms. They are not relicensed by inclusion in a build or test
   environment. Any future bundle must include notices for its actual contents.
 
+The MG21 update backend invokes `universal-silabs-flasher==0.0.31` as a separate
+tool. Its [upstream distribution](https://pypi.org/project/universal-silabs-flasher/0.0.31/)
+declares GPL-3.0; BSD-2-Clause applies to this project's own adapter code, not to
+that tool. Images containing the flasher must preserve its licence and matching
+source distribution, together with notices for the resolved dependencies.
+Publish the matching source alongside downloadable image/offline bundles and
+record its checksum. A link to a moving upstream branch is not a substitute for
+the source corresponding to the distributed version. Review the complete image's
+notice/source inventory before publication; including this paragraph alone does
+not complete that review.
+
 The root `LICENSE` is canonical. Independently built Python packages and
 assembled Home Assistant distributions carry copies so recipients receive it
 without requiring the monorepo. Keep those copies identical when updating it.

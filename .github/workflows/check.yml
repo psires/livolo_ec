@@ -32,7 +32,9 @@ jobs:
       - name: Test decoder and protocol vectors
         run: python -m unittest discover -s tools -p 'test_*.py'
       - name: Test host service and local integrations
-        run: PYTHONPATH=host python -m unittest discover -s host/tests -p 'test_*.py'
+        run: |
+          PYTHONPATH=host python -m unittest discover -s host/tests -p 'test_*.py'
+          node --test host/tests/test_web_firmware.js
       - name: Test gateway UART and peer management
         run: python -m unittest discover -s firmware/gateway/tests -p 'test_*.py'
       - name: Test update authentication and rollback
