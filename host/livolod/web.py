@@ -3,6 +3,8 @@
 import asyncio
 from concurrent.futures import TimeoutError as FutureTimeout
 import hmac
+import hashlib
+from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import inspect
 import json
@@ -15,6 +17,8 @@ import socket
 import threading
 from urllib.parse import urlsplit
 
+from .ingress import request_context, validate_ingress
+
 LOG = logging.getLogger(__name__)
 STATIC = Path(__file__).with_name("static")
 ASSETS = {
@@ -26,15 +30,25 @@ ACTIONS = {"add", "rename", "remove", "pair", "set"}
 
 
 class WebServer:
-    def __init__(self, service, host="127.0.0.1", port=8080, token=None):
+    def __init__(self, service, host="127.0.0.1", port=8080, token=None, ingress=None):
         """Configure a same-origin UI server with optional bearer authentication.
 
         @param service Daemon service whose API runs on the owning asyncio loop.
         @param host Local address or hostname to bind.
         @param port HTTP port, or zero to select a free port.
-        @param token Required bearer token, or None for loopback-only access.
+        @param token Standalone bearer token, or None for loopback/ingress access.
+        @param ingress Explicit trusted-proxy and public-origin configuration.
         """
-        if host not in ("127.0.0.1", "::1", "localhost") and not token:
+        self.ingress = validate_ingress(ingress)
+        if self.ingress["enabled"] and token is not None:
+            raise ValueError(
+                "Ingress proxy authentication and standalone bearer authentication are separate modes"
+            )
+        if (
+            host not in ("127.0.0.1", "::1", "localhost")
+            and not token
+            and not self.ingress["enabled"]
+        ):
             raise ValueError("A non-loopback web host requires an access token")
         if token is not None and (not token or not token.isascii()):
             raise ValueError("Access token must be nonempty ASCII")
@@ -80,22 +94,39 @@ class WebServer:
                 self.send_header("Content-Length", str(len(body)))
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
-                self.send_header("X-Frame-Options", "DENY")
+                public_origin = getattr(self, "ingress_origin", None)
+                if public_origin is None:
+                    self.send_header("X-Frame-Options", "DENY")
+                # Trusted ingress pages are embedded by their exact public origin.
+                # X-Frame-Options is omitted only here; CSP remains restrictive.
+                ancestors = public_origin or "'none'"
                 self.send_header("Referrer-Policy", "no-referrer")
                 self.send_header(
                     "Content-Security-Policy",
-                    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+                    f"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors {ancestors}; base-uri 'none'; form-action 'self'",
                 )
                 self.send_header("Connection", "close")
                 self.end_headers()
                 self.wfile.write(body)
 
             def check_host(self):
-                """Reject requests addressed to an unexpected host or listening port.
+                """Validate the ingress trust boundary or the standalone Host header.
 
-                @return True for an accepted Host header; otherwise send an error and return
-                    False.
+                @return True for an accepted request authority; otherwise send an error
+                    and return False.
                 """
+                if owner.ingress["enabled"]:
+                    try:
+                        public, path = request_context(
+                            owner.ingress, self.client_address[0], self.headers
+                        )
+                    except ValueError:
+                        self.send(
+                            403, {"error": "Invalid ingress proxy, origin or base path"}
+                        )
+                        return False
+                    self.ingress_origin, self.ingress_path = public, path
+                    return True
                 try:
                     hosts = self.headers.get_all("Host", [])
                     if len(hosts) != 1 or any(c in hosts[0] for c in "/\\@?#"):
@@ -136,6 +167,18 @@ class WebServer:
                     return False
                 return True
 
+            def csrf_token(self):
+                """Prevent reuse of an ingress CSRF token across public origins or paths.
+
+                @return Context-bound ingress token, or the standalone session token.
+                """
+                if not owner.ingress["enabled"]:
+                    return owner.token
+                context = self.ingress_origin + "\n" + self.ingress_path
+                return hmac.new(
+                    owner.token.encode(), context.encode(), hashlib.sha256
+                ).hexdigest()
+
             def dispatch(self, action=None, payload=None):
                 """Obtain a service result on the owner loop without cancelling timed-out work.
 
@@ -174,6 +217,7 @@ class WebServer:
                 if self.path == "/api/state":
                     state = self.dispatch()
                     if state is not None:
+                        state["csrf_token"] = self.csrf_token()
                         self.send(200, state)
                 elif re.fullmatch(r"/api/commands/[A-Za-z0-9_.:-]{1,128}", self.path):
                     result = self.dispatch("result", self.path.rsplit("/", 1)[1])
@@ -181,7 +225,13 @@ class WebServer:
                         self.send(200, result)
                 elif self.path in ASSETS:
                     filename, kind = ASSETS[self.path]
-                    self.send(200, (STATIC / filename).read_bytes(), kind)
+                    body = (STATIC / filename).read_bytes()
+                    if filename == "index.html":
+                        base = getattr(self, "ingress_path", "") + "/"
+                        body = body.replace(
+                            b"__LIVOLO_BASE_PATH__", escape(base, quote=True).encode()
+                        )
+                    self.send(200, body, kind)
                 else:
                     self.send(404, {"error": "Not found"})
 
@@ -192,14 +242,21 @@ class WebServer:
                 if not self.authorized():
                     return
                 origin = self.headers.get("Origin")
-                if (
-                    origin and origin != "http://" + self.headers["Host"]
-                ) or self.headers.get("Sec-Fetch-Site") == "cross-site":
+                expected_origin = "http://" + self.headers["Host"]
+                if owner.ingress["enabled"]:
+                    # request_context has already checked the canonical origin.
+                    if not origin:
+                        self.send(403, {"error": "Ingress writes require Origin"})
+                        return
+                    expected_origin = origin
+                if (origin and origin != expected_origin) or self.headers.get(
+                    "Sec-Fetch-Site"
+                ) == "cross-site":
                     self.send(403, {"error": "Cross-origin requests are not accepted"})
                     return
                 if not hmac.compare_digest(
                     self.headers.get("X-Livolo-Token", "").encode(),
-                    owner.token.encode(),
+                    self.csrf_token().encode(),
                 ):
                     self.send(
                         403,
@@ -300,6 +357,9 @@ async def start_web(service, config):
     """
     settings = config.web
     token = None
+    ingress = validate_ingress(settings.get("ingress"))
+    if ingress["enabled"] and settings.get("token_env"):
+        raise ValueError("web.token_env must be omitted in ingress mode")
     if settings.get("token_env"):
         token = os.environ.get(settings["token_env"])
         if not token or not token.isascii():
@@ -307,7 +367,11 @@ async def start_web(service, config):
                 "Web token environment variable must contain a nonempty ASCII token"
             )
     server = WebServer(
-        service, settings.get("host", "127.0.0.1"), settings.get("port", 8080), token
+        service,
+        settings.get("host", "127.0.0.1"),
+        settings.get("port", 8080),
+        token,
+        ingress=ingress,
     )
     await server.start()
     return server

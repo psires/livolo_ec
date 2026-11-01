@@ -14,23 +14,24 @@ import subprocess
 import time
 
 from . import __version__
-from .config import load
+from .config import load, uart_baudrate
 from .protocol import key_values
 from .update_package import inspect_package, public_key
 from .version import parse_version
 
 
 class UpdatePort:
-    def __init__(self, port):
+    def __init__(self, port, baudrate=115200):
         """Claim an exclusive serial connection for a firmware update session.
 
         @param port Serial device path.
+        @param baudrate Application rate matching the installed firmware.
         """
         import serial
 
         self.serial = serial.Serial(
             port,
-            115200,
+            uart_baudrate(baudrate),
             timeout=0.2,
             write_timeout=2,
             exclusive=True,
@@ -256,7 +257,7 @@ def main():
         if a.service:
             subprocess.run(["systemctl", "stop", a.service], check=True)
             stopped = True
-        port = UpdatePort(config.serial_port)
+        port = UpdatePort(config.serial_port, config.serial_baudrate)
         transfer(port, data, key, progress, transaction)
         deadline = time.monotonic() + 35
         while time.monotonic() < deadline:

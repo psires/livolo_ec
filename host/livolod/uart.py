@@ -4,6 +4,8 @@ import asyncio
 import secrets
 import time
 
+from .config import uart_baudrate
+
 
 class LinkError(RuntimeError):
     """The adapter session must be discarded; RF outcome may be unknown."""
@@ -33,17 +35,18 @@ class Gateway:
         self.loop.add_reader(self.serial.fileno(), self._read)
 
     @classmethod
-    def open(cls, port):
+    def open(cls, port, baudrate=115200):
         """Open an exclusive adapter connection with the UART v3 serial settings.
 
         @param port Serial device path.
+        @param baudrate Application rate matching the installed firmware.
         @return A Gateway that owns the opened serial connection.
         """
         import serial
 
         uart = serial.Serial(
             port,
-            115200,
+            uart_baudrate(baudrate),
             timeout=0,
             write_timeout=0.2,
             exclusive=True,

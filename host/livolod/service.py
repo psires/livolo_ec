@@ -15,6 +15,7 @@ from .config import Device, hex_value, identity, integer, mqtt_config
 from .homeassistant import discovery_messages
 from .protocol import decode, frame, heartbeat, key_values, rx_envelope
 from .phase import PhaseClient
+from .scheduler import SchedulerClient
 from . import __version__
 from .version import firmware_info
 from .uart import CommandError, Gateway, LinkError
@@ -25,6 +26,24 @@ SET_CONFIRM_TIMEOUT = 4.0
 SET_ATTEMPTS = 3
 PHASE_SET_ATTEMPTS = 6
 SET_RETRY_INTERVAL = 0.2
+REFRESH_ROUNDS = 3
+REFRESH_QUERY_INTERVAL = 0.2
+# At 460800, shorter UART serialization otherwise reduces the RF pair gap
+# from about 237 ms to 213 ms. This measured correction is baud-specific.
+REFRESH_QUERY_INTERVAL_460800 = 0.224
+REFRESH_RESPONSE_WAIT = 4.0
+REFRESH_TIMEOUT = 14.0
+
+
+def refresh_query_interval(baudrate):
+    """Select the measured host delay between read-only query transmissions.
+
+    @param baudrate Configured application UART baud rate.
+    @return Delay in seconds; unmeasured rates retain the existing policy.
+    """
+    return (
+        REFRESH_QUERY_INTERVAL_460800 if baudrate == 460800 else REFRESH_QUERY_INTERVAL
+    )
 
 
 class Service:
@@ -40,14 +59,22 @@ class Service:
         @param simulated Whether to isolate MQTT identity and disable live settings changes.
         """
         self.config, self.store, self.broker = config, store, broker
+        mqtt = mqtt_config(config.mqtt, config.gateway, allow_password=True)
+        self.mqtt_enabled = mqtt.get("enabled", True)
         self.config = replace(
             config,
             devices=store.devices(config.devices),
-            mqtt=mqtt_config(
-                store.mqtt_settings(config.mqtt), config.gateway, allow_password=True
+            mqtt=(
+                mqtt_config(
+                    store.mqtt_settings(config.mqtt),
+                    config.gateway,
+                    allow_password=True,
+                )
+                if self.mqtt_enabled
+                else mqtt
             ),
         )
-        if simulated:
+        if simulated and self.mqtt_enabled:
             mqtt = dict(self.config.mqtt)
             mqtt["base_topic"] += "/simulated"
             mqtt["client_id"] += "-simulated"
@@ -55,12 +82,13 @@ class Service:
         self.mqtt_factory = None
         self.mqtt_lock = asyncio.Lock()
         self.gateway_factory = gateway_factory or (
-            lambda: Gateway.open(config.serial_port)
+            lambda: Gateway.open(config.serial_port, config.serial_baudrate)
         )
         self.devices = {d.id: d for d in self.config.devices}
         self.states = {k: v for k, v in store.states().items() if k in self.devices}
         self.seen = {}
         self.state_received = {}
+        self.state_sequences = {}
         self.availability = {}
         self.commands = asyncio.Queue(maxsize=64)
         self.stop = asyncio.Event()
@@ -70,6 +98,8 @@ class Service:
         self.simulated = simulated
         self.gateway = None
         self.phase_client = None
+        self.scheduler = None
+        self.state_sequences.clear()
         self.phase_reference_missing = True
         self.session = None
         self.sequence = secrets.randbelow(256)
@@ -82,10 +112,26 @@ class Service:
         self.schedule = []
         self.diagnostics = {"rx_gaps": 0, "invalid_rx": 0, "ack_failures": 0}
         self.diagnostics["output_mode"] = config.output_mode
+        self.diagnostics["serial_baudrate"] = config.serial_baudrate
+        self.diagnostics["query_timing"] = {
+            "query_interval_seconds": refresh_query_interval(config.serial_baudrate),
+            "response_wait_seconds": REFRESH_RESPONSE_WAIT,
+            "rounds": REFRESH_ROUNDS,
+            "deadline_seconds": REFRESH_TIMEOUT,
+        }
         self.last_rx = None
         self.discovery_seen = {}
         self.discoveries = {}
         self.started = time.monotonic()
+        self.change_listeners = set()
+
+    def notify_changed(self):
+        """Schedule API observations on the owner loop without waiting on clients."""
+        for callback in tuple(self.change_listeners):
+            try:
+                callback()
+            except Exception:
+                LOG.exception("State observer failed")
 
     def publish(self, suffix, value, retain=False):
         """Publish service state when an MQTT broker is configured.
@@ -94,6 +140,7 @@ class Service:
         @param value String or JSON-serializable payload.
         @param retain Whether the broker should retain the payload.
         """
+        self.notify_changed()
         if self.broker:
             self.broker.publish(suffix, value, retain)
 
@@ -243,6 +290,7 @@ class Service:
                 return previous
             values = self.validate_action(action, request)
             self.store.begin(request_id, recorded)
+            self.notify_changed()
             if action in ("add", "rename", "remove"):
                 return self.manage_registry(request_id, action, values)
             if action == "snapshot":
@@ -330,7 +378,21 @@ class Service:
         @return Public MQTT settings and availability metadata.
         """
         settings = self.config.mqtt
+        if not self.mqtt_enabled:
+            return {
+                "enabled": False,
+                "host": "",
+                "port": 1883,
+                "base_topic": "",
+                "username": "",
+                "password_set": False,
+                "tls": False,
+                "editable": False,
+                "connected": False,
+                "error": None,
+            }
         return {
+            "enabled": True,
             "host": settings["host"],
             "port": settings["port"],
             "base_topic": settings["base_topic"],
@@ -353,7 +415,7 @@ class Service:
         from .mqtt_settings import updated_settings
 
         async with self.mqtt_lock:
-            if self.mqtt_factory is None or self.simulated:
+            if not self.mqtt_enabled or self.mqtt_factory is None or self.simulated:
                 raise ValueError("MQTT settings are unavailable in this demo")
             settings = updated_settings(self.config.mqtt, request, self.config.gateway)
             if settings == self.config.mqtt:
@@ -552,6 +614,8 @@ class Service:
         """Establish and verify a fresh adapter session before accepting radio work."""
         self.ready = False
         self.phase_client = None
+        self.scheduler = None
+        self.state_sequences.clear()
         self.phase_reference_missing = True
         revision = self.registry_revision
         devices = self.config.devices
@@ -584,6 +648,8 @@ class Service:
             )
         except (KeyError, ValueError):
             capable = False
+        if "baud" in caps and caps["baud"] != str(self.config.serial_baudrate):
+            raise LinkError("Adapter baud does not match serial_baudrate")
         if not capable:
             raise LinkError("Adapter capabilities do not meet daemon requirements")
         if self.config.output_mode == "experimental_phase":
@@ -594,6 +660,19 @@ class Service:
                 gateway_id=self.config.gateway,
                 allow_outputs=True,
             )
+        if caps.get("scheduler") == "timed_v1" and self.phase_client:
+            self.scheduler = SchedulerClient(self.gateway, self.session, caps)
+        self.diagnostics["heartbeat_owner"] = "mcu" if self.scheduler else "host"
+        self.diagnostics.pop("scheduler", None)
+        self.diagnostics["query_mode"] = (
+            "mcu"
+            if self.scheduler and self.scheduler.query_supported
+            else (
+                "phase"
+                if self.phase_client and self.phase_client.query_supported
+                else "raw"
+            )
+        )
         await self.gateway.command(
             f"NETWORK {self.config.gateway} {self.config.tag} {self.session}"
         )
@@ -695,22 +774,44 @@ class Service:
         async with self.radio_lock:
             return await self._transmit(raw)
 
-    async def _transmit(self, raw, *, reference_setup=False):
+    async def _transmit(
+        self, raw, *, reference_setup=False, still_needed=None, phase_query=False
+    ):
         """Submit a frame with bounded retries only for definite channel-busy non-sends.
 
         @param raw Complete EC command frame bytes; caller must hold radio_lock.
         @param reference_setup Whether a heartbeat may establish the reference during restore.
-        @return True after successful submission, or False if every attempt was busy.
+        @param still_needed Optional predicate checked before each radio attempt.
+        @param phase_query Use guarded query phase stamping instead of raw SEND.
+        @return True after submission, or False if busy or no longer needed.
         """
         # CCA busy is a definite non-send. Other TX failures have uncertain RF outcome.
         for attempt in range(4):
+            if still_needed is not None and not still_needed():
+                return False
             if not self.ready and not (reference_setup and raw[21:23] == b"\x8c\x08"):
                 raise LinkError("Radio session is being reconciled")
             try:
-                await self.gateway.command(f"SEND {self.session} {raw.hex()}")
+                if phase_query:
+                    if self.phase_reference_missing:
+                        return False
+                    metadata = await self.phase_client.query(raw)
+                    self.diagnostics["query_phase_tx"] = dict(metadata)
+                else:
+                    await self.gateway.command(f"SEND {self.session} {raw.hex()}")
                 return True
             except CommandError as error:
-                if str(error) != "ERR TX 2":
+                if phase_query and str(error) == "ERR PHASE_REFERENCE":
+                    self.phase_reference_missing = True
+                    return False
+                busy = str(error) == "ERR TX 2"
+                if phase_query:
+                    busy = str(error).startswith("ERR TX 2 ")
+                    if busy:
+                        self.diagnostics["query_phase_tx"] = dict(
+                            self.phase_client.last_tx
+                        )
+                if not busy:
                     raise LinkError(str(error)) from error
                 if attempt < 3:
                     await asyncio.sleep(0.025 * (attempt + 1))
@@ -733,6 +834,8 @@ class Service:
 
         @return The monotonic timestamp of the next permitted heartbeat.
         """
+        if self.scheduler:
+            return self.next_heartbeat
         return max(
             self.next_heartbeat,
             self.last_heartbeat + 10 if self.last_heartbeat is not None else 0,
@@ -790,6 +893,16 @@ class Service:
             radio_lock.
         @return True if sent successfully, or False when the radio remains busy.
         """
+        if self.scheduler and not restoring:
+            status = await self.scheduler.status()
+            self.diagnostics["scheduler"] = status
+            if status["hb_active"] != "1":
+                raise LinkError("MCU heartbeat schedule lost")
+            self.phase_reference_missing = not bool(
+                self.phase_client.reference_status(status)
+            )
+            self.next_heartbeat = time.monotonic() + 0.5
+            return not self.phase_reference_missing
         raw = heartbeat(
             self.config.gateway,
             self.config.tag,
@@ -797,6 +910,15 @@ class Service:
             int(time.monotonic() - self.started),
             self.config.heartbeat_parameter,
         )
+        if self.scheduler:
+            status = await self.scheduler.start_heartbeat(raw)
+            self.diagnostics["scheduler"] = status
+            self.diagnostics["phase_reference"] = self.phase_client.reference_status(
+                status
+            )
+            self.phase_reference_missing = False
+            self.next_heartbeat = time.monotonic() + 0.5
+            return True
         sent = (
             await self._transmit(raw, reference_setup=True)
             if restoring
@@ -865,23 +987,25 @@ class Service:
                 continue
             self.handle_rx(received, line)
 
-    def handle_rx(self, received, line):
+    def handle_rx(self, received, line, *, retained=False):
         """Accept valid device reports for discovery, durable state, and exact command
         confirmation.
 
         @param received Monotonic host timestamp at which the UART record arrived.
         @param line Complete RX record from the active adapter.
+        @param retained Recover a confirmed query report without altering UART RX ordering.
         """
         try:
             sequence, rssi, lqi, raw = rx_envelope(line)
         except ValueError:
             self.diagnostics["invalid_rx"] += 1
             return
-        if self.last_rx is not None:
+        if not retained and self.last_rx is not None:
             gap = (sequence - self.last_rx - 1) & 0xFFFFFFFF
             if gap < 0x80000000:
                 self.diagnostics["rx_gaps"] += gap
-        self.last_rx = sequence
+        if not retained:
+            self.last_rx = sequence
         try:
             packet = decode(raw)
         except ValueError:
@@ -936,6 +1060,18 @@ class Service:
         # their full state, but exact-mask matching below cannot confirm a set.
         if mask & ~device.mask or bits & ~device.mask:
             return
+        # Retained MCU reports can overtake their bulk RX log. Apply them once
+        # and never let a delayed older log replace a newer accepted state.
+        previous_sequence = self.state_sequences.get(device.id)
+        if (
+            self.scheduler
+            and self.scheduler.query_supported
+            and previous_sequence is not None
+        ):
+            step = (sequence - previous_sequence) & 0xFFFFFFFF
+            if step == 0 or step >= 0x80000000:
+                return
+        self.state_sequences[device.id] = sequence
         previous = self.states.get(device.id)
         signature = (bits, counter, token)
         state = {
@@ -1084,39 +1220,209 @@ class Service:
                 raise
 
     async def refresh_state(self, request_id, device):
-        """Request a fresh device report without changing its outputs.
+        """Retry read-only query pairs until fresh state or bounded exhaustion.
 
         @param request_id Durable refresh command identifier.
         @param device Configured device identity to query.
         """
+        if self.scheduler and self.scheduler.query_supported:
+            await self.refresh_state_mcu(request_id, device)
+            return
         peer = self.devices[device]
         started = time.monotonic()
-        for opcode in (0x10, 0xAC):
-            await self.transmit(
-                frame(
-                    self.config.gateway,
-                    self.config.tag,
-                    device,
-                    peer.suffix,
-                    self.next_sequence(),
-                    opcode,
-                    bytes(7) + b"\x01",
-                )
+        deadline = started + REFRESH_TIMEOUT
+        session = self.session
+        rounds = sent = 0
+
+        def fresh():
+            """Return whether this device has an accepted report since refresh began."""
+            return (
+                device in self.states and self.state_received.get(device, 0) >= started
             )
-            await asyncio.sleep(0.2)
-        deadline = time.monotonic() + 4
-        while time.monotonic() < deadline:
-            state = self.states.get(device)
-            if state and self.state_received.get(device, 0) >= started:
-                self.result(request_id, "confirmed", device=device, state=state)
-                return
-            await asyncio.sleep(0.05)
+
+        def needed():
+            """Abort a lost session and suppress sends after fresh state or deadline."""
+            if not self.ready or self.session != session:
+                raise LinkError("Radio session changed during state refresh")
+            return not fresh() and time.monotonic() < deadline
+
+        async def wait_for_report(seconds):
+            """Wait at most the given seconds, stopping promptly on fresh state.
+
+            @param seconds Maximum response or query-spacing wait in seconds.
+            """
+            until = min(deadline, time.monotonic() + seconds)
+            while needed() and time.monotonic() < until:
+                await asyncio.sleep(min(0.05, until - time.monotonic()))
+
+        for _ in range(REFRESH_ROUNDS):
+            if not needed():
+                break
+            rounds += 1
+            for opcode in (0x10, 0xAC):
+                if not needed():
+                    break
+                acquired = False
+                while needed() and not acquired:
+                    try:
+                        await asyncio.wait_for(
+                            self.radio_lock.acquire(),
+                            max(0, min(0.05, deadline - time.monotonic())),
+                        )
+                        acquired = True
+                    except asyncio.TimeoutError:
+                        pass  # Recheck fresh state while another radio user owns the lock.
+                if not acquired:
+                    break
+                try:
+                    # A report may have arrived while waiting for another radio user.
+                    if needed():
+                        sent += bool(
+                            await self._transmit(
+                                frame(
+                                    self.config.gateway,
+                                    self.config.tag,
+                                    device,
+                                    peer.suffix,
+                                    self.next_sequence(),
+                                    opcode,
+                                    bytes(7) + b"\x01",
+                                ),
+                                still_needed=needed,
+                                phase_query=bool(
+                                    self.phase_client
+                                    and self.phase_client.query_supported
+                                ),
+                            )
+                        )
+                finally:
+                    self.radio_lock.release()
+                if opcode == 0x10:
+                    await wait_for_report(
+                        refresh_query_interval(self.config.serial_baudrate)
+                    )
+            await wait_for_report(REFRESH_RESPONSE_WAIT)
+        if fresh():
+            self.result(
+                request_id,
+                "confirmed",
+                device=device,
+                state=self.states[device],
+                query_rounds=rounds,
+                queries_sent=sent,
+            )
+            return
         self.result(
             request_id,
             "unconfirmed",
             device=device,
             error="No fresh state report after read-only queries",
+            query_rounds=rounds,
+            queries_sent=sent,
         )
+
+    async def refresh_state_mcu(self, request_id, device):
+        """Drain a complete MCU query without using host timers to transmit retries.
+
+        @param request_id Durable refresh command identity.
+        @param device Registry-authorized peer identity.
+        """
+        peer = self.devices[device]
+        scheduler, session = self.scheduler, self.session
+        self.diagnostics.pop("query_phase_tx", None)
+        self.diagnostics["query_execution"] = dict(
+            owner="mcu",
+            pair_entry_seconds=0.2355,
+            response_entry_seconds=REFRESH_RESPONSE_WAIT + 0.012,
+            rounds=3,
+            deadline_seconds=14.0,
+            cca_attempts=4,
+        )
+        raw = frame(
+            self.config.gateway,
+            self.config.tag,
+            device,
+            peer.suffix,
+            self.next_sequence(),
+            0x10,
+            bytes(7) + b"\x01",
+        )
+        started = time.monotonic()
+        async with self.radio_lock:
+            job = await scheduler.start_query(raw, peer.mask, REFRESH_RESPONSE_WAIT)
+        completed = False
+        try:
+            until = started + REFRESH_TIMEOUT + 2
+            while True:
+                if not self.ready or self.session != session:
+                    raise LinkError("Radio session changed during MCU query")
+                result = await scheduler.query_result(job, raw, peer.mask)
+                self.diagnostics["query_transaction"] = dict(result)
+                if result["state"] == "done":
+                    completed = True
+                    break
+                if time.monotonic() >= until:
+                    result = await scheduler.query_result(
+                        job, raw, peer.mask, cancel=True
+                    )
+                    completed = result["state"] == "done"
+                    raise LinkError("MCU query exceeded bounded completion time")
+                await asyncio.sleep(0.05)
+            if int(result["attempts"]) and int(result["tx_result"]) >= 0:
+                wire = bytes.fromhex(result["raw"])
+                expected = bytearray(raw)
+                if len(wire) != 41 or wire[22] not in (0x10, 0xAC):
+                    raise LinkError("Invalid MCU query opcode")
+                expected[22] = wire[22]
+                expected[37] = sum(expected[21:37]) & 255
+                code = int(result["tx_result"])
+                fields = " ".join(
+                    f"{k}={result[k]}"
+                    for k in (
+                        "entry_ticks",
+                        "return_ticks",
+                        "anchor_ticks",
+                        "anchor_gen",
+                        "age_ticks",
+                        "raw",
+                    )
+                )
+                metadata = self.phase_client.validate_reply(
+                    f"{'OK' if code == 0 else 'ERR'} TX {code} timestamp=tx_entry {fields}",
+                    bytes(expected),
+                )
+                self.diagnostics["query_phase_tx"] = dict(metadata)
+            values = dict(
+                device=device,
+                query_rounds=int(result["rounds"]),
+                queries_sent=int(result["sent"]),
+            )
+            if result["outcome"] == "1":
+                report = result["report"]
+                self.handle_rx(
+                    time.monotonic(),
+                    f"RX {result['rx_sequence']} 0 {result['rssi']} {result['lqi']} 39 {report}",
+                    retained=True,
+                )
+                if self.state_received.get(device, 0) < started:
+                    raise LinkError(
+                        "Retained query confirmation did not validate on host"
+                    )
+                self.result(
+                    request_id, "confirmed", state=self.states[device], **values
+                )
+            elif result["outcome"] == "2":
+                self.result(
+                    request_id,
+                    "unconfirmed",
+                    error="No fresh state report after read-only queries",
+                    **values,
+                )
+            else:
+                raise LinkError("MCU query cancelled or radio outcome uncertain")
+        finally:
+            if completed and self.ready and self.session == session:
+                await scheduler.drop_query(job)
 
     async def _phase_ready(self):
         """Require a usable phase reference without forcing an early heartbeat.
@@ -1188,6 +1494,8 @@ class Service:
         @param mask Nonzero mask selecting outputs to change.
         @param value Desired state bits restricted to the selected mask.
         """
+        if self.phase_client and self.scheduler and self.scheduler.output_supported:
+            return await self.set_outputs_mcu(request_id, device, mask, value)
         peer = self.devices[device]
         future = None
         sent = False
@@ -1295,6 +1603,120 @@ class Service:
             self.pending = None
             if future and not future.done():
                 future.cancel()
+
+    async def set_outputs_mcu(self, request_id, device, mask, value):
+        """Keep ownership on the Pi; drain a bounded MCU-aligned output transaction.
+
+        @param request_id Durable command identifier used to publish the result.
+        @param device Wire-order identifier of the registered target peer.
+        @param mask Output bits selected by the validated command.
+        @param value Requested state bits within the selected mask.
+        """
+        peer, scheduler, session = self.devices[device], self.scheduler, self.session
+        previous = self.states.get(device, {})
+        baseline = (
+            bytes(previous[k] for k in ("state_bits", "counter", "token"))
+            if previous
+            else b"\xff" * 3
+        )
+        token = self.store.token(
+            device, previous.get("token"), mask=mask, value=value, full_mask=peer.mask
+        )
+        raw = frame(
+            self.config.gateway,
+            self.config.tag,
+            device,
+            peer.suffix,
+            self.next_sequence(),
+            2,
+            bytes((1, 0, mask, value, 0, 0, 0, token)),
+        )
+        self.diagnostics["output_execution"] = dict(
+            owner="mcu", grid_ms=200, attempts=6, deadline_seconds=4
+        )
+        async with self.radio_lock:
+            job = await scheduler.start_output(raw, peer.mask, baseline)
+        completed = False
+        try:
+            # Four seconds on MCU; the extra two seconds only drain its result.
+            until = time.monotonic() + SET_CONFIRM_TIMEOUT + 2
+            while True:
+                if not self.ready or self.session != session:
+                    raise LinkError("Radio session changed during MCU output")
+                result = await scheduler.query_result(
+                    job, raw, peer.mask, output=True, baseline=baseline
+                )
+                self.diagnostics["output_transaction"] = dict(result)
+                if result["state"] == "done":
+                    completed = True
+                    break
+                if time.monotonic() >= until:
+                    await scheduler.query_result(
+                        job, raw, peer.mask, cancel=True, output=True, baseline=baseline
+                    )
+                    raise LinkError("MCU output exceeded bounded completion time")
+                await asyncio.sleep(0.02)
+            if int(result["attempts"]) and int(result["tx_result"]) >= 0:
+                code = int(result["tx_result"])
+                fields = " ".join(
+                    f"{k}={result[k]}"
+                    for k in (
+                        "entry_ticks",
+                        "return_ticks",
+                        "anchor_ticks",
+                        "anchor_gen",
+                        "age_ticks",
+                        "raw",
+                    )
+                )
+                self.diagnostics["phase_tx"] = self.phase_client.validate_reply(
+                    f"{'OK' if code == 0 else 'ERR'} TX {code} timestamp=tx_entry {fields}",
+                    raw,
+                )
+            values = dict(
+                device=device,
+                token=token,
+                output_attempts=int(result["attempts"]),
+                output_sent=int(result["sent"]),
+                grid_skips=int(result["grid_skips"]),
+            )
+            if result["outcome"] == "1":
+                packet = decode(bytes.fromhex(result["report"]))
+                self.handle_rx(
+                    time.monotonic(),
+                    f"RX {result['rx_sequence']} 0 {result['rssi']} {result['lqi']} 39 {result['report']}",
+                    retained=True,
+                )
+                # Report the confirmed transaction's state even if a newer
+                # physical event has already updated the authoritative registry.
+                bits = packet.data[3]
+                state = dict(
+                    device=device,
+                    state_bits=bits,
+                    outputs={
+                        str(n + 1): "ON" if bits & (1 << n) else "OFF"
+                        for n in range(peer.outputs)
+                    },
+                    mask=packet.data[2],
+                    counter=packet.data[6],
+                    token=packet.data[7],
+                    last_seen=time.time(),
+                    rssi=int(result["rssi"]),
+                    lqi=int(result["lqi"]),
+                )
+                self.result(request_id, "confirmed", state=state, **values)
+            elif result["outcome"] == "2":
+                self.result(
+                    request_id,
+                    "unconfirmed" if int(result["sent"]) else "busy",
+                    error="No matching state report",
+                    **values,
+                )
+            else:
+                raise LinkError("MCU output cancelled or radio outcome uncertain")
+        finally:
+            if completed and self.ready and self.session == session:
+                await scheduler.drop_query(job)
 
     async def run(self):
         """Keep the gateway reconciled across failures until shutdown is requested."""

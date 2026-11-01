@@ -68,6 +68,7 @@ function toast(message, error = false) {
   const close = document.createElement('button');
   close.textContent = '×';
   close.setAttribute('aria-label', 'Dismiss notification');
+  /** Dismiss this notification without changing other operation feedback. */
   close.addEventListener('click', () => item.remove());
   item.append(text, close);
   $('#toasts').append(item);
@@ -128,6 +129,17 @@ function relativeTime(timestamp) {
   return `${Math.floor(seconds / 86400)}d ago`;
 }
 /**
+ * Resolve a browser API path beneath the server-validated ingress prefix.
+ *
+ * @param {string} path - Local browser API route.
+ * @returns {string} Same-origin path in this UI's mount.
+ */
+function apiUrl(path) {
+  const base = document.querySelector('meta[name="livolo-base-path"]').content;
+  return base + path.replace(/^\//, '');
+}
+
+/**
  * Request gateway JSON with bounded waiting and actionable connection errors.
  *
  * @param {string} path - Same-origin API path.
@@ -138,7 +150,7 @@ async function api(path, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12000);
   try {
-    const response = await fetch(path, {
+    const response = await fetch(apiUrl(path), {
       cache: 'no-store',
       ...options,
       signal: controller.signal,
@@ -433,11 +445,13 @@ function renderNetwork() {
       'MQTT',
       !connected
         ? 'Unknown'
-        : bridge.mqtt_connected === true
-          ? 'Connected'
-          : bridge.mqtt_connected === false
-            ? 'Disconnected'
-            : 'Not reported',
+        : snapshot.mqtt?.enabled === false || snapshot.mqtt === null
+          ? 'Disabled'
+          : bridge.mqtt_connected === true
+            ? 'Connected'
+            : bridge.mqtt_connected === false
+              ? 'Disconnected'
+              : 'Not reported',
     ],
     ['Devices', `${snapshot.devices.length} / 256`],
     ['Pairing', snapshot.pairing ? deviceName(snapshot.pairing.device) : 'Closed'],
@@ -543,14 +557,19 @@ async function startPairing(device) {
 }
 /**
  * Dismiss the containing dialog when its close control is activated.
+ *
+ * @param {HTMLButtonElement} button - Close control bound to its containing dialog.
  */
 $$('.close-dialog').forEach((button) =>
   button.addEventListener('click', () => button.closest('dialog').close()),
 );
+/** Keep the visible view synchronized with browser navigation. */
 window.addEventListener('hashchange', changeView);
 changeView();
 /**
  * Apply the chosen availability filter and update its accessible selection state.
+ *
+ * @param {HTMLButtonElement} button - Control selecting an availability filter.
  */
 $$('[data-filter]').forEach((button) =>
   button.addEventListener('click', () => {
@@ -765,7 +784,7 @@ $('#login-form').addEventListener('submit', async (event) => {
   }
 });
 /**
- * Refresh automatically after each completed request without overlapping polls.
+ * Schedule the next snapshot refresh after the preceding refresh finishes.
  *
  * @returns {Promise<void>} Completion after scheduling the next refresh.
  */
@@ -780,7 +799,7 @@ let mqttInitialized = false;
  */
 function fillMqtt() {
   const settings = snapshot?.mqtt;
-  if (!settings) return;
+  if (!settings || settings.enabled === false) return;
   $('#mqtt-host').value = settings.host;
   $('#mqtt-port').value = settings.port;
   $('#mqtt-topic').value = settings.base_topic;
@@ -804,6 +823,17 @@ function updatePasswordField() {
  */
 function renderMqtt() {
   const settings = snapshot.mqtt;
+  const disabled = settings === null || settings?.enabled === false;
+  $('#mqtt-disabled').hidden = !disabled;
+  $('#mqtt-intro').hidden = disabled;
+  $('#mqtt-form').hidden = disabled;
+  if (disabled) {
+    $('#mqtt-status').textContent = 'Disabled';
+    $('#mqtt-status').className = 'badge';
+    $('#mqtt-password').value = '';
+    mqttInitialized = false;
+    return;
+  }
   if (!mqttInitialized) fillMqtt();
   const online = connected && settings?.connected;
   $('#mqtt-status').textContent = !connected ? 'Unknown' : online ? 'Connected' : 'Disconnected';
@@ -825,8 +855,11 @@ function renderMqtt() {
   else if (!busy && online && $('#mqtt-feedback').dataset.saved)
     $('#mqtt-feedback').textContent = 'Settings saved. Connected to the broker.';
   if (settings && !settings.editable)
-    $('#mqtt-feedback').textContent = 'MQTT configuration is unavailable in this demo.';
+    $('#mqtt-feedback').textContent = snapshot.simulated
+      ? 'MQTT configuration is unavailable in this demo.'
+      : 'MQTT settings are managed by the gateway configuration.';
 }
+/** Keep password entry and validation aligned with the selected password action. */
 $('#mqtt-password-action').addEventListener('change', updatePasswordField);
 /**
  * Discard unsaved broker edits and clear the settings feedback.

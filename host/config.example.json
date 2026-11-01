@@ -5,6 +5,7 @@
     "heartbeat_parameter": 1
   },
   "serial_port": "/dev/ttyAMA0",
+  "serial_baudrate": 115200,
   "database": "/var/lib/livolod/state.sqlite3",
   "offline_after": 180,
   "output_mode": "experimental_legacy",

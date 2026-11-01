@@ -1,0 +1,11 @@
+{
+  "network": {"gateway": "10203040", "tag": "42", "heartbeat_parameter": 1},
+  "serial_port": "/dev/livolo",
+  "serial_baudrate": 460800,
+  "database": "/var/lib/livolod/state.sqlite3",
+  "offline_after": 180,
+  "output_mode": "experimental_phase",
+  "mqtt": {"host": "127.0.0.1", "port": 1883, "base_topic": "livolo"},
+  "devices": [],
+  "web": {"enabled": true, "host": "127.0.0.1", "port": 8080}
+}

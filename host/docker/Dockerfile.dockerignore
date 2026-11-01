@@ -1,0 +1,19 @@
+# Only daemon sources, build metadata and the smoke check reach the builder.
+**
+!VERSION
+!host/
+!host/pyproject.toml
+!host/LICENSE
+!host/livolod/
+!host/livolod/**
+!host/docker/
+!host/docker/Dockerfile
+!host/docker/Dockerfile.dockerignore
+!host/docker/smoke.py
+**/__pycache__/
+**/*.pyc
+**/*.sqlite*
+**/*.db
+**/*.pem
+**/*.key
+**/.env

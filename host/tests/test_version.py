@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import replace
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -14,6 +15,21 @@ from livolod.version import parse_version, firmware_info
 
 
 class VersionTests(unittest.TestCase):
+    def test_project_and_firmware_release_markers_match(self):
+        """Catch application header drift before a firmware flash."""
+        root = Path(__file__).resolve().parents[2]
+        self.assertEqual((root / "VERSION").read_text().strip(), __version__)
+        header = (root / "firmware/version.h").read_text()
+        values = [
+            re.search(r"#define EC_VERSION_" + part + r" (\d+)", header).group(1)
+            for part in ("MAJOR", "MINOR")
+        ]
+        self.assertEqual(".".join(values), __version__)
+        self.assertIn(
+            'version = "' + __version__ + '"',
+            (root / "host/pyproject.toml").read_text(),
+        )
+
     def test_numeric_major_minor_and_unknown_legacy(self):
         """Verify numeric major minor and unknown legacy."""
         self.assertGreater(parse_version("0.10"), parse_version("0.9"))
@@ -27,7 +43,7 @@ class VersionTests(unittest.TestCase):
 
 
 class TrialTests(unittest.IsolatedAsyncioTestCase):
-    async def exercise(self, firmware="0.2", bad_confirm=False):
+    async def exercise(self, firmware=__version__, bad_confirm=False):
         """Run startup confirmation with the requested firmware-version behavior.
 
         @param firmware Firmware release reported during startup.
@@ -97,10 +113,10 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_wrong_release_or_failed_durable_confirmation_is_not_ready(self):
         """Verify wrong release or failed durable confirmation is not ready."""
-        for firmware, bad in [("0.3", False), ("0.2", True)]:
+        for firmware, bad in [("0.1", False), (__version__, True)]:
             service, store, history = await self.exercise(firmware, bad)
             with self.assertRaises(LinkError):
                 await service.restore()
             self.assertFalse(service.ready)
-            if firmware == "0.3":
+            if firmware != __version__:
                 self.assertNotIn("UPDATE_CONFIRM", history)

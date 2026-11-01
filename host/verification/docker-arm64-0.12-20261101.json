@@ -1,0 +1,72 @@
+{
+  "release": "0.12",
+  "platform": "linux/arm64",
+  "image_tags": [
+    "livolod:0.12"
+  ],
+  "image_id": "sha256:61b594e95393df6c71e0d9cc09d33e25a5effc8d013ce630f12a017fea6de71d",
+  "archive_sha256": "966c7ae6d54641af51669443c3743ad8f5121eeaf2b487c5ee158359ed15b8dc",
+  "archive_bytes": 43918544,
+  "buildkit_version": "0.34.1",
+  "compose_version": "5.6.1",
+  "compose_validation_passed": true,
+  "missing_serial_gid_rejected": true,
+  "non_root_smoke_passed": true,
+  "hardened_oci_smoke_passed": true,
+  "hardened_oci_settings": {
+    "uid": 10001,
+    "gid": 10001,
+    "root_read_only": true,
+    "capabilities": [],
+    "no_new_privileges": true,
+    "tmpfs": "/tmp",
+    "persistent_bind": "/var/lib/livolod"
+  },
+  "hardware_accessed": false,
+  "production_service_changed": false,
+  "docker_engine_load_tested": false,
+  "registry_published": false,
+  "build_metadata": {
+    "containerimage.config.digest": "sha256:61b594e95393df6c71e0d9cc09d33e25a5effc8d013ce630f12a017fea6de71d",
+    "containerimage.descriptor": {
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "digest": "sha256:a465e5bdd2542b52c38b70537a43fecc6ecfa1d2ec60d989c4f243ab2f5c7016",
+      "size": 1620,
+      "annotations": {
+        "org.opencontainers.image.created": "2026-11-01T16:33:02Z"
+      },
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux"
+      }
+    },
+    "containerimage.digest": "sha256:a465e5bdd2542b52c38b70537a43fecc6ecfa1d2ec60d989c4f243ab2f5c7016",
+    "image.name": "docker.io/library/livolod:0.12"
+  },
+  "runtime_sources": {
+    "host/livolod/uart.py": "49eecd626c86ba026573644369335fc96139ff793aced86c5f97afbca1194ced",
+    "host/livolod/simulator.py": "c4f91b55149d33c00156047585dd4927639a196482f177126d8a7497bd759f2f",
+    "host/livolod/firmware_update.py": "6ec08f325338241e1fe8943687cad4241cfd12ed0f1fb30625d95b20e9d83798",
+    "host/livolod/mqtt.py": "d41b078bcbe0c29fda265a6b2ba15f71d419f243b70e58587cfe9bcb5cd57e60",
+    "host/livolod/scheduler.py": "d106d4c641594dd0bc3ed3040fd6467e2e742a988ef52dd114420767758dddf8",
+    "host/livolod/protocol.py": "3d8f29b627c6fb231769f41a24d72d1116f92fdf788e2a0dcc383ac54c123c06",
+    "host/livolod/phase.py": "b4121c5c01947047d303d9775dea9c3b33a51459175ca8c1c368a1b21a248fee",
+    "host/livolod/mqtt_settings.py": "0860f27de9f5c809af602b94e36502e405f8418c547eec9a99930eebed459ca1",
+    "host/livolod/__main__.py": "62ba3f56ef9774ee774973300640a168e6d5fa093c118bc3dd487906175f5f3e",
+    "host/livolod/service.py": "7363260a7513bca3cfaac20f1c50775a7a8c15465cdd9c37b2fb98ccc0ef0fc9",
+    "host/livolod/version.py": "0f767809531d9e4f0a7a5c7103861d474c36df8f133f5e28e06c2db7f4dd592c",
+    "host/livolod/homeassistant.py": "5ace2fba059d834cf09d7988b7426ed0c268936dc24a0cc8d067c63d18cc8a3f",
+    "host/livolod/storage.py": "be966287f35d3bd63f6b07acc17495c0d7c69e5fca8dfa215cf215a982f0e5a0",
+    "host/livolod/update_package.py": "8dee55736488f26a409511749b67cae31d93ec5d982f1734eabb75c8eac0a33b",
+    "host/livolod/__init__.py": "dd0256756bd2f88c5522d952241e507ef0170e578191bbc6eadfa4b865c69684",
+    "host/livolod/web_demo.py": "662ab4825cd0b6c7118ff54b4b2c94898a2ce0008c32b56b0daf1fd9181ceeb9",
+    "host/livolod/config.py": "373f42a07275a10d5cb6348bca71b1b247e49edc2248deceadc23bfb29dd65d8",
+    "host/livolod/web.py": "3c1fc7f69b0b4dd43b31066a2a43fbf850d1dd1049475904daa50e476eec7f38",
+    "host/livolod/static/app.js": "17360dc06013b214baa197fb59d4430965aa803b6bfdc07ce9481cc6724e2db6",
+    "host/livolod/static/index.html": "9f5eb16fb973687c1f56f27d48dd74d0a7202cc2cca551f393f4501b30073b8b",
+    "host/livolod/static/style.css": "902bb7348bb74a48e6953263682e251fdbf6fbddfbbf69b619a3774a7a15b4c0"
+  },
+  "new_python_format_check": "black 24.8.0: passed",
+  "new_python_documentation_check": "passed",
+  "repository_documentation_check": "Existing failures outside host/docker; no unrelated sources changed"
+}

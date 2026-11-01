@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="livolo-base-path" content="__LIVOLO_BASE_PATH__">
   <meta name="theme-color" content="#f6f7f9">
   <title>Livolo · Device manager</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='12' fill='%232c735b'/%3E%3Cpath d='M13 10v20h15' stroke='white' stroke-width='4' fill='none'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/style.css">
-  <script src="/app.js" defer></script>
+  <link rel="stylesheet" href="__LIVOLO_BASE_PATH__style.css">
+  <script src="__LIVOLO_BASE_PATH__app.js" defer></script>
 </head>
 <body>
   <aside class="sidebar">
@@ -45,7 +46,8 @@
       <section id="view-network" class="view" hidden><div class="page-heading"><div><p class="eyebrow">BEHIND YOUR DEVICES</p><h1>Network</h1><p class="subtitle">Your local gateway at a glance.</p></div></div><div class="network-layout"><div class="surface network-details" id="network-details"></div>
         <section class="surface mqtt-settings" aria-labelledby="mqtt-title">
           <div class="mqtt-heading"><div><p class="eyebrow">CONNECT YOUR AUTOMATIONS</p><h2 id="mqtt-title">MQTT settings</h2></div><span id="mqtt-status" class="badge">Connecting</span></div>
-          <p class="muted">Connect Livolo to your MQTT broker. Changes apply without restarting the radio.</p>
+          <p class="muted" id="mqtt-intro">Connect Livolo to your MQTT broker. Changes apply without restarting the radio.</p>
+          <p id="mqtt-disabled" class="muted" hidden>MQTT is disabled. Device management and control do not require MQTT.</p>
           <form id="mqtt-form">
             <div class="form-row"><label class="field">Server<input id="mqtt-host" required maxlength="253" placeholder="e.g. 192.168.1.10" autocomplete="off" spellcheck="false"><small>Hostname or IP address, without mqtt://</small></label><label class="field">Port<input id="mqtt-port" type="number" required min="1" max="65535" value="1883"></label></div>
             <label class="field">Topic prefix<input id="mqtt-topic" required maxlength="1024" placeholder="livolo" autocomplete="off" spellcheck="false"><small id="mqtt-topic-help">Messages are published beneath this prefix.</small></label>

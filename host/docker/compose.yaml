@@ -1,0 +1,35 @@
+services:
+  livolod:
+    image: livolod:${LIVOLO_VERSION:-0.12}
+    platform: linux/arm64
+    restart: unless-stopped
+    network_mode: host
+    user: "${LIVOLO_UID:-10001}:${LIVOLO_GID:-10001}"
+    group_add:
+      - "${LIVOLO_SERIAL_GID:?Set LIVOLO_SERIAL_GID to the serial device group ID}"
+    devices:
+      - "${LIVOLO_SERIAL_DEVICE:-/dev/ttyAMA0}:/dev/livolo:rw"
+    volumes:
+      - type: bind
+        source: ./config.json
+        target: /etc/livolod/config.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data
+        target: /var/lib/livolod
+        bind:
+          create_host_path: false
+    env_file: ./daemon.env
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

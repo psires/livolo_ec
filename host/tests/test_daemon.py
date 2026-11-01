@@ -747,6 +747,8 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_refresh_uses_only_queries_and_requires_fresh_report(self):
         """Verify refresh uses only queries and requires fresh report."""
+        # Let the simulator's unsolicited ARM report predate this refresh.
+        await asyncio.sleep(0.06)
         self.start_workers()
         self.service.handle_rx(time.monotonic() - 10, report())
         original = self.service.gateway.command
@@ -771,6 +773,165 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             self.service.command_result("refresh1")["state"]["state_bits"], 1
         )
+
+    async def test_refresh_retries_until_same_state_fresh_report_then_stops(self):
+        """A third-round fresh report stops even the unsent second query of that round."""
+        self.service.handle_rx(time.monotonic() - 10, report(bits=0))
+        packets = []
+        sequences = []
+        original = self.service.gateway.command
+
+        async def query(text, retries=1):
+            """Answer the fifth query with unchanged but freshly received state.
+
+            @param text UART request to inspect.
+            @param retries UART reply retry allowance.
+            """
+            result = await original(text, retries)
+            if text.startswith("SEND "):
+                raw = bytes.fromhex(text.split()[-1])
+                packets.append(decode(raw))
+                sequences.append(raw[2])
+                if len(packets) == 5:
+                    self.service.handle_rx(time.monotonic(), report(bits=0, mask=0))
+            return result
+
+        self.service.gateway.command = query
+        self.service.submit("refresh", {"request_id": "late", "device": "46715621"})
+        with (
+            patch("livolod.service.REFRESH_QUERY_INTERVAL", 0.001),
+            patch("livolod.service.REFRESH_RESPONSE_WAIT", 0.005),
+        ):
+            await self.service.refresh_state("late", "46715621")
+        result = self.service.command_result("late")
+        self.assertEqual(result["status"], "confirmed")
+        self.assertEqual(result["query_rounds"], 3)
+        self.assertEqual(result["queries_sent"], 5)
+        self.assertEqual([p.opcode for p in packets], [0x10, 0xAC, 0x10, 0xAC, 0x10])
+        self.assertTrue(all(p.data == bytes(7) + b"\x01" for p in packets))
+        self.assertEqual(len(set(sequences)), 5)
+
+    async def test_refresh_exhausts_bound_without_accepting_nonstate_or_stale_reports(
+        self,
+    ):
+        """Six queries exhaust three rounds; cached state and other traffic cannot confirm."""
+        self.service.handle_rx(time.monotonic() - 10, report())
+        original = self.service.gateway.command
+        sent = []
+
+        async def query(text, retries=1):
+            """Inject keepalive, query reply and foreign state while queries remain unanswered.
+
+            @param text UART request to inspect.
+            @param retries UART reply retry allowance.
+            """
+            result = await original(text, retries)
+            if text.startswith("SEND "):
+                sent.append(text)
+                for packet in (report(opcode=8), report(opcode=0xFA), report(tag="b1")):
+                    self.service.handle_rx(time.monotonic(), packet)
+            return result
+
+        self.service.gateway.command = query
+        self.service.submit("refresh", {"request_id": "silent", "device": "46715621"})
+        with (
+            patch("livolod.service.REFRESH_QUERY_INTERVAL", 0.001),
+            patch("livolod.service.REFRESH_RESPONSE_WAIT", 0.005),
+        ):
+            await self.service.refresh_state("silent", "46715621")
+        result = self.service.command_result("silent")
+        self.assertEqual((result["status"], result["queries_sent"]), ("unconfirmed", 6))
+        self.assertEqual(len(sent), 6)
+
+    async def test_refresh_report_during_radio_lock_wait_prevents_transmission(self):
+        """A report arriving behind another radio user prevents even the first query."""
+        self.service.submit("refresh", {"request_id": "locked", "device": "46715621"})
+        await self.service.radio_lock.acquire()
+        task = asyncio.create_task(self.service.refresh_state("locked", "46715621"))
+        self.tasks.append(task)
+        await asyncio.sleep(0.01)
+        self.service.handle_rx(time.monotonic(), report())
+        try:
+            await asyncio.wait_for(task, 0.2)
+            self.assertTrue(self.service.radio_lock.locked())
+        finally:
+            self.service.radio_lock.release()
+        result = self.service.command_result("locked")
+        self.assertEqual((result["status"], result["queries_sent"]), ("confirmed", 0))
+        self.assertFalse(
+            any(c.startswith("SEND ") for c in self.service.gateway.commands)
+        )
+
+    async def test_refresh_report_during_cca_backoff_prevents_retry(self):
+        """Fresh state after a definite channel-busy result suppresses its next RF attempt."""
+        original = self.service.gateway.command
+        sends = []
+
+        async def busy(text, retries=1):
+            """Report state during the backoff following a definite non-send.
+
+            @param text UART request to inspect.
+            @param retries UART reply retry allowance.
+            """
+            if text.startswith("SEND "):
+                sends.append(text)
+                asyncio.get_running_loop().call_later(
+                    0.005, self.service.handle_rx, time.monotonic(), report()
+                )
+                raise CommandError("ERR TX 2")
+            return await original(text, retries)
+
+        self.service.gateway.command = busy
+        self.service.submit("refresh", {"request_id": "busy", "device": "46715621"})
+        await self.service.refresh_state("busy", "46715621")
+        self.assertEqual(len(sends), 1)
+        self.assertEqual(self.service.command_result("busy")["queries_sent"], 0)
+        self.assertEqual(self.service.command_result("busy")["status"], "confirmed")
+
+    async def test_refresh_session_change_and_uart_uncertainty_abort_without_retry(
+        self,
+    ):
+        """An uncertain send or changed session cannot trigger another query attempt."""
+        original = self.service.gateway.command
+        for failure in ("session", "uart"):
+            sends = []
+
+            async def changed(text, retries=1):
+                """Inject the selected session or UART failure on the first query.
+
+                @param text UART request to inspect.
+                @param retries UART reply retry allowance.
+                """
+                if text.startswith("SEND "):
+                    sends.append(text)
+                    if failure == "uart":
+                        raise LinkError("unknown UART outcome")
+                    self.service.session = "0011223344556677"
+                    return "OK TX 0"
+                return await original(text, retries)
+
+            self.service.gateway.command = changed
+            with self.assertRaises(LinkError):
+                await self.service.refresh_state("failed", "46715621")
+            self.assertEqual(len(sends), 1)
+            self.assertFalse(self.service.radio_lock.locked())
+
+    async def test_refresh_deadline_bounds_lock_wait(self):
+        """A blocked radio lock expires without transmitting or stealing the owner's lock."""
+        self.service.submit("refresh", {"request_id": "deadline", "device": "46715621"})
+        await self.service.radio_lock.acquire()
+        try:
+            with patch("livolod.service.REFRESH_TIMEOUT", 0.02):
+                await asyncio.wait_for(
+                    self.service.refresh_state("deadline", "46715621"), 0.2
+                )
+            result = self.service.command_result("deadline")
+            self.assertEqual(
+                (result["status"], result["queries_sent"]), ("unconfirmed", 0)
+            )
+            self.assertTrue(self.service.radio_lock.locked())
+        finally:
+            self.service.radio_lock.release()
 
     async def test_foreign_and_invalid_reports_do_not_set_state(self):
         """Verify foreign and invalid reports do not set state."""

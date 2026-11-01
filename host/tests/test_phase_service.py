@@ -12,7 +12,7 @@ from livolod.protocol import decode
 from livolod.service import Service
 from livolod.simulator import Simulator
 from livolod.storage import Store
-from livolod.uart import LinkError
+from livolod.uart import CommandError, LinkError
 
 EXAMPLE = Path(__file__).parents[1] / "config.example.json"
 
@@ -54,6 +54,187 @@ class PhaseServiceTests(unittest.IsolatedAsyncioTestCase):
         self.store.begin(name, dict(action="set", device="46715621", mask=1, value=1))
         await self.service.set_outputs(name, "46715621", 1, 1)
         return self.store.command_result(name)
+
+    async def test_mcu_output_retained_confirmation_updates_state_and_drains_slot(self):
+        """A retained radio confirmation must reach MQTT state and release its slot."""
+        from unittest.mock import AsyncMock, Mock
+        from test_daemon import report
+
+        await self.start()
+        await asyncio.sleep(0.06)
+        context = {}
+
+        async def start_output(raw, mask, baseline):
+            """Capture the output transaction for a matching retained confirmation.
+
+            @param raw Requested output frame including the allocated token.
+            @param mask Registry-authorized output bits.
+            @param baseline Previous state, counter and token bytes.
+            """
+            context.update(raw=raw, mask=mask, baseline=baseline)
+            return 9
+
+        async def result(*args, **kwargs):
+            """Return a successful retained report matching the captured request.
+
+            @param args Scheduler result lookup positional arguments.
+            @param kwargs Scheduler output validation options.
+            """
+            raw = context["raw"]
+            return dict(
+                state="done",
+                outcome="1",
+                attempts="1",
+                sent="1",
+                grid_skips="0",
+                tx_result="0",
+                entry_ticks="1",
+                return_ticks="2",
+                anchor_ticks="0",
+                anchor_gen="1",
+                age_ticks="1",
+                raw=raw.hex(),
+                report=report(bits=1, mask=1, counter=2, token=raw[36]).split()[-1],
+                rx_sequence="100",
+                rssi="-40",
+                lqi="60",
+            )
+
+        scheduler = Mock(output_supported=True)
+        scheduler.start_output = AsyncMock(side_effect=start_output)
+        scheduler.query_result = AsyncMock(side_effect=result)
+        scheduler.drop_query = AsyncMock()
+        self.service.scheduler = scheduler
+        self.service.phase_client = Mock(validate_reply=Mock(return_value={}))
+        answer = await self.control("mcu-output")
+        self.assertEqual(answer["status"], "confirmed")
+        self.assertEqual(answer["state"]["state_bits"], 1)
+        self.assertEqual(answer["output_attempts"], 1)
+        self.assertEqual(self.service.states["46715621"]["state_bits"], 1)
+        self.assertEqual(context["mask"], 3)
+        self.assertEqual(len(context["baseline"]), 3)
+        scheduler.drop_query.assert_awaited_once_with(9)
+        self.assertFalse(
+            any(c.startswith("SEND_PHASE ") for c in self.service.gateway.commands)
+        )
+
+    async def test_phase_queries_keep_round_bound_and_stop_on_fresh_state(self):
+        """Stamp query pairs, exhaust three rounds, and stop early on a fresh report."""
+        await self.start()
+        await asyncio.sleep(0.06)  # The ARM report must predate the refresh.
+        original = self.service.gateway.command
+        attempts = []
+        confirm_at = None
+
+        async def command(text, retries=1):
+            """Record actual stamped bytes and optionally publish fresh state.
+
+            @param text UART command to execute.
+            @param retries UART retry allowance.
+            """
+            reply = await original(text, retries)
+            if text.startswith("SEND_PHASE "):
+                attempts.append(bytes.fromhex(reply.split("raw=")[1]))
+                if len(attempts) == confirm_at:
+                    self.service.gateway.current_state("46715621")
+                    await asyncio.sleep(0)
+            return reply
+
+        self.service.gateway.command = command
+        self.service.gateway.commands.clear()
+        for name, stop_at, expected in (("silent", None, 6), ("fresh", 5, 5)):
+            attempts.clear()
+            confirm_at = stop_at
+            self.store.begin(name, dict(action="refresh", device="46715621"))
+            with (
+                patch("livolod.service.REFRESH_QUERY_INTERVAL", 0.001),
+                patch("livolod.service.REFRESH_RESPONSE_WAIT", 0.005),
+            ):
+                await self.service.refresh_state(name, "46715621")
+            result = self.store.command_result(name)
+            self.assertEqual(
+                result["status"], "confirmed" if stop_at else "unconfirmed"
+            )
+            self.assertEqual(
+                (result["query_rounds"], result["queries_sent"]), (3, expected)
+            )
+            self.assertEqual(
+                [decode(p).opcode for p in attempts],
+                [0x10, 0xAC, 0x10, 0xAC, 0x10, 0xAC][:expected],
+            )
+            self.assertTrue(
+                all(
+                    decode(p).data == bytes(7) + b"\x01" and p[-3:] != bytes(3)
+                    for p in attempts
+                )
+            )
+        self.assertFalse(
+            any(c.startswith("SEND ") for c in self.service.gateway.commands)
+        )
+
+    async def test_query_reference_loss_and_uncertain_send_never_fall_back(self):
+        """Missing phase or uncertain TX cannot cause a raw query or unbounded replay."""
+        await self.start()
+        await asyncio.sleep(0.06)
+        original = self.service.gateway.command
+        attempts = []
+
+        async def command(text, retries=1):
+            """Inject uncertain transmission after restoring a missing reference.
+
+            @param text UART command to execute.
+            @param retries UART retry allowance.
+            """
+            if text.startswith("SEND_PHASE "):
+                attempts.append(text)
+                raise CommandError("ERR TX 1")
+            return await original(text, retries)
+
+        self.service.gateway.phase_anchor = None
+        self.service.gateway.commands.clear()
+        self.store.begin("lost", dict(action="refresh", device="46715621"))
+        with (
+            patch("livolod.service.REFRESH_QUERY_INTERVAL", 0.001),
+            patch("livolod.service.REFRESH_RESPONSE_WAIT", 0.005),
+        ):
+            await self.service.refresh_state("lost", "46715621")
+        self.assertEqual(self.store.command_result("lost")["queries_sent"], 0)
+        self.assertEqual(len(self.service.gateway.commands), 1)
+        self.assertTrue(self.service.gateway.commands[0].startswith("SEND_PHASE "))
+        self.service.phase_reference_missing = False
+        self.service.gateway.command = command
+        with self.assertRaises(LinkError):
+            await self.service.refresh_state("uncertain", "46715621")
+        self.assertEqual(len(attempts), 1)
+
+    async def test_phase_query_busy_retries_restamp_and_stop_on_report(self):
+        """Keep existing CCA backoff and suppress its retry after fresh state arrives."""
+        await self.start()
+        await asyncio.sleep(0.06)
+        original = self.service.gateway.command
+        attempts = []
+
+        async def command(text, retries=1):
+            """Return valid CCA metadata and deliver a report during backoff.
+
+            @param text UART command to execute.
+            @param retries UART retry allowance.
+            """
+            reply = await original(text, retries)
+            if text.startswith("SEND_PHASE "):
+                attempts.append(reply)
+                asyncio.get_running_loop().call_later(
+                    0.005, self.service.gateway.current_state, "46715621"
+                )
+                raise CommandError(reply.replace("OK TX 0", "ERR TX 2"))
+            return reply
+
+        self.service.gateway.command = command
+        self.store.begin("busy-query", dict(action="refresh", device="46715621"))
+        await self.service.refresh_state("busy-query", "46715621")
+        self.assertEqual(len(attempts), 1)
+        result = self.store.command_result("busy-query")
+        self.assertEqual((result["status"], result["queries_sent"]), ("confirmed", 0))
 
     def test_missing_config_mode_disables_outputs(self):
         """Verify missing config mode disables outputs."""

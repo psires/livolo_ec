@@ -7,6 +7,20 @@ from pathlib import Path
 import re
 
 
+UART_BAUDRATES = (115200, 230400, 460800, 921600)
+
+
+def uart_baudrate(value):
+    """Validate an application UART rate shared with the firmware build.
+
+    @param value Integer baud rate; booleans and implicit conversions are rejected.
+    @return The supported baud rate.
+    """
+    if type(value) is not int or value not in UART_BAUDRATES:
+        raise ValueError(f"serial_baudrate must be one of {UART_BAUDRATES}")
+    return value
+
+
 def integer(value, low, high, name):
     """Validate an integer setting against its supported inclusive range.
 
@@ -88,6 +102,10 @@ class Config:
         default_factory=lambda: {"enabled": False, "host": "127.0.0.1", "port": 8080}
     )
     output_mode: str = "disabled"
+    serial_baudrate: int = 115200
+    api: dict = field(
+        default_factory=lambda: {"enabled": False, "host": "127.0.0.1", "port": 8090}
+    )
 
 
 def load(path):
@@ -107,7 +125,7 @@ def parse(raw):
     """
     fields(
         raw,
-        "network serial_port database mqtt devices offline_after web output_mode",
+        "network serial_port serial_baudrate database mqtt devices offline_after web output_mode api",
         "configuration",
     )
     output_mode = raw.get("output_mode", "disabled")
@@ -142,7 +160,7 @@ def parse(raw):
                 "Device IDs and slots must be unique and distinct from gateway"
             )
         devices.append(device)
-    mqtt = mqtt_config(raw["mqtt"], gateway)
+    mqtt = mqtt_config(raw.get("mqtt"), gateway)
     for key in ("serial_port", "database"):
         if (
             not isinstance(raw.get(key), str)
@@ -151,7 +169,11 @@ def parse(raw):
         ):
             raise ValueError(f"{key} must be an absolute path")
     web = dict(raw.get("web", {}))
-    fields(web, "enabled host port token_env", "web")
+    fields(web, "enabled host port token_env ingress", "web")
+    if "ingress" in web:
+        from .ingress import validate_ingress
+
+        web["ingress"] = validate_ingress(web["ingress"])
     web.setdefault("enabled", False)
     web.setdefault("host", "127.0.0.1")
     web.setdefault("port", 8080)
@@ -165,8 +187,10 @@ def parse(raw):
         not isinstance(web["token_env"], str) or not web["token_env"]
     ):
         raise ValueError("web.token_env must name an environment variable")
-    if web["host"] not in ("127.0.0.1", "::1", "localhost") and not web.get(
-        "token_env"
+    if (
+        web["host"] not in ("127.0.0.1", "::1", "localhost")
+        and not web.get("token_env")
+        and not web.get("ingress", {}).get("enabled", False)
     ):
         raise ValueError("A non-loopback web host requires token_env")
     integer(web["port"], 1, 65535, "web.port")
@@ -183,7 +207,33 @@ def parse(raw):
         ),
         web,
         output_mode,
+        uart_baudrate(raw.get("serial_baudrate", 115200)),
+        api_config(raw.get("api", {})),
     )
+
+
+def api_config(raw):
+    """Validate the separate authenticated machine API listener.
+
+    @param raw API configuration mapping.
+    @return Listener settings with defaults, without resolving its secret.
+    """
+    fields(raw, "enabled host port token_env", "api")
+    api = dict(enabled=False, host="127.0.0.1", port=8090)
+    api.update(raw)
+    if type(api["enabled"]) is not bool:
+        raise ValueError("api.enabled must be boolean")
+    if not isinstance(api["host"], str) or not api["host"] or "\0" in api["host"]:
+        raise ValueError("api.host must be nonempty")
+    integer(api["port"], 1, 65535, "api.port")
+    if "token_env" in api and (
+        not isinstance(api["token_env"], str)
+        or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", api["token_env"])
+    ):
+        raise ValueError("api.token_env must name an environment variable")
+    if api["enabled"] and not api.get("token_env"):
+        raise ValueError("Enabled API requires api.token_env")
+    return api
 
 
 def mqtt_config(raw, gateway, *, allow_password=False):
@@ -194,7 +244,20 @@ def mqtt_config(raw, gateway, *, allow_password=False):
     @param allow_password Whether a saved plaintext password field is accepted.
     @return A validated copy of the MQTT settings.
     """
+    if raw is None:
+        return {"enabled": False}
+    fields(
+        raw,
+        "enabled host port base_topic client_id username password_env tls_ca tls_cert tls_key"
+        + (" password" if allow_password else ""),
+        "mqtt",
+    )
     mqtt = dict(raw)
+    enabled = mqtt.pop("enabled", True)
+    if type(enabled) is not bool:
+        raise ValueError("mqtt.enabled must be boolean")
+    if not enabled:
+        return {"enabled": False}
     fields(
         mqtt,
         "host port base_topic client_id username password_env tls_ca tls_cert tls_key"

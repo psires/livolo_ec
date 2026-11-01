@@ -26,6 +26,7 @@ async def run(config, simulate=False):
     store = Store(config.database, config.gateway + ":" + config.tag)
     service = None
     web = None
+    api = None
     try:
         service = Service(
             config,
@@ -34,8 +35,11 @@ async def run(config, simulate=False):
             simulated=simulate,
         )
         service.simulated = simulate
-        service.mqtt_factory = None if simulate else Broker
-        service.broker = Broker(service.config.mqtt, service.receive, service.snapshot)
+        if service.mqtt_enabled:
+            service.mqtt_factory = None if simulate else Broker
+            service.broker = Broker(
+                service.config.mqtt, service.receive, service.snapshot
+            )
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             loop.add_signal_handler(sig, service.stop.set)
@@ -43,9 +47,16 @@ async def run(config, simulate=False):
             from .web import start_web
 
             web = await start_web(service, config)
-        service.broker.start()
+        if config.api["enabled"]:
+            from .native_api import start_api
+
+            api = await start_api(service, config)
+        if service.broker:
+            service.broker.start()
         await service.run()
     finally:
+        if api:
+            await api.close()
         if web:
             await web.close()
         if service and service.broker:
@@ -88,8 +99,10 @@ def main():
                 web["host"] = args.web_host
             if args.web_port is not None:
                 web["port"] = integer(args.web_port, 1, 65535, "web port")
-            if web["host"] not in ("127.0.0.1", "::1", "localhost") and not web.get(
-                "token_env"
+            if (
+                web["host"] not in ("127.0.0.1", "::1", "localhost")
+                and not web.get("token_env")
+                and not web.get("ingress", {}).get("enabled", False)
             ):
                 raise ValueError(
                     "A non-loopback web host requires configured web.token_env"

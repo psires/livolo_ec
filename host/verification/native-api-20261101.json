@@ -1,0 +1,45 @@
+{
+  "verified_at_utc": "2026-11-01T18:06:16.161183+00:00",
+  "host_version": "0.12",
+  "api_version": 1,
+  "source_only": true,
+  "live_deployment_changed": false,
+  "hardware_accessed": false,
+  "firmware_changed": false,
+  "full_daemon_suite": {
+    "python": "3.9.6",
+    "aiohttp": "3.13.5",
+    "tests": 140,
+    "passed": true
+  },
+  "native_api_suite": {
+    "python": "3.14.7",
+    "aiohttp": "3.14.5",
+    "tests": 14,
+    "passed": true
+  },
+  "local_non_root_smoke": {
+    "passed": true,
+    "mqtt_enabled": false,
+    "web_and_authenticated_native_api": true,
+    "simulated_radio": true,
+    "container_runtime_used": false
+  },
+  "arm64_cp313_dependency_wheels_resolved": true,
+  "new_docker_image_built": false,
+  "wheel_contains_native_api_ingress_and_web_assets": true,
+  "paho_mqtt_optional_extra_verified": true,
+  "changed_modules_documentation_passed": true,
+  "new_modules_formatting_passed": true,
+  "source_sha256": {
+    "host/livolod/native_api.py": "3d6c50615efe46765e8f08ded0162b2304c524023d89134cd2511b8b11867500",
+    "host/livolod/config.py": "067c2e039251046e88fc9536a823793d5f58cfd91378121ca84aa87ac090e6f6",
+    "host/livolod/__main__.py": "bbd74730f1a32201dea2608a51d1e1626db4ac18d45da2cc55b5d88246daab93",
+    "host/livolod/mqtt.py": "02b457b34eda349d1ab665b369bd574b2632cab0c433187e9947dd36d94d00c2",
+    "host/livolod/service.py": "6d984772805ec7b9139bfd37bcd6ae1050cc5cb0e0464b93ad315c624c2fc51e",
+    "host/tests/test_native_api.py": "d99903f897b83065774b3e1100fd7e92b35ecf59efcc73bca822fffac20018c4",
+    "host/pyproject.toml": "ba517eac986cd7477a8002b256c21897122cf2947e6eef3134250930cb126ec9",
+    "host/docker/Dockerfile": "584aa4e709233f564fdce8942a28b0b3ce3db3398bdfd35d37f705f98db878ee",
+    "host/docker/smoke.py": "0820c113eef7c3fa469084c2e9f7f9d2b545a02e144ebdc31dd4ac0a47e5e29a"
+  }
+}

@@ -1,4 +1,4 @@
-"""Opt-in UART phase candidate support; not wired into live daemon controls yet.
+"""Guarded adapter phase stamping for opt-in outputs and supported state queries.
 
 tx_entry_v1 measures radio submission, not SFD. Never synthesize phase from host
 time or fall back to raw SEND when this capability or its reference is absent.
@@ -77,6 +77,8 @@ class PhaseClient:
         self.gateway_id = identity(gateway_id)
         self.caps = PhaseCapabilities.parse(caps)
         self.allow_outputs = allow_outputs
+        self.query_supported = caps.get("phase_queries") == "10_ac_v1"
+        self.adapter_sequence = caps.get("tx_sequence") == "adapter_when_hb"
         self.last_tx = None
 
     def reference_status(self, status):
@@ -147,7 +149,10 @@ class PhaseClient:
                 ):
                     raise ValueError
             if expected is not None and (
-                len(raw) != len(expected) or raw[:-3] != expected[:-3]
+                len(raw) != len(expected)
+                or raw[:2] != expected[:2]
+                or raw[3:-3] != expected[3:-3]
+                or (not self.adapter_sequence and raw[2] != expected[2])
             ):
                 raise ValueError
             if len(raw) not in (38, 41) or raw[-3:] != self.caps.trailer(age):
@@ -199,6 +204,31 @@ class PhaseClient:
             raise ValueError(
                 "Phase send requires a direct 8c02 frame with a zero input trailer"
             )
+        return await self._command(f"SEND_PHASE {self.session} {raw.hex()}", raw)
+
+    async def query(self, raw):
+        """Phase-stamp only the observed read-only query form, without output permission.
+
+        @param raw Direct 10/ac query with data 0000000000000001 and zero trailer.
+        @return Validated timing metadata; absent capability or wrong form is rejected.
+        """
+        if not self.query_supported:
+            raise LinkError("Adapter does not advertise phase_queries=10_ac_v1")
+        packet = decode(raw)
+        if (
+            len(raw) != 41
+            or packet.family != 0x8C
+            or packet.opcode not in (0x10, 0xAC)
+            or packet.data != bytes(7) + b"\x01"
+            or packet.source != self.gateway_id
+            or packet.destination in (self.gateway_id, "ffffffff")
+            or raw[20] != 0x1E
+            or raw[11:15] != bytes(4)
+            or raw[3:7] != raw[15:19]
+            or raw[3:7] != raw[23:27]
+            or raw[-3:] != bytes(3)
+        ):
+            raise ValueError("Phase query requires the observed direct 10/ac frame")
         return await self._command(f"SEND_PHASE {self.session} {raw.hex()}", raw)
 
     async def probe(self, sequence, nonce):

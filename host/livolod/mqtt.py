@@ -18,7 +18,12 @@ class Broker:
         @param on_message Callback receiving topic, payload bytes, and retained flag.
         @param on_connect Callback publishing authoritative state after connection or HA birth.
         """
-        import paho.mqtt.client as mqtt
+        try:
+            import paho.mqtt.client as mqtt
+        except ImportError:
+            raise RuntimeError(
+                "MQTT is enabled; install livolo-ec-daemon[mqtt]"
+            ) from None
 
         self.loop = asyncio.get_running_loop()
         self.config = config

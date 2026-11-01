@@ -67,7 +67,10 @@ async def check(args):
         config = replace(load(args.config), database=directory + "/state.db")
         store = Store(config.database, config.gateway + ":" + config.tag)
         service = Service(
-            config, store, Recorder(), lambda: AuditedGateway.open(config.serial_port)
+            config,
+            store,
+            Recorder(),
+            lambda: AuditedGateway.open(config.serial_port, config.serial_baudrate),
         )
         task = asyncio.create_task(service.run())
         try:
@@ -105,7 +108,7 @@ async def check(args):
             service.stop.set()
             await asyncio.wait_for(task, 8)
             store.close()
-        gateway = AuditedGateway.open(config.serial_port)
+        gateway = AuditedGateway.open(config.serial_port, config.serial_baudrate)
         try:
             final = key_values(await gateway.command("STATUS"))
             if final["armed"] != "0" or final["ack"] != "0":

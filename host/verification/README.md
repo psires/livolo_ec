@@ -1,4 +1,27 @@
-# Daemon validation — 2026-10-17
+# Daemon validation
+
+## Source finalization — 2026-11-01
+
+The host suite passed all 140 tests on Python 3.9.6. The simulated non-root
+startup check passed for the web UI, authenticated native API, SQLite and clean
+SIGTERM shutdown, with MQTT disabled and no radio or broker. This smoke check
+ran as a local process, not in a newly built container.
+
+The daemon wheel built successfully and contains the web assets, native API,
+ingress module and a BSD-2-Clause license identical to the repository license.
+Owned Python sources passed the function documentation and Black 24.8.0 checks.
+An AST comparison excluding docstrings confirmed that finalization's Python
+documentation and formatting edits preserved behavior.
+
+The [original ARM64 Docker build record](docker-arm64-0.12-20261101.json) and
+[native API development record](native-api-20261101.json) retain their original
+source hashes and scope. They describe earlier snapshots, not the finalized
+source. The original 0.12 Docker archive was not rebuilt or replaced. Historical
+reports below and in deployment notes may reference additional local logs that
+are intentionally not part of the source distribution. No hardware, firmware or
+live deployment was changed during source finalization.
+
+## Initial hardware validation — 2026-10-17
 
 The development Pi ran a bounded 25-second daemon session against the installed
 UART v3 firmware, using the known local gateway `2a992b12`, tag `a7`, and switch

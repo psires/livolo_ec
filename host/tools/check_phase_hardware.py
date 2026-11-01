@@ -264,7 +264,7 @@ async def check(args):
     gateway = None
     consumer = None
     try:
-        gateway = AuditedGateway.open(config.serial_port)
+        gateway = AuditedGateway.open(config.serial_port, config.serial_baudrate)
         gateway.gateway_id, gateway.tag, gateway.transcript = (
             config.gateway,
             config.tag,

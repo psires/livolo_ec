@@ -1,20 +1,24 @@
 # Livolo EC daemon
 
+For the ARM64 container image and deployment steps, see the
+[Docker guide](docker/README.md).
+
 `livolod` is the Raspberry Pi host service for the [UART v3 radio adapter](../firmware/gateway/UART_PROTOCOL.md).
-It bridges the verified Livolo light-switch protocol to MQTT. The TI module owns
-fast radio acknowledgements; the Pi owns network identity, the device registry,
+It bridges the verified Livolo light-switch protocol to optional MQTT and the
+authenticated native API. The radio module owns fast acknowledgements; the host owns network identity, the device registry,
 pairing, command tracking and reported output state.
 
-The development Pi is now running the service; see [deployment paths and rollback](DEPLOYMENT.md).
-The deployed release includes a [cadence experiment](verification/cadence-candidate.md).
-It can delay a set until the next regular heartbeat, adding up to about ten seconds
-before transmission; reliable output-control acceptance is still being verified.
+The former development Pi is stopped after the Home Assistant handover; see
+[deployment history and rollback](DEPLOYMENT.md). Current source release is 0.12.
+Output control remains experimental and depends on the selected mode and radio
+capabilities described below; hardware results apply to the tested switch models.
 
 Implemented:
 
 - Up to 256 configured peers; explicit one/two-output profiles and wire-order IDs.
 - SQLite device registry, names, reported state and durable request deduplication.
 - MQTT set commands, state, availability, discovery candidates and diagnostics.
+- Optional MQTT and a separate authenticated native HTTP/WebSocket API v1.
 - Home Assistant MQTT discovery: one switch entity per output, grouped by device.
 - Bounded pairing windows for one named device at a time.
 - Complete peer-table restoration with a fresh session after UART failure/reset.
@@ -24,21 +28,31 @@ Implemented:
 This is a first implementation for the directly reachable, tested EC switch
 family. Full route discovery/recovery, four-gang profiles, generic Zigbee support,
 and automatic capability inference are not implemented.
-One-gang configuration is supported but has not been validated against a real
-one-gang device. The `0002` suffix is **not** used to infer output count. Pairing
+One-gang configuration was validated on switch `66780945` on 2026-11-01:
+targeted pairing, a fresh state query, and a physical ON-to-OFF report succeeded
+alongside two-gang switch `46715621`. Its suffix was `0001` and full-state mask
+was `01`; output count was explicitly configured, not automatically inferred.
+See `analysis/development/onegang-pairing-20261101.json` and the corresponding
+Nordic capture. Subsequent output-control testing found intermittent failures:
+only 3/8 recorded ON requests were confirmed, versus 7/7 OFF requests; failures
+persisted with the original EC gateway off. MQTT delivery worked, but reliable
+one-gang output control is not yet validated. See
+`analysis/development/onegang-control-20261101.json`.
+The `0002` suffix is **not** used to infer output count. Pairing
 reproduces the successful spare-switch trial; it is not a claim that every Livolo
 model or factory-reset sequence is supported.
 
 ## Install on the Pi
 
-Requires Python 3.9+, a running MQTT broker, and UART v3 firmware. From the checkout:
+Requires Python 3.9+ and UART v3 firmware. MQTT installations additionally need
+a running broker and the `mqtt` dependency extra. From the checkout:
 
 ```sh
 sudo apt-get install python3-venv
 sudo useradd --system --user-group --home-dir /var/lib/livolod --no-create-home livolod
 sudo usermod -aG dialout livolod
 sudo python3 -m venv /opt/livolod
-sudo /opt/livolod/bin/pip install ./host
+sudo /opt/livolod/bin/pip install './host[mqtt]'
 sudo install -d -m 0750 -o root -g livolod /etc/livolod
 sudo install -m 0640 -o root -g livolod host/config.example.json /etc/livolod/config.json
 sudo install -m 0644 host/systemd/livolod.service /etc/systemd/system/livolod.service
@@ -108,6 +122,34 @@ Request IDs accept 1–128 letters, digits, underscores, dots, colons or hyphens
 | `bridge/request/refresh` | command | `{"request_id":"refresh-1","device":"46715621"}` sends observed read-only queries and waits for a fresh state report |
 | `bridge/result` | event | `request_id`, status and details; subscribe before issuing requests |
 
+State refresh makes at most three rounds of the observed `10/ac` read-only
+queries, with a 224 ms host delay between queries at 460800 baud (200 ms at
+other rates) and up to four seconds for a report after
+each pair. It stops on the first accepted native state report received since
+the request began, even if the reported bits have not changed. Cached state,
+keepalives and `fa` query replies do not confirm a refresh. New queries stop
+after a 14-second scheduling deadline; an in-flight UART operation retains its
+existing bounded timeout and same-ID recovery rules. No new query is scheduled
+after fresh state, including while waiting for the radio lock or CCA backoff.
+
+Results include `query_rounds` (rounds started) and `queries_sent` (successful
+adapter TX submissions, not device acknowledgements). Exhaustion returns
+`unconfirmed`; a lost radio session or uncertain UART outcome returns `unknown`
+through the existing session recovery path. Refresh uses the serial command
+worker, so commands queued behind a long refresh retain their five-second queue
+expiry. Heartbeats and lease renewal continue independently. No output command
+or speculative state update is used to obtain a refresh.
+
+In `experimental_phase` mode, firmware advertising `phase_queries=10_ac_v1`
+(release 0.3) also stamps `10/ac` query trailers at radio-call entry. Diagnostics
+report `query_mode=phase` and the latest validated `query_phase_tx` metadata.
+Older adapters or other output modes retain raw queries and report
+`query_mode=raw`. Phase-query failure never triggers raw fallback. A lost timing
+reference waits for the normal heartbeat to restore it; no extra heartbeat is
+inserted by refresh. The three-round retry schedule and response waits above
+remain unchanged. Larger UART timing replies can increase measured on-air
+spacing even though the host's configured delays are unchanged.
+
 Output 1 is bit 0; output 2 is bit 1. `mask=2,value=2` turns output 2 on and
 preserves output 1. `state=ON/OFF` selects all configured outputs. Physical
 left/right positioning remains a device-specific mapping. There is no toggle
@@ -172,7 +214,7 @@ Results:
   when applicable.
 
 The command queue is bounded at 64, with a five-second waiting lifetime. Set
-operations are serialized. Deployed release 06 increases phase mode to six attempts
+operations are serialized. Phase mode allows six attempts
 ([review record](verification/phase-retry06-candidate.md))
 while retaining three in legacy mode. Both use roughly 200 ms waits and one
 four-second deadline from the first attempt, including UART and confirmation
@@ -205,7 +247,7 @@ when absent), `experimental_legacy`, or `experimental_phase`. The example explic
 selects legacy mode. Phase mode requires the advertised `tx_entry_v1` capability
 and a verified heartbeat reference before readiness; it never silently falls back
 to raw commands. The GUI disables output buttons in disabled mode. The development
-Pi uses experimental phase mode explicitly selected; current deployment and
+Pi used experimental phase mode explicitly selected; deployment history and
 captured output checks are recorded in [DEPLOYMENT.md](DEPLOYMENT.md). See the
 [phase integration review](verification/phase-integration.md) before upgrading or
 rolling back configuration.
@@ -232,6 +274,54 @@ disarms and restores the complete table with a fresh session. In-flight control
 may become `unknown`; queued controls are rejected during this transition.
 Removing a host record does not make the physical switch forget its network.
 
+## Native API and optional MQTT
+
+The current source implements [native API v1](NATIVE_API.md) for machine clients.
+This is development code; the previously deployed 0.12 image has not been rebuilt
+or replaced with these changes. The browser API remains separate.
+
+Add this object to a configuration to enable the listener:
+
+```json
+"api": {
+  "enabled": true,
+  "host": "127.0.0.1",
+  "port": 8090,
+  "token_env": "LIVOLO_API_TOKEN"
+}
+```
+
+Supply a nonempty ASCII secret without whitespace in `LIVOLO_API_TOKEN` through
+the service environment (or `daemon.env` for Compose). Every request, including
+WebSocket upgrades and `/health`, requires `Authorization: Bearer <secret>`.
+URL credentials are rejected. The native API is disabled by default; choose an
+explicit bind address when clients connect from another container or machine.
+
+Endpoints are `/api/v1/info`, `/api/v1/snapshot`, `/api/v1/events` (WebSocket),
+`POST /api/v1/commands`, and `/api/v1/commands/{request_id}`. HTTP snapshots and
+events share a full-snapshot envelope with `api_version`, process `epoch`, and
+increasing `sequence`. Clients replace state from every snapshot and reconnect
+for a fresh one; a new epoch allows the sequence to reset. State includes output
+bits, availability, control policy, pairing, registry, public diagnostics and
+recent results, without broker settings, raw packets or browser tokens.
+
+Commands use the same durable service policy as MQTT and the browser UI. After an
+ambiguous response, look up the original request ID before retrying. A pending
+command interrupted by a process restart becomes `unknown`; retrying its ID does
+not execute it again. Request bodies are limited to 4096 bytes. Event subscriptions
+are limited to 32 clients with four queued snapshots each and a five-second write
+deadline; a slow client is closed with code 1013. Service mutations coalesce on
+the owner loop, with a one-second check for time-driven state changes. `/health`
+reports API liveness even while the radio is offline.
+
+For broker-free operation, omit `mqtt`, set it to `null`, or use
+`"mqtt": {"enabled": false}`. Saved MQTT settings remain in SQLite but are not
+restored or connected while disabled; the browser MQTT editor is unavailable.
+Install `./host` without extras for this mode. Existing MQTT configurations remain
+enabled by default. Install `./host[mqtt]` to use them; the Dockerfile retains that
+extra for backwards compatibility. Simulation also works without a broker and is
+always marked `simulated` in native API responses.
+
 ## GUI integration and simulation
 
 The service exposes `api_snapshot()`, `submit(action,payload)` and
@@ -256,7 +346,7 @@ set commands generate reports; the simulator is not an RF, mesh or pairing model
 
 ## Firmware updates
 
-Host and application releases use `major.minor` (currently `0.2`). The daemon
+Host and application releases use `major.minor` (currently `0.12`). The daemon
 exposes `diagnostics.host_version` and `diagnostics.firmware` in `/api/state`,
 including `running_version`, `target_version`, `update_available`,
 `update_supported`, `boot_version` and `trial`. MQTT `bridge/info` includes
@@ -264,13 +354,15 @@ including `running_version`, `target_version`, `update_available`,
 Version comparisons are numeric, so `0.10` is newer than `0.9`. Old firmware
 without version discovery remains usable but reports an unknown running version.
 
+The signed UART updater applies to the codm CC2652P board with this project's
+dual-slot bootloader. Other boards use their board-specific flash procedures.
 Install the matching host release with its `update` extra before updating the
 MCU. After the one-time bootloader installation, routine updates use UART only:
 
 ```sh
 sudo /opt/livolod/bin/livolod-firmware \
   --config /etc/livolod/config.json \
-  --package /path/to/ec-gateway-0.2.ecupd \
+  --package /path/to/ec-gateway-0.12.ecupd \
   --public-key /path/to/public.key \
   --service livolod
 ```
@@ -283,6 +375,11 @@ within 60 seconds, or a reset during trial, rolls back to the previous image.
 The updater requires a strictly newer application version; it does not silently
 reinstall or downgrade an image. An interrupted transfer can be retried with the
 same package; a committed matching package resumes activation.
+
+`--service livolod` controls the native systemd service only. For Docker or a
+Home Assistant app, stop the actual owner first, omit `--service`, and arrange
+for the matching daemon to restart within the trial confirmation window. The
+standalone Docker image does not include the optional updater dependencies.
 
 No RESET/FLASH GPIO wiring is required for routine updates. Configurable GPIO
 recovery and the original buttons remain available for initial installation or
@@ -322,3 +419,84 @@ are persisted at most once per minute to reduce SD-card writes.
 
 The MQTT adapter uses [Paho's callback v2/network-loop API](https://eclipse.dev/paho/files/paho.mqtt.python/html/client.html),
 and UART uses [pySerial's POSIX exclusive mode](https://pyserial.readthedocs.io/en/latest/pyserial_api.html).
+
+## Application UART baud
+
+At 460800 the host uses a measured 224 ms query-pair delay to compensate for
+shorter UART serialization. Nordic measured about 237 ms between radio query
+transmissions, matching the earlier 115200 run. Other baud rates retain the
+200 ms delay; the correction is not extrapolated to unmeasured rates. This
+affects read-only refreshes only. Three rounds, a four-second response wait,
+the 14-second deadline and stopping on fresh state are unchanged. Effective
+settings are exposed in `diagnostics.query_timing`.
+
+`serial_baudrate` in the daemon JSON defaults to 115200 and accepts 115200,
+230400, 460800 or 921600. It must match the firmware's `UART_BAUD` build option.
+The daemon checks an advertised `CAPS baud=` before arming and includes the
+configured rate in diagnostics. Hardware-check tools and the TI application
+updater use the same setting. Ordinary firmware upgrades should retain the
+application rate; a rate-changing upgrade requires coordinated config migration,
+including rollback. No automatic baud probing or live switching is performed.
+
+MG21 Gecko recovery and TI ROM flashing remain at 115200. To enter MG21 recovery,
+send `BOOTLOADER` at the current application rate and then select 115200 in the
+Gecko flashing tool. See [the hardware comparison](DEPLOYMENT.md): the current
+Sonoff development gateway uses 460800. A reproduced MCU receive-overrun fault
+was corrected in the MG21 UART writer, then passed 6000 integrity requests and
+a ten-minute live run without UART faults. Query spacing at 460800 now includes
+the measured compensation above; RF query reliability still has unresolved
+timeouts. Defaults remain 115200; other higher rates are not
+hardware-qualified. The earlier ZB-GW04 USB reply truncation was not retested.
+
+
+## MCU scheduler capability
+
+Release 0.6 negotiates `scheduler=timed_v1` on the phase-capable TI adapter.
+The daemon installs an absolute ten-second heartbeat schedule during session
+restoration and verifies its first phase anchor. It continues renewing the
+existing lease and monitors `diagnostics.heartbeat_owner` and
+`diagnostics.scheduler`. UART polling supplies diagnostics; the MCU timer owns
+heartbeat deadlines. A missing schedule triggers session reconciliation.
+
+The Pi retains all authoritative network/device records, pairing and routing
+policy, persistence and transaction confirmation. Query policy remains three
+rounds, four CCA attempts per send, a 14-second scheduling deadline, the existing
+baud-specific pair delay and a 4.000-second response wait. Fresh state still stops
+retries. Current supported adapters negotiate their clock rate (65536 or 1000000
+ticks per second); adapters without this capability retain host heartbeats.
+
+`SchedulerClient` exposes explicit enqueue, result, cancel and drain operations
+for the first-stage RAM queue. In 0.6 the daemon does not submit whole query/output
+transactions to it. Queue acceptance, radio transmission and native confirmation
+are distinct outcomes. See the [firmware contract](../firmware/gateway/UART_PROTOCOL.md#ti-timed-queues-and-heartbeat-ownership--release-06).
+
+
+### Complete MCU state queries (0.7)
+
+TI capability `query=transaction_v1 query_slots=1` moves the whole read-only
+query into one retained volatile transaction. The daemon supplies the exact peer,
+suffix, output mask and timing profile, then polls/drains the result; polling
+never drives RF retries. The MCU retains the confirming native frame even if
+bulk UART logs are dropped. The Pi independently validates and persists it,
+without allowing a delayed older RX event to replace newer state.
+
+Three rounds, four CCA attempts per opcode and the 14-second deadline are
+unchanged. The MCU uses measured TI wire targets (235.504 ms between 10/ac,
+4.011993 s after ac), replacing the old host sleeps plus UART overhead. Diagnostics
+expose `query_mode=mcu`, `query_execution` and `query_transaction`; adapters without
+this capability retain the existing host query path. No persistent network state
+moves onto the radio. See the [UART transaction contract](../firmware/gateway/UART_PROTOCOL.md#complete-ti-state-query-transactions--release-07).
+
+### MCU output and query grid (0.12)
+
+With `output_grid=transaction_200ms_v1`, phase-mode output commands use a bounded
+MCU transaction on heartbeat-relative 200 ms boundaries: at most six attempts
+within four seconds. The host persists the token before submission, validates
+the retained peer report against the requested bits and prior state, and drains
+the completed slot. Acceptance alone never publishes a confirmed output state.
+
+The scheduler client also supports explicit `ac_only` and `grid` options for
+read-only query experiments; grid queries require AC-only mode and the matching
+adapter capabilities. These are client/harness options, not daemon JSON settings.
+The daemon uses ordinary paired queries. The 14-second query deadline and
+authoritative host registry remain unchanged.

@@ -38,7 +38,7 @@ class Simulator:
         if verb == "CAPS":
             return (
                 "OK proto=3 peers=256 ack_mask=1f lease_max=60 session_bytes=8 channel=11 max_line=319 max_raw=125 "
-                "phase=tx_entry_v1 phase_scale=65500 phase_max_ms=12000 phase_probe=1 rtimer_hz=65536 rtimer_bits=32"
+                "phase=tx_entry_v1 phase_scale=65500 phase_max_ms=12000 phase_probe=1 rtimer_hz=65536 rtimer_bits=32 phase_queries=10_ac_v1"
             )
         if verb == "NETWORK":
             self.network = words[1:]

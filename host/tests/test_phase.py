@@ -54,6 +54,39 @@ class GatewayStub:
 
 
 class PhaseTests(unittest.IsolatedAsyncioTestCase):
+    async def test_query_capability_policy_and_metadata_without_output_permission(self):
+        """Queries require their own capability and cannot authorize output frames."""
+        for opcode in (0x10, 0xAC):
+            raw = frame(
+                "2a992b12", "a7", "46715621", "0002", 1, opcode, bytes(7) + b"\x01"
+            )
+            gateway = GatewayStub(response(raw))
+            client = PhaseClient(
+                gateway,
+                "123456789abcdef0",
+                dict(CAPS, phase_queries="10_ac_v1"),
+                gateway_id="2a992b12",
+            )
+            metadata = await client.query(raw)
+            self.assertEqual(bytes.fromhex(metadata["raw"])[:38], raw[:38])
+            self.assertNotEqual(bytes.fromhex(metadata["raw"])[-3:], bytes(3))
+            with self.assertRaises(ValueError):
+                await client.query(RAW)
+            with self.assertRaises(ValueError):
+                await client.send(RAW)
+            wrong_data = frame(
+                "2a992b12", "a7", "46715621", "0002", 1, opcode, bytes(8)
+            )
+            with self.assertRaises(ValueError):
+                await client.query(wrong_data)
+            self.assertEqual(len(gateway.commands), 1)
+            old = PhaseClient(gateway, "123456789abcdef0", CAPS, gateway_id="2a992b12")
+            with self.assertRaisesRegex(LinkError, "phase_queries"):
+                await old.query(raw)
+            gateway.reply = response(raw).replace("age_ticks=32768", "age_ticks=32769")
+            with self.assertRaises(LinkError):
+                await client.query(raw)
+
     def test_capabilities_are_explicit_and_timestamp_scale_is_not_timer_frequency(self):
         """Verify capabilities are explicit and timestamp scale is not timer frequency."""
         caps = PhaseCapabilities.parse(CAPS)
