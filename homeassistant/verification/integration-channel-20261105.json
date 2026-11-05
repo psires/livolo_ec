@@ -1,0 +1,67 @@
+{
+  "verified_at_utc": "2026-11-05T20:02:02.903071+00:00",
+  "repository": "https://github.com/psires/ha-livolo-ec",
+  "channel": "custom repository for HACS and Marketplace; not default catalog inclusion",
+  "public_asset_checks": "Anonymous download; SHA256SUMS verified; current ZIP matches reviewed export byte-for-byte",
+  "releases": [
+    {
+      "version": "0.2.0",
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.2.0",
+      "source_commit": "6fe41cbdc909a6497776202b3eeae088655b9908",
+      "assets": {
+        "SHA256SUMS": "5dcbb70c7194428abedccdbd0e50b3bfca3dc9b299b6e6cffaab311a799b66b7",
+        "livolo_ec.zip": "eb1de44dd4cbe713eed26f426b900bd95f7882a6e3cf1291d9766c0a7a4a733d",
+        "source.json": "1be97be8ffde804ca33c22f5b9e9932ab610ee29c7747bec0298707d09b5a3d9"
+      }
+    },
+    {
+      "version": "0.2.1",
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.2.1",
+      "source_commit": "c75839d038462042f15731bc28a19cc579f5d630",
+      "assets": {
+        "SHA256SUMS": "cd2ef68615a051ce5307d1c9584ea9c08dcf53d29848717119bfc300d1da1ae3",
+        "livolo_ec.zip": "d6a17c3a5f0f106bde10ea4e1d1745ba00b6b584866539d53bcf7ad8ce769e86",
+        "source.json": "7225822ef01a690699c5138b031eec20b144de5574f2e195d37f71308b83bdd3"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "installer": "HACS",
+      "upstream_commit": "a15e87ec0d1c82e58f1ddbaf17669d3eaa261eb8",
+      "homeassistant": "2026.10.4",
+      "result": "1 passed",
+      "duration_seconds": 1.16
+    },
+    {
+      "installer": "Marketplace",
+      "upstream_core_commit": "74cf5a49c63ed8d4d87717844bf14f79c28c9cea",
+      "homeassistant": "2026.11.0",
+      "result": "1 passed",
+      "duration_seconds": 1.43
+    }
+  ],
+  "python": "3.14.7",
+  "tested": [
+    "Anonymous upstream GitHub release listing",
+    "Public release ZIP installation 0.2.0 and replacement with 0.2.1 using upstream installer",
+    "Pending update before upgrade and cleared after upgrade",
+    "Installed manifest versions and flat component-root layout",
+    "Configuration entry identity, URL and token preserved",
+    "Entity IDs, unique IDs, custom name and assigned area preserved",
+    "Simulator switch control and daemon state preserved",
+    "Restart requirement raised; config entry reload succeeds"
+  ],
+  "scope_limits": [
+    "Isolated HA instances and simulator; no radio access or live deployment",
+    "Repository metadata refresh stubbed after explicit upstream release retrieval",
+    "No GitHub OAuth/device authorization or catalog UI test",
+    "No scheduled polling or full HA process restart test",
+    "Marketplace exercised GitHub custom-repository installer, not default catalog installer"
+  ],
+  "scripts": [
+    "homeassistant/channel_tests/conftest.py",
+    "homeassistant/channel_tests/run.py",
+    "homeassistant/channel_tests/test_installer_upgrade.py"
+  ]
+}
