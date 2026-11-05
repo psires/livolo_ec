@@ -1,8 +1,81 @@
 # Container publication plan
 
-Status: recommendation prepared 2026-11-05; this document does not publish an
-image, change a release, or qualify a new deployment. Coordinate HA delivery
-with [HA_PUBLICATION.md](HA_PUBLICATION.md).
+Status: publication implementation prepared 2026-11-05; an enabled, reviewed
+request and passing CI are required before any image is advertised as published.
+Coordinate HA delivery with [HA_PUBLICATION.md](HA_PUBLICATION.md).
+
+## Implemented release controls
+
+The workflow `.github/workflows/container-release.yml` runs on an explicit
+`host/docker/releases.json` push to `main`, or manual dispatch. New entries are
+disabled until reviewed. The manifest pins the source tag and full commit, Python
+base, Dockerfile frontend, BuildKit image, Buildx version and test broker. Actions
+are pinned by commit. Only the publishing job receives `packages: write`.
+
+`tools/container_prepare.py` builds a minimal context from `git archive` at the
+exact source commit, verifying the tag and component version. An external
+Dockerfile overlay constrains Python build tooling, preserves matching third-party
+Python source archives, and adds notices, source/build metadata and Debian package
+inventory. Application code and the historical wrapper are copied unchanged.
+The generated Dockerfile, original recipe hash and every context file hash are
+recorded. Current-source Dockerfile ignore rules also include `host/PACKAGE.md`.
+
+Each enabled release runs on `ubuntu-24.04-arm`. Buildx pushes a unique candidate
+with SBOM and maximum provenance, then the workflow pulls and tests that exact
+digest. Checks include package consistency, CLI/helper imports, source checksums,
+architecture/labels/attestation descriptors, and real container lifecycle tests.
+`tools/container_check.py` owns a temporary internal Docker network and temporary
+state only; it publishes no host ports and maps no radio devices. Run it only on
+disposable Docker hosts: its `172.30.32.0/24` test network models the Supervisor
+trusted-peer address and must not overlap a real Supervisor installation.
+
+Standalone tests use the installed simulator and an isolated MQTT broker, verify
+retained online status, web assets/CSRF rejection, authenticated HTTP/WebSocket
+API, registry writes and persistence after container replacement. HA tests run
+the real wrapper with a nonexistent serial path, check privilege dropping and
+untrusted-ingress rejection, and use a private trusted-peer container to check
+ingress assets/origin enforcement. They also restore root-owned database files
+between containers to test ownership repair. This models the proxy boundary; it
+does not claim to test Supervisor authentication itself.
+
+Set `previous_image` to an already published **digest** to test a real version
+upgrade. HA 0.2.0 establishes the baseline; the 0.2.1 request must reference its
+verified digest. When `previous_image` is null, the evidence explicitly reports
+first installation and same-image recreation, not a version upgrade. The HA
+specialist separately owns disposable Supervisor app installation/update tests.
+
+`tools/container_registry.py` first checks anonymous candidate pulls using an
+empty Docker credential store. If the new package is private, the job stops
+before creating a full version tag. The maintainer can set package visibility
+to public and rerun. Successful publication copies the tested OCI index without
+rebuilding; an existing different version digest causes failure, never overwrite.
+The final tag is checked for digest equality and anonymous access. Disable a
+completed manifest entry before requesting another release; retrying a complete
+build is not a mechanism to replace an existing version.
+
+Every job uploads evidence, including on failure: source/context recipe metadata,
+Docker/build tooling versions, candidate index and image metadata, Python source
+and license inventory, Debian package inventory, runtime logs and successful
+publication metadata when available. Buildx registry attestations remain attached
+to the promoted index. Inventory/source files also ship inside the image under
+`/usr/share/livolo-ec/`, with project notices under
+`/usr/share/licenses/livolo-ec/`. Base-image Debian package copyright material
+remains under `/usr/share/doc`; the package inventory and pinned base identify
+the corresponding upstream source distribution. Review this inventory before
+claiming the release's third-party obligations complete.
+
+Local validation command (Python 3.12 or newer):
+
+```sh
+python3 tools/container_test.py
+python3 tools/container_prepare.py
+```
+
+The first command exercises historical context assembly, request validation,
+immutable promotion, public-access gating and corrupt-source rejection. Actual
+container runtime results must come from CI; local helper tests alone do not
+qualify a release. Keep source/image publication distinct from deployment to
+either live testbed.
 
 ## Existing artifacts and version boundaries
 

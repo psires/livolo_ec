@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "buildx_version": "v0.38.2",
+  "buildkit_image": "moby/buildkit@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe",
+  "python_image": "python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72",
+  "frontend_image": "docker/dockerfile@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e",
+  "broker_image": "eclipse-mosquitto@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f",
+  "releases": [
+    {
+      "enabled": true,
+      "kind": "standalone",
+      "image": "ghcr.io/psires/livolod",
+      "version": "0.2.0",
+      "daemon_version": "0.12",
+      "source_tag": "standalone-0.2.0",
+      "source_commit": "b371ca9f30e091eceeea357169be8c602398702f",
+      "previous_image": null
+    },
+    {
+      "enabled": true,
+      "kind": "ha",
+      "image": "ghcr.io/psires/livolo-ec-ha-app",
+      "version": "0.2.0",
+      "daemon_version": "0.12",
+      "source_tag": "ha-0.2.0",
+      "source_commit": "6fe41cbdc909a6497776202b3eeae088655b9908",
+      "previous_image": null
+    }
+  ]
+}

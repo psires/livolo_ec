@@ -3,6 +3,7 @@
 !VERSION
 !host/
 !host/pyproject.toml
+!host/PACKAGE.md
 !host/LICENSE
 !host/livolod/
 !host/livolod/**

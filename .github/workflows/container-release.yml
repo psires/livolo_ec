@@ -1,0 +1,183 @@
+name: Publish tested container releases
+
+on:
+  push:
+    branches: [main]
+    paths: [host/docker/releases.json]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Version tags must never be raced by separate publication runs.
+concurrency:
+  group: container-release-publication
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      enabled: ${{ steps.plan.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: plan
+        run: |
+          python3 tools/container_test.py
+          python3 tools/container_prepare.py > matrix.json
+          echo "matrix=$(cat matrix.json)" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY'
+          import json, os
+          value = bool(json.load(open('matrix.json'))['include'])
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('enabled=' + str(value).lower() + '\n')
+          PY
+
+  publish:
+    needs: plan
+    if: needs.plan.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      IMAGE: ${{ matrix.image }}
+      VERSION: ${{ matrix.version }}
+      KIND: ${{ matrix.kind }}
+      PREVIOUS: ${{ matrix.previous_image }}
+      BROKER_IMAGE: ${{ matrix.broker_image }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: prepare
+        name: Assemble exact source and external release recipe
+        run: |
+          mkdir evidence
+          python3 tools/container_prepare.py --kind "$KIND" --version "$VERSION" --output build-context
+          cp build-context/container/release.json evidence/release.json
+          cp build-context/Dockerfile evidence/Dockerfile
+          cp host/docker/releases.json evidence/request.json
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          version: ${{ matrix.buildx_version }}
+          driver-opts: image=${{ matrix.buildkit_image }}
+      - name: Record builder and platform
+        run: |
+          docker version > evidence/docker-version.txt
+          docker buildx version > evidence/buildx-version.txt
+          uname -a > evidence/platform.txt
+      - id: build
+        name: Push candidate with SBOM and provenance
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./build-context
+          file: ./build-context/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ${{ matrix.image }}:candidate-${{ matrix.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+          build-args: |
+            PYTHON_IMAGE=${{ matrix.python_image }}
+            RELEASE_VERSION=${{ matrix.daemon_version }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/psires/livolo_ec
+            org.opencontainers.image.revision=${{ matrix.source_commit }}
+            org.opencontainers.image.version=${{ matrix.version }}
+            org.opencontainers.image.licenses=BSD-2-Clause
+            net.sfires.livolo.daemon-version=${{ matrix.daemon_version }}
+            net.sfires.livolo.recipe-revision=${{ github.sha }}
+          sbom: true
+          provenance: mode=max
+      - id: inspect
+        name: Pull and inspect exact candidate
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          docker pull "$IMAGE@$DIGEST"
+          docker buildx imagetools inspect --raw "$IMAGE@$DIGEST" > evidence/index.json
+          docker image inspect "$IMAGE@$DIGEST" > evidence/image.json
+          python3 - <<'PY'
+          import json, os
+          image = json.load(open('evidence/image.json'))[0]
+          assert image['Architecture'] == 'arm64' and image['Os'] == 'linux'
+          labels = image['Config']['Labels']
+          assert labels['org.opencontainers.image.version'] == os.environ['VERSION']
+          index = json.load(open('evidence/index.json'))
+          assert any(m.get('annotations', {}).get('vnd.docker.reference.type') == 'attestation-manifest' for m in index['manifests'])
+          PY
+          docker run --rm --network none --entrypoint python "$IMAGE@$DIGEST" -c '
+          import json, pathlib, subprocess
+          from importlib.metadata import version
+          assert version("livolo-ec-daemon") == "${{ matrix.daemon_version }}"
+          subprocess.run(["python", "-m", "pip", "check"], check=True)
+          for name in ("livolod", "livolod-firmware", "livolod-firmware-manage"):
+              subprocess.run([name, "--help"], check=True, stdout=subprocess.DEVNULL)
+          subprocess.run(["python", "-m", "universal_silabs_flasher", "--help"], check=True, stdout=subprocess.DEVNULL)
+          subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd="/usr/share/livolo-ec/sources", check=True)
+          ' > evidence/package-checks.txt
+          docker run --rm --network none --entrypoint cat "$IMAGE@$DIGEST" /usr/share/livolo-ec/sources/python-inventory.json > evidence/python-inventory.json
+          docker run --rm --network none --entrypoint cat "$IMAGE@$DIGEST" /usr/share/livolo-ec/debian-packages.txt > evidence/debian-packages.txt
+      - id: runtime
+        name: Installed image and persistent replacement checks
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        shell: bash
+        run: |
+          set -o pipefail
+          args=()
+          if [ -n "$PREVIOUS" ]; then args+=(--previous-image "$PREVIOUS"); fi
+          python3 tools/container_check.py --image "$IMAGE@$DIGEST" --kind "$KIND" --broker-image "$BROKER_IMAGE" "${args[@]}" 2>&1 | tee evidence/runtime-checks.txt
+      - id: promote
+        name: Anonymous pull gate and immutable promotion
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          python3 tools/container_registry.py --image "$IMAGE" --version "$VERSION" --digest "$DIGEST" --output evidence/publication.json
+      - name: Summarize release gates
+        if: always()
+        env:
+          CANDIDATE_DIGEST: ${{ steps.build.outputs.digest }}
+          PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          INSPECT_OUTCOME: ${{ steps.inspect.outcome }}
+          RUNTIME_OUTCOME: ${{ steps.runtime.outcome }}
+          PROMOTE_OUTCOME: ${{ steps.promote.outcome }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          gates = {k: os.environ[k.upper() + '_OUTCOME'] for k in ('prepare', 'build', 'inspect', 'runtime', 'promote')}
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+              f.write('\n### ' + os.environ['IMAGE'] + ':' + os.environ['VERSION'] + '\n\n')
+              f.write('Candidate digest: `' + (os.environ['CANDIDATE_DIGEST'] or 'not built') + '`\n\n')
+              for gate, result in gates.items():
+                  f.write('- ' + gate + ': **' + result + '**\n')
+              f.write('\nRegistry package settings: https://github.com/users/psires/packages/container/' + os.environ['IMAGE'].rsplit('/',1)[1] + '/settings\n')
+              if gates['promote'] != 'success':
+                  f.write('\nThis run has not verified a public version release. Do not advertise it in app metadata.\n')
+                  print('::error title=Container release incomplete::Inspect the failed gate and uploaded evidence; no successful public release is established by this run.')
+              log = Path('evidence/runtime-checks.txt')
+              if log.exists():
+                  f.write('\nRuntime check tail:\n\n```text\n' + '\n'.join(log.read_text()[-8000:].splitlines()[-60:]) + '\n```\n')
+          PY
+      - name: Preserve release evidence, including failed candidates
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: container-${{ matrix.kind }}-${{ matrix.version }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
