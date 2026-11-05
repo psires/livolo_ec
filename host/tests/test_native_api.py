@@ -54,6 +54,31 @@ class NativeConfigurationTests(unittest.TestCase):
 
 
 class NativeAPITests(unittest.IsolatedAsyncioTestCase):
+    async def test_firmware_preflight_is_read_only_and_accepts_only_candidate_id(self):
+        """Preflight uses normal bearer authentication without starting a firmware job."""
+        changes = self.store.db.total_changes
+        status, value = await self.get("/api/v1/firmware/preflight")
+        self.assertEqual(status, 200)
+        self.assertEqual(value["schema"], 1)
+        self.assertFalse(value["executable"])
+        self.assertIsNone(self.store.firmware_job())
+        self.assertEqual(self.store.db.total_changes, changes)
+        status, snapshot = await self.get("/api/v1/snapshot")
+        self.assertEqual(status, 200)
+        self.assertIs(snapshot["data"]["firmware_update"]["preflight_supported"], True)
+        for query in (
+            "?path=/tmp/file",
+            "?candidate_id=../file",
+            "?candidate_id=a&candidate_id=b",
+        ):
+            status, _ = await self.get("/api/v1/firmware/preflight" + query)
+            self.assertEqual(status, 400)
+        async with self.client.get(
+            self.base + "/api/v1/firmware/preflight",
+            headers={"Authorization": "Bearer wrong"},
+        ) as response:
+            self.assertEqual(response.status, 401)
+
     async def asyncSetUp(self):
         """Start only the machine API, with the radio initially offline."""
         self.temp = tempfile.TemporaryDirectory()

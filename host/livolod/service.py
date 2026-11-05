@@ -144,6 +144,14 @@ class Service:
         """Expose public update eligibility and the latest persisted job."""
         return self.firmware_manager.snapshot()
 
+    def firmware_preflight(self, candidate_id=None):
+        """Expose advisory firmware checks without changing radio or job state.
+
+        @param candidate_id Optional hash-bound artifact ID; paths are not accepted.
+        @return Sanitized preflight report shared by CLI, Web and native clients.
+        """
+        return self.firmware_manager.preflight_report(candidate_id)
+
     def notify_changed(self):
         """Schedule API observations on the owner loop without waiting on clients."""
         for callback in tuple(self.change_listeners):
@@ -800,6 +808,13 @@ class Service:
             reported = key_values(await self.gateway.command("VERSION"))
             if reported.get("fw_version") != caps["fw_version"]:
                 raise LinkError("Firmware version changed during setup")
+            self.firmware_manager.version_info = dict(reported)
+        self.firmware_manager.check_manual_restore(
+            caps, self.firmware_manager.version_info
+        )
+        self.firmware_manager.check_nordic_restore(
+            caps, self.firmware_manager.version_info
+        )
         try:
             capable = (
                 caps["proto"] == "3"
@@ -898,6 +913,7 @@ class Service:
                 if update.get("trial") != "0" or update.get("state") != "fffffff0":
                     raise LinkError("Firmware trial confirmation was not durable")
             firmware["trial"] = False
+        self.firmware_manager.update_info = dict(update or {})
         firmware["verified_at"] = time.time()
         firmware["session"] = self.session
         with self.store.db:
@@ -1882,6 +1898,8 @@ class Service:
             try:
                 self.reconfigure.clear()
                 guard = radio_guard(self.config.database)
+                self.firmware_manager.check_manual_restore()
+                self.firmware_manager.check_nordic_restore()
                 self.gateway = self.gateway_factory()
                 await self.restore()
                 delay = 1

@@ -68,14 +68,36 @@ def _target(dfu_port, serial_number):
     return _usb_target(dfu_port, serial_number, 0x1915, 0x521F)
 
 
-def application_target_status(port_name, serial_number):
+def application_target_status(port_name, serial_number, *, usb_profile=None):
     """Check an explicitly selected gateway application identity after manual DFU.
 
     @param port_name Exact configured application device path, not a DFU path guess.
     @param serial_number Operator-supplied application USB serial (may differ from DFU).
+    @param usb_profile Optional explicit topology profile for container-published nodes.
     @return Unique cafe:4001 identity match; caller must still verify live firmware/session.
     """
+    if usb_profile:
+        return configured_target(port_name, serial_number, usb_profile, "application")
     return _usb_target(port_name, serial_number, 0xCAFE, 0x4001)
+
+
+def configured_target(port_name, serial_number, settings, mode):
+    """Check explicit manual selection against an optional published-node profile.
+
+    @param port_name Operator-selected device node.
+    @param serial_number Operator-selected serial identity for this USB mode.
+    @param settings Configured physical topology and application/DFU serial pair.
+    @param mode Application or factory DFU mode.
+    @return True only when both explicit selections match the verified current target.
+    """
+    from .firmware_nordic import target
+
+    try:
+        return serial_number == settings[mode + "_serial"] and port_name == target(
+            settings, mode
+        )
+    except (BundleError, KeyError, ValueError, OSError):
+        return False
 
 
 def _helper(helper_python):
@@ -120,13 +142,16 @@ def _helper(helper_python):
     )
 
 
-def manual_backend_status(candidate, *, helper_python, dfu_port, serial_number):
+def manual_backend_status(
+    candidate, *, helper_python, dfu_port, serial_number, usb_profile=None
+):
     """Report explicit recovery readiness without serial commands or flash writes.
 
     @param candidate Private validated application candidate.
     @param helper_python Operator-configured isolated helper interpreter.
     @param dfu_port Exact target already in factory USB DFU mode.
     @param serial_number Expected factory-DFU USB serial identity.
+    @param usb_profile Optional configured topology for narrowly published container nodes.
     @return Sanitized readiness report; no paths, serials, bytes or helper output.
     """
     checks = []
@@ -146,7 +171,11 @@ def manual_backend_status(candidate, *, helper_python, dfu_port, serial_number):
         for ident, check, code in (
             (
                 "dfu_identity",
-                lambda: _target(dfu_port, serial_number),
+                lambda: (
+                    configured_target(dfu_port, serial_number, usb_profile, "dfu")
+                    if usb_profile
+                    else _target(dfu_port, serial_number)
+                ),
                 "dfu_identity_unavailable",
             ),
             ("helper", lambda: _helper(helper_python), "backend_unavailable"),
@@ -174,7 +203,15 @@ def manual_backend_status(candidate, *, helper_python, dfu_port, serial_number):
 
 
 def install_manual(
-    candidate, *, port_name, helper_python, serial_number, lock_fd, before, progress
+    candidate,
+    *,
+    port_name,
+    helper_python,
+    serial_number,
+    lock_fd,
+    before,
+    progress,
+    usb_profile=None,
 ):
     """Upload a revalidated application to the explicitly selected factory bootloader.
 
@@ -185,6 +222,7 @@ def install_manual(
     @param lock_fd Inherited exclusive lifetime lock held by the durable job owner.
     @param before Durable phase callback; must acknowledge flash before mutation.
     @param progress Event callback; receives transfer-complete, never network confirmation.
+    @param usb_profile Optional explicit configured topology for container-published nodes.
     """
     from .firmware_worker import validate_guard
 
@@ -201,6 +239,7 @@ def install_manual(
         helper_python=helper_python,
         dfu_port=port_name,
         serial_number=serial_number,
+        usb_profile=usb_profile,
     )
     if not status["executable"]:
         raise BundleError(
@@ -211,23 +250,25 @@ def install_manual(
         payload.write_bytes(candidate["_data"])
         before("flash")
         # The parent handshake may take time; refuse a replacement USB device.
-        if not _target(port_name, serial_number):
+        if not (
+            configured_target(port_name, serial_number, usb_profile, "dfu")
+            if usb_profile
+            else _target(port_name, serial_number)
+        ):
             raise BundleError(
                 "dfu_identity_changed", "DFU target changed before transfer"
             )
+        command = [
+            helper_python,
+            "-I",
+            str(Path(__file__).with_name("nordic_helper.py")),
+            "--package",
+            str(payload),
+            "--port",
+            port_name,
+        ]
         child = subprocess.Popen(
-            [
-                helper_python,
-                "-I",
-                "-m",
-                "nordicsemi",
-                "dfu",
-                "usb-serial",
-                "--package",
-                str(payload),
-                "--port",
-                port_name,
-            ],
+            command,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

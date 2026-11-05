@@ -15,7 +15,7 @@ from pathlib import Path
 import secrets
 import socket
 import threading
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from .ingress import request_context, validate_ingress
 
@@ -219,6 +219,19 @@ class WebServer:
                     if state is not None:
                         state["csrf_token"] = self.csrf_token()
                         self.send(200, state)
+                elif urlsplit(self.path).path == "/api/firmware/preflight":
+                    query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+                    if (
+                        set(query) - {"candidate_id"}
+                        or len(query.get("candidate_id", [])) > 1
+                    ):
+                        self.send(400, {"error": "Invalid preflight query"})
+                        return
+                    value = self.dispatch(
+                        "firmware_preflight", query.get("candidate_id", [None])[0]
+                    )
+                    if value is not None:
+                        self.send(200, value)
                 elif re.fullmatch(r"/api/commands/[A-Za-z0-9_.:-]{1,128}", self.path):
                     result = self.dispatch("result", self.path.rsplit("/", 1)[1])
                     if result is not None:
@@ -348,6 +361,8 @@ class WebServer:
             value = self.service.configure_mqtt(payload)
         elif action == "firmware_install":
             value = self.service.start_firmware_update(payload)
+        elif action == "firmware_preflight":
+            value = self.service.firmware_preflight(payload)
         elif action == "result":
             value = self.service.command_result(payload)
             if value is None:

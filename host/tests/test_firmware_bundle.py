@@ -296,13 +296,18 @@ class BundleTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "signing_key_mismatch")
 
     def test_nordic_cannot_be_enabled_by_manifest_flags(self):
-        """A declared qualified Nordic entry still cannot bypass the absent backend."""
+        """A validated Nordic entry cannot bypass its explicit runtime/USB profile."""
+        from test_firmware_artifacts import nrf_zip
+        from livolod.firmware_backends import backend_status
+
         self.entry.update(
             board="nordic-pca10059",
             backend="nrf52840_usb_dfu_v1",
             layout="nrf-app-1000-e0000",
         )
-        self.write()
+        self.write(nrf_zip())
+        self.assertEqual(backend_status(self.candidate()), "backend_unavailable")
+        self.write(bytes(256))
         with self.assertRaises(BundleError) as caught:
             self.candidate()
-        self.assertEqual(caught.exception.code, "backend_unavailable")
+        self.assertEqual(caught.exception.code, "artifact_invalid")

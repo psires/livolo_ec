@@ -3,7 +3,7 @@
 The daemon remains responsible for quiescence, durable phase acknowledgement,
 worker lifetime and post-install verification/restore. The separate pinned GPL
 Silicon Labs helper is invoked as a CLI; its implementation is not copied here.
-Nordic's unqualified integrated DFU path intentionally cannot be invoked.
+Nordic USB handoff requires an explicit operator-selected identity/runtime profile.
 """
 
 import importlib.metadata
@@ -20,13 +20,18 @@ from .version import parse_version
 SILABS_VERSION = "0.0.31"
 
 
-def backend_status(candidate):
+def backend_status(candidate, nordic=None):
     """Check local helper availability without touching a radio.
 
     @param candidate Validated bundle candidate dictionary.
+    @param nordic Optional operator-configured Nordic USB/helper profile.
     @return None when installed, otherwise a stable blocking reason code.
     """
     try:
+        if candidate["backend"] == "nrf52840_usb_dfu_v1":
+            from .firmware_nordic import backend_status as nordic_status
+
+            return nordic_status(nordic or {})
         if candidate["backend"] == "ti_uart_signed_v1":
             importlib.metadata.version("cryptography")
             return None
@@ -150,7 +155,7 @@ def _run_flasher(path, port, lock_fd):
         )
 
 
-def install(candidate, port_name, lock_fd, before, progress):
+def install(candidate, port_name, lock_fd, before, progress, nordic=None):
     """Transfer a validated newer application under exclusive worker ownership.
 
     @param candidate Verified private candidate, including immutable payload bytes.
@@ -158,13 +163,18 @@ def install(candidate, port_name, lock_fd, before, progress):
     @param lock_fd Open inherited lifetime guard; pass unchanged to external helpers.
     @param before Blocking durable phase handshake; failure prevents the next mutation.
     @param progress Callback for genuine transfer-stage measurements only.
+    @param nordic Optional explicit Nordic identity/runtime profile from local configuration.
     @return Nothing; successful return requires daemon reconnect/restore to confirm.
     """
-    reason = backend_status(candidate)
+    reason = backend_status(candidate, nordic)
     if reason:
         raise BundleError(
             reason, "Required firmware installation backend is unavailable"
         )
+    if candidate["backend"] == "nrf52840_usb_dfu_v1":
+        from .firmware_nordic import install as nordic_install
+
+        return nordic_install(candidate, port_name, lock_fd, before, progress, nordic)
     if (
         not isinstance(port_name, str)
         or not port_name.startswith("/")

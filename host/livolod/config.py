@@ -107,6 +107,7 @@ class Config:
         default_factory=lambda: {"enabled": False, "host": "127.0.0.1", "port": 8090}
     )
     firmware_bundle_dir: str = str(Path(__file__).parent / "firmware")
+    firmware_nordic: dict = field(default_factory=dict)
 
 
 def load(path):
@@ -126,7 +127,7 @@ def parse(raw):
     """
     fields(
         raw,
-        "network serial_port serial_baudrate database mqtt devices offline_after web output_mode api firmware_bundle_dir",
+        "network serial_port serial_baudrate database mqtt devices offline_after web output_mode api firmware_bundle_dir firmware_nordic",
         "configuration",
     )
     output_mode = raw.get("output_mode", "disabled")
@@ -202,6 +203,13 @@ def parse(raw):
         or "\0" in bundle_dir
     ):
         raise ValueError("firmware_bundle_dir must be an absolute local directory")
+    from .firmware_nordic import profile
+
+    nordic = profile(raw.get("firmware_nordic", {}))
+    if nordic and raw["serial_port"] != str(
+        Path(nordic["device_directory"]) / "application"
+    ):
+        raise ValueError("Nordic profile must use its published application node")
     return Config(
         gateway,
         tag,
@@ -218,6 +226,7 @@ def parse(raw):
         uart_baudrate(raw.get("serial_baudrate", 115200)),
         api_config(raw.get("api", {})),
         bundle_dir,
+        nordic,
     )
 
 

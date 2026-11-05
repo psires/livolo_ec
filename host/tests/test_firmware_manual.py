@@ -158,9 +158,10 @@ class ManualFirmwareTests(unittest.TestCase):
             @return Completed fake child.
             """
             self.assertEqual(
-                command[:6],
-                ["/isolated/python", "-I", "-m", "nordicsemi", "dfu", "usb-serial"],
+                command[:2],
+                ["/isolated/python", "-I"],
             )
+            self.assertTrue(command[2].endswith("/nordic_helper.py"))
             self.assertEqual(command[-2:], ["--port", "/dev/ttyACM0"])
             path = Path(command[command.index("--package") + 1])
             self.assertEqual(path.read_bytes(), value["_data"])

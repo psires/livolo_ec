@@ -140,7 +140,16 @@ def main(argv=None):
     @return Zero after transfer, one on failure; never claims network readiness.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--bundle-dir", required=True)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--bundle-dir")
+    source.add_argument("--artifact")
+    parser.add_argument("--operation", choices=("update", "recovery"), default="update")
+    parser.add_argument("--board")
+    parser.add_argument("--version")
+    parser.add_argument("--public-key")
+    parser.add_argument("--dfu-serial")
+    parser.add_argument("--helper-python")
+    parser.add_argument("--nordic-profile")
     parser.add_argument("--candidate-id", required=True)
     parser.add_argument("--port", required=True)
     parser.add_argument("--baud", type=int, required=True)
@@ -152,13 +161,88 @@ def main(argv=None):
     channel = Channel(args.job_id)
     try:
         guard = validate_guard(args.lock_fd)
-        candidate = load_candidate(
-            args.bundle_dir,
-            args.candidate_id,
-            host_version=__version__,
-            app_baudrate=args.baud,
-        )
-        install(candidate, args.port, guard, channel.before, channel.progress)
+        if args.artifact:
+            from .firmware_artifacts import inspect_artifact
+
+            candidate = inspect_artifact(
+                args.artifact,
+                board=args.board,
+                version=args.version,
+                public_key=args.public_key,
+                operation=args.operation,
+            )
+            if (
+                candidate["id"] != args.candidate_id
+                or candidate["version"] != __version__
+                or candidate["app_baudrate"] != args.baud
+            ):
+                raise BundleError(
+                    "artifact_invalid",
+                    "Local artifact changed or does not match this host",
+                )
+        else:
+            if args.operation != "update" or any(
+                (
+                    args.board,
+                    args.version,
+                    args.public_key,
+                    args.dfu_serial,
+                    args.helper_python,
+                )
+            ):
+                raise BundleError(
+                    "unsupported_operation",
+                    "Catalog updates cannot override transport or board",
+                )
+            candidate = load_candidate(
+                args.bundle_dir,
+                args.candidate_id,
+                host_version=__version__,
+                app_baudrate=args.baud,
+            )
+        if args.operation == "recovery":
+            from .firmware_manual import install_manual
+            from .nordic_usb import profile
+
+            install_manual(
+                candidate,
+                port_name=args.port,
+                helper_python=args.helper_python,
+                serial_number=args.dfu_serial,
+                lock_fd=guard,
+                before=channel.before,
+                progress=channel.progress,
+                usb_profile=(
+                    profile(json.loads(args.nordic_profile))
+                    if args.nordic_profile
+                    else None
+                ),
+            )
+        else:
+            if args.dfu_serial or args.helper_python:
+                raise BundleError(
+                    "unsupported_operation",
+                    "Routine updates cannot override their helper",
+                )
+            if args.nordic_profile:
+                from .firmware_nordic import profile
+
+                if candidate["backend"] != "nrf52840_usb_dfu_v1":
+                    raise BundleError(
+                        "unsupported_operation",
+                        "Nordic profile cannot override another backend",
+                    )
+                nordic = profile(json.loads(args.nordic_profile))
+                install(
+                    candidate,
+                    args.port,
+                    guard,
+                    channel.before,
+                    channel.progress,
+                    nordic=nordic,
+                )
+            else:
+                install(candidate, args.port, guard, channel.before, channel.progress)
         channel.emit("transferred")
         return 0
     except Exception as error:

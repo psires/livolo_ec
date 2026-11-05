@@ -17,6 +17,7 @@ API_VERSION = 1
 ACTIONS = {"set", "refresh", "add", "rename", "remove", "pair"}
 MAX_BODY = 4096
 FIRMWARE_FIELDS = {
+    "preflight_supported",
     "board",
     "installed_version",
     "latest_version",
@@ -247,7 +248,7 @@ class NativeAPI:
                 status=401,
                 headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"},
             )
-        if request.query_string:
+        if request.query_string and request.path != "/api/v1/firmware/preflight":
             return web.json_response(
                 {"error": "Query parameters are not supported"}, status=400
             )
@@ -267,6 +268,7 @@ class NativeAPI:
                 web.get("/health", self.health),
                 web.get("/api/v1/info", self.info),
                 web.get("/api/v1/snapshot", self.snapshot),
+                web.get("/api/v1/firmware/preflight", self.preflight_firmware),
                 web.get("/api/v1/events", self.events),
                 web.post("/api/v1/commands", self.command),
                 web.post("/api/v1/firmware/install", self.install_firmware),
@@ -400,6 +402,23 @@ class NativeAPI:
         ):
             return web.json_response({"error": "Invalid command envelope"}, status=400)
         return web.json_response(self.service.submit(value["action"], value["payload"]))
+
+    async def preflight_firmware(self, request):
+        """Expose read-only compatibility checks without accepting device or file paths.
+
+        @param request Authenticated request with at most one candidate_id query value.
+        @return Public advisory report, or HTTP 400 for an invalid selection.
+        """
+        if (
+            set(request.query) - {"candidate_id"}
+            or len(request.query.getall("candidate_id", [])) > 1
+        ):
+            return web.json_response({"error": "Invalid preflight query"}, status=400)
+        try:
+            value = self.service.firmware_preflight(request.query.get("candidate_id"))
+        except ValueError:
+            return web.json_response({"error": "Invalid candidate_id"}, status=400)
+        return web.json_response(value)
 
     async def install_firmware(self, request):
         """Submit a catalog candidate without accepting paths or flashing in the API.

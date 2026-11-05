@@ -21,16 +21,17 @@ from .version import parse_version
 
 
 class UpdatePort:
-    def __init__(self, port, baudrate=115200):
+    def __init__(self, port, baudrate=115200, *, passive=False):
         """Claim an exclusive serial connection for a firmware update session.
 
         @param port Serial device path.
         @param baudrate Application rate matching the installed firmware.
+        @param passive Set inactive DTR/RTS before opening for explicit read-only probes.
         """
         import serial
 
         self.serial = serial.Serial(
-            port,
+            None if passive else port,
             uart_baudrate(baudrate),
             timeout=0.2,
             write_timeout=2,
@@ -38,6 +39,11 @@ class UpdatePort:
             rtscts=False,
             dsrdtr=False,
         )
+        if passive:
+            self.serial.dtr = False
+            self.serial.rts = False
+            self.serial.port = port
+            self.serial.open()
         self.request_id = secrets.randbelow(0xFFFFFF00) + 1
 
     def close(self):

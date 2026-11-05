@@ -51,6 +51,10 @@ class FirmwareManager:
         self.board = None
         self.installed = None
         self.caps = {}
+        self.version_info = {}
+        self.update_info = {}
+        self.worker_arguments = None
+        self.manual_restore_serial = None
         self.process = None
         self.restore_deadline = None
         self.job = service.store.firmware_job()
@@ -86,6 +90,8 @@ class FirmwareManager:
         from .firmware_backends import backend_status
 
         self.caps = dict(caps)
+        self.version_info = {}
+        self.update_info = {}
         self.board = caps.get("board")
         self.installed = caps.get("fw_version")
         self.candidate = None
@@ -100,7 +106,9 @@ class FirmwareManager:
                 host_version=__version__,
                 app_baudrate=self.service.config.serial_baudrate,
             )
-            self.reason = backend_status(self.candidate)
+            self.reason = backend_status(
+                self.candidate, self.service.config.firmware_nordic
+            )
             if (
                 self.candidate["backend"] == "ti_uart_signed_v1"
                 and caps.get("update") != "uart_signed_v1"
@@ -108,6 +116,47 @@ class FirmwareManager:
                 self.reason = "bootloader_install_required"
         except BundleError as error:
             self.reason = error.code
+
+    def preflight_report(self, candidate_id=None, *, candidate=None):
+        """Check current catalog bytes and cached owned-session identity without UART I/O.
+
+        @param candidate_id Optional opaque artifact selection.
+        @param candidate Optional freshly validated private candidate for install admission.
+        @return Public advisory report; install independently repeats the checks.
+        """
+        from .firmware_preflight import build_report
+
+        service = self.service
+        blocked = None
+        if self.busy:
+            blocked = (
+                "recovery_required"
+                if self.job.get("recovery")
+                else "update_in_progress"
+            )
+        elif (
+            service.command_inflight
+            or not service.commands.empty()
+            or service.pending
+            or service.pairing
+            or service.reconfigure.is_set()
+            or service.radio_lock.locked()
+            or service.mqtt_lock.locked()
+        ):
+            blocked = "radio_busy"
+        return build_report(
+            service.config,
+            candidate_id,
+            board=self.board,
+            caps=self.caps,
+            version_info=self.version_info,
+            update_info=self.update_info,
+            live=service.ready,
+            simulated=service.simulated,
+            blocked=blocked,
+            identity_source="live_session" if service.ready else "unknown",
+            candidate=candidate,
+        )
 
     def snapshot(self):
         """Return only public status; package paths, bytes and keys remain internal."""
@@ -131,6 +180,7 @@ class FirmwareManager:
         elif not self.service.ready:
             reason = "radio_offline"
         return dict(
+            preflight_supported=True,
             board=self.board,
             installed_version=self.installed,
             latest_version=candidate.get("version"),
@@ -154,6 +204,121 @@ class FirmwareManager:
             release_notes=candidate.get("release_notes"),
             release_url=candidate.get("release_url"),
         )
+
+    def start_local(self, payload, candidate, worker_arguments):
+        """Admit a locally inspected operator artifact through the normal durable job.
+
+        @param payload Request ID and exact hash-bound local candidate ID.
+        @param candidate Private validated operator artifact, never accepted over HTTP.
+        @param worker_arguments Fixed worker arguments constructed by the offline CLI.
+        @return Existing or newly accepted command result; incompatible inputs are rejected.
+        """
+        from . import __version__
+
+        if (
+            candidate["version"] != __version__
+            or candidate.get("operation") != "update"
+        ):
+            raise ValueError("Local update must match the installed host release")
+        previous = self.service.store.previous(
+            payload["request_id"],
+            dict(action="firmware_update", candidate_id=payload["candidate_id"]),
+        )
+        if previous:
+            return previous
+        report = self.preflight_report(candidate["id"], candidate=candidate)
+        if not report["executable"]:
+            return dict(
+                request_id=payload["request_id"],
+                status="rejected",
+                error=report["blocked_reason"],
+            )
+        old_candidate, old_reason = self.candidate, self.reason
+        self.candidate, self.reason = candidate, None
+        result = self.start(payload)
+        if result["status"] == "pending":
+            self.worker_arguments = list(worker_arguments)
+            self.job["operation"] = "local_update"
+            self.persist()
+        else:
+            self.candidate, self.reason = old_candidate, old_reason
+        return result
+
+    def check_manual_restore(self, caps=None, version_info=None):
+        """Require explicit application USB identity before resuming manual recovery.
+
+        @param caps Optional fresh application capabilities to verify before network writes.
+        @param version_info VERSION response from the same owned application connection.
+        """
+        if not self.busy or self.job.get("operation") != "recovery":
+            return
+        from .firmware_manual import application_target_status
+
+        if (
+            self.job.get("transfer_completed") is not True
+            or not self.manual_restore_serial
+            or not application_target_status(
+                self.service.config.serial_port,
+                self.manual_restore_serial,
+                usb_profile=self.service.config.firmware_nordic,
+            )
+        ):
+            raise LinkError(
+                "Explicit application identity verification is required after manual recovery"
+            )
+        if caps is not None and (
+            caps.get("board") != self.job["board"]
+            or caps.get("fw_version") != self.job["version"]
+            or caps.get("baud") != str(self.job["baudrate"])
+            or caps.get("proto") != "3"
+            or (version_info or {}).get("board") != self.job["board"]
+            or (version_info or {}).get("fw_version") != self.job["version"]
+            or (version_info or {}).get("proto") != "3"
+        ):
+            raise LinkError(
+                "Recovered application does not match the recorded manual transfer"
+            )
+
+    def check_nordic_restore(self, caps=None, version_info=None):
+        """Verify the configured physical Nordic board before opening or restoring it.
+
+        @param caps Optional fresh capabilities, checked before network writes.
+        @param version_info Optional VERSION response from the same owned serial session.
+        """
+        settings = self.service.config.firmware_nordic
+        automatic = bool(self.busy and self.job.get("nordic_profile"))
+        if not settings and not automatic:
+            return
+        from .firmware_nordic import target
+        from .firmware_bundle import BundleError
+
+        try:
+            if automatic and (
+                settings != self.job["nordic_profile"]
+                or self.job.get("transfer_completed") is not True
+            ):
+                raise LinkError(
+                    "Nordic update requires explicit recovery before radio restoration"
+                )
+            if target(settings, "application") != self.service.config.serial_port:
+                raise LinkError("Nordic application path changed")
+        except (BundleError, ValueError) as error:
+            raise LinkError("Configured Nordic USB identity is unavailable") from error
+        if caps is not None:
+            facts = (caps, version_info or {})
+            if any(
+                f.get("board") != "nordic-pca10059" or f.get("proto") != "3"
+                for f in facts
+            ):
+                raise LinkError(
+                    "Nordic application identity did not match its USB profile"
+                )
+            if automatic and any(
+                f.get("fw_version") != self.job["version"] for f in facts
+            ):
+                raise LinkError(
+                    "Nordic application does not match the completed update"
+                )
 
     def start(self, payload):
         """Deduplicate an explicit install and request an exclusive radio handoff.
@@ -213,6 +378,7 @@ class FirmwareManager:
                 self.service.notify_changed()
                 return result
             candidate = self.candidate
+            self.worker_arguments = None
             self.job = dict(
                 recorded,
                 request_id=ident,
@@ -230,6 +396,9 @@ class FirmwareManager:
                 started_at=time.time(),
                 last_critical=None,
             )
+            if candidate["backend"] == "nrf52840_usb_dfu_v1":
+                self.job["nordic_profile"] = dict(self.service.config.firmware_nordic)
+                self.job["transfer_completed"] = False
             self.persist()
             self.service.ready = False
             self.requested.set()
@@ -369,28 +538,45 @@ class FirmwareManager:
                 transferred = True
         return transferred and await process.wait() == 0
 
-    async def execute(self, guard):
+    async def execute(self, guard, worker_arguments=None):
         """Run one bounded worker while retaining the cross-process radio guard.
 
         @param guard Locked lifetime descriptor; this method closes the parent's copy.
+        @param worker_arguments Optional fixed offline CLI arguments; never accepted from HTTP.
         """
         process = None
         try:
             if self.service.stop.is_set():
                 self.failed("Shutdown before update started", uncertain=False)
                 return
+            arguments = (
+                worker_arguments
+                or self.worker_arguments
+                or [
+                    "--bundle-dir",
+                    self.service.config.firmware_bundle_dir,
+                    "--candidate-id",
+                    self.job["candidate_id"],
+                    "--port",
+                    self.service.config.serial_port,
+                    "--baud",
+                    str(self.job["baudrate"]),
+                ]
+            )
+            if (
+                self.job.get("nordic_profile")
+                and self.job.get("operation") != "recovery"
+            ):
+                arguments = [
+                    *arguments,
+                    "--nordic-profile",
+                    json.dumps(self.job["nordic_profile"], sort_keys=True),
+                ]
             process = await asyncio.create_subprocess_exec(
                 sys.executable,
                 "-m",
                 "livolod.firmware_worker",
-                "--bundle-dir",
-                self.service.config.firmware_bundle_dir,
-                "--candidate-id",
-                self.job["candidate_id"],
-                "--port",
-                self.service.config.serial_port,
-                "--baud",
-                str(self.job["baudrate"]),
+                *arguments,
                 "--job-id",
                 self.job["request_id"],
                 "--lock-fd",
@@ -415,8 +601,20 @@ class FirmwareManager:
                 )
                 if communication not in done or not communication.result():
                     raise RuntimeError("Firmware update interrupted or timed out")
-                self.job.update(stage="restoring", error=None)
-                self.restore_deadline = time.monotonic() + RESTORE_TIMEOUT
+                if self.job.get("operation") == "recovery":
+                    self.job.update(
+                        status="unknown",
+                        stage="transferred",
+                        transfer_completed=True,
+                        error=None,
+                        recovery="manual_verification_required",
+                    )
+                    self.restore_deadline = None
+                else:
+                    self.job.update(stage="restoring", error=None)
+                    if self.job.get("nordic_profile"):
+                        self.job["transfer_completed"] = True
+                    self.restore_deadline = time.monotonic() + RESTORE_TIMEOUT
                 self.persist()
             finally:
                 communication.cancel()
@@ -434,6 +632,7 @@ class FirmwareManager:
             if process:
                 await self.reap(process)
             self.process = None
+            self.worker_arguments = None
             if guard is not None:
                 os.close(guard)
             self.requested.clear()
@@ -467,6 +666,16 @@ class FirmwareManager:
         """
         if not self.job or not self.busy or self.requested.is_set():
             return
+        if self.job.get("operation") == "recovery":
+            try:
+                self.check_manual_restore(caps, self.version_info)
+            except LinkError:
+                return
+        if self.job.get("nordic_profile"):
+            try:
+                self.check_nordic_restore(caps, self.version_info)
+            except LinkError:
+                return
         match = (
             caps.get("board") == self.job["board"]
             and caps.get("fw_version") == self.job["version"]

@@ -43,11 +43,14 @@ class VersionTests(unittest.TestCase):
 
 
 class TrialTests(unittest.IsolatedAsyncioTestCase):
-    async def exercise(self, firmware=__version__, bad_confirm=False):
+    async def exercise(
+        self, firmware=__version__, bad_confirm=False, initial_trial=True
+    ):
         """Run startup confirmation with the requested firmware-version behavior.
 
         @param firmware Firmware release reported during startup.
         @param bad_confirm Whether durable firmware confirmation should fail.
+        @param initial_trial Whether the simulated TI image starts in an unconfirmed trial.
         """
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
@@ -62,7 +65,7 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
         service.gateway = gateway
         original = gateway.command
         history = []
-        trial = True
+        trial = initial_trial
 
         async def command(text, retries=1):
             """Provide the scenario-specific UART response or injected failure.
@@ -75,10 +78,10 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
             if text == "CAPS":
                 return (
                     await original(text, retries)
-                    + f" fw_version={firmware} boot_version=0.2 update=uart_signed_v1"
+                    + f" board=codm-cc2652p fw_version={firmware} boot_version=0.2 update=uart_signed_v1"
                 )
             if text == "VERSION":
-                return f"OK fw_version={firmware}"
+                return f"OK board=codm-cc2652p proto=3 fw_version={firmware}"
             if text == "UPDATE_STATUS":
                 return (
                     "OK trial=1 state=fffffff8"
@@ -120,3 +123,19 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(service.ready)
             if firmware != __version__:
                 self.assertNotIn("UPDATE_CONFIRM", history)
+
+    async def test_new_host_restores_confirmed_012_without_flashing(self):
+        """A software upgrade preserves UART3 control of a confirmed older radio."""
+        service, store, history = await self.exercise("0.12", initial_trial=False)
+        await service.restore()
+        self.assertTrue(service.ready)
+        self.assertEqual(service.diagnostics["host_version"], __version__)
+        self.assertEqual(service.diagnostics["firmware"]["running_version"], "0.12")
+        self.assertTrue(any(command.startswith("ARM ") for command in history))
+        self.assertFalse(
+            any(
+                command.startswith(("UPDATE_BEGIN", "UPDATE_CONFIRM", "BOOTLOADER"))
+                for command in history
+            )
+        )
+        self.assertIsNone(store.firmware_job())

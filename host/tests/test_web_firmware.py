@@ -64,9 +64,47 @@ class FirmwareService:
         """
         return self.results.get(request_id)
 
+    def firmware_preflight(self, candidate_id=None):
+        """Model a read-only report with the same candidate input validation.
+
+        @param candidate_id Optional opaque selected artifact ID.
+        @return Public advisory result without appending an install call.
+        """
+        from livolod.firmware_preflight import candidate_identity
+
+        candidate_identity(candidate_id)
+        return dict(
+            schema=1,
+            operation="update",
+            executable=False,
+            blocked_reason="artifact_missing",
+        )
+
 
 class FirmwareWebTests(unittest.IsolatedAsyncioTestCase):
     """Exercise the browser firmware route against an isolated HTTP server."""
+
+    async def test_preflight_is_authenticated_read_only_and_rejects_path_overrides(
+        self,
+    ):
+        """Browser callers may inspect one opaque ID but cannot choose files or ports."""
+        status, report = await self.request(
+            "GET", "/api/firmware/preflight?candidate_id=test:123"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(report["schema"], 1)
+        self.assertEqual(self.service.calls, [])
+        for query in (
+            "?path=/tmp/file",
+            "?candidate_id=../file",
+            "?candidate_id=a&candidate_id=b",
+        ):
+            status, _ = await self.request("GET", "/api/firmware/preflight" + query)
+            self.assertEqual(status, 400)
+        status, _ = await self.request(
+            "GET", "/api/firmware/preflight", headers={"Authorization": "Bearer wrong"}
+        )
+        self.assertEqual(status, 401)
 
     async def asyncSetUp(self):
         """Bind a local server and a fake service, without any radio connection."""

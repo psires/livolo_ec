@@ -357,8 +357,17 @@ def _candidate(root, entry, app_baudrate):
         public, digest = public_bytes.hex(), info["sha512"]
     elif entry["backend"] == "mg21_gecko_gbl_v1":
         _gbl(data, entry["board"], entry["version"])
+    elif entry["backend"] == "nrf52840_usb_dfu_v1":
+        from .nrf_dfu import inspect_package
+
+        try:
+            inspect_package(data, version=entry["version"])
+        except ValueError as error:
+            raise BundleError(
+                "artifact_invalid", "Invalid Nordic application package"
+            ) from error
     else:
-        _fail("Nordic DFU integration is not yet qualified", "backend_unavailable")
+        _fail("Unsupported firmware backend", "backend_unavailable")
     return {
         "id": entry["id"] + ":" + entry["sha256"],
         "artifact_id": entry["id"],
