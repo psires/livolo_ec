@@ -96,6 +96,36 @@ def mqtt_online():
         client.loop_stop()
 
 
+def firmware_preflight(base, headers, snapshot):
+    """Verify the installed release's advisory API without starting a firmware job.
+
+    @param base Isolated native API URL.
+    @param headers Test bearer credentials.
+    @param snapshot Current state from a simulator or missing-radio test container.
+    @return Whether this release exposes the additive preflight capability.
+    """
+    firmware = snapshot["firmware_update"]
+    if not firmware.get("preflight_supported"):
+        # Previous release images remain part of the persisted-data upgrade test.
+        assert snapshot["diagnostics"]["host_version"] == "0.12"
+        return False
+    endpoint = base + "/api/v1/firmware/preflight"
+    assert request(endpoint)[0] == 401
+    status, body = request(endpoint, headers=headers)
+    report = json.loads(body)
+    assert status == 200 and report["schema"] == 1, report
+    assert report["operation"] == "update"
+    assert report["executable"] is False and report["blocked_reason"], report
+    assert report["candidate_id"] is None, "Public catalog must remain empty"
+    assert request(endpoint + "?path=/tmp/firmware", headers=headers)[0] == 400
+    status, body = request(base + "/api/v1/snapshot", headers=headers)
+    after = json.loads(body)["data"]["firmware_update"]
+    assert status == 200
+    for key in ("request_id", "status", "stage", "in_progress"):
+        assert after[key] == firmware[key], (key, firmware, after)
+    return True
+
+
 def check(kind, seed):
     """Check live authentication, registry writes, persistence and wrapper UID.
 
@@ -128,6 +158,7 @@ def check(kind, seed):
     assert snapshot["simulated"] == (kind == "standalone")
     if kind == "ha":
         assert not snapshot["ready"], "Missing radio must not be ready"
+    preflight_supported = firmware_preflight(base, headers, snapshot)
     status_lines = Path("/proc/1/status").read_text().splitlines()
     assert (
         next(line for line in status_lines if line.startswith("Uid:")).split()[1:]
@@ -179,6 +210,7 @@ def check(kind, seed):
                 "api": True,
                 "websocket": True,
                 "daemon_uid": 10001,
+                "firmware_preflight": preflight_supported,
             }
         )
     )

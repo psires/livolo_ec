@@ -91,6 +91,10 @@ def prepare(data, entry, output):
         "host/docker/Dockerfile",
         "host/docker/smoke.py",
         "host/docker/requirements-firmware.txt",
+        "host/docker/requirements-nordic.txt",
+        "host/docker/requirements-nordic-build.txt",
+        "host/docker/build_nordic.py",
+        "tools/container_sources.py",
     ]
     paths += (
         ["host/release/version.json"]
@@ -139,8 +143,16 @@ def prepare(data, entry, output):
                 config,
                 re.M,
             )
-        for relative in ("VERSION", "LICENSE", "THIRD_PARTY_NOTICES.md", "host"):
+        for relative in (
+            "VERSION",
+            "LICENSE",
+            "THIRD_PARTY_NOTICES.md",
+            "host",
+            "tools",
+        ):
             origin = source / relative
+            if not origin.exists():
+                continue
             if origin.is_dir():
                 shutil.copytree(origin, output / relative)
             else:

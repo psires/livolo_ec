@@ -70,6 +70,10 @@ def main():
             "host/PACKAGE.md",
             "host/docker/smoke.py",
             "host/docker/requirements-firmware.txt",
+            "host/docker/requirements-nordic.txt",
+            "host/docker/requirements-nordic-build.txt",
+            "host/docker/build_nordic.py",
+            "tools/container_sources.py",
         ):
             destination = app / relative
             destination.parent.mkdir(parents=True, exist_ok=True)

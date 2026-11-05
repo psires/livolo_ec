@@ -4,8 +4,8 @@ Native Linux service and maintenance commands for Livolo EC UART v3 radios.
 Provides a local web interface, authenticated API, optional MQTT and persistent
 device registration. Project-owned code is BSD-2-Clause.
 
-The daemon version follows the radio compatibility version, currently 0.12.
-The standalone distribution has its own version, 0.2.0. See the
+The daemon version follows the radio compatibility version, currently 0.13.
+The standalone distribution has its own version, 0.3.0. See the
 [standalone installation guide](https://github.com/psires/livolo_ec/blob/main/host/release/README.md)
 for configuration, systemd setup, upgrades and emergency maintenance.
 

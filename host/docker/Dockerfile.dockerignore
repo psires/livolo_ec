@@ -12,6 +12,11 @@
 !host/docker/Dockerfile.dockerignore
 !host/docker/smoke.py
 !host/docker/requirements-firmware.txt
+!host/docker/requirements-nordic.txt
+!host/docker/requirements-nordic-build.txt
+!host/docker/build_nordic.py
+!tools/
+!tools/container_sources.py
 **/__pycache__/
 **/*.pyc
 **/*.sqlite*

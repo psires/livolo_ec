@@ -34,3 +34,14 @@ not complete that review.
 The root `LICENSE` is canonical. Independently built Python packages and
 assembled Home Assistant distributions carry copies so recipients receive it
 without requiring the monorepo. Keep those copies identical when updating it.
+
+The optional Nordic update backend uses a separate Python 3.10 runtime with
+legacy `nrfutil==6.1.7`. The Python helper modules from `pc-ble-driver-py` are
+pinned to upstream commit `cc3a9d259b9363524823aa4a48dbe6991eca6bd7`; native BLE
+libraries are not included. Nordic's original notices, including the restriction
+to use with Nordic processors, remain applicable. These dependencies are not
+relicensed under the project's BSD-2-Clause licence. Container images retain
+the verified upstream archive, matching Python source distributions, dependency
+versions, hashes and notices under `/usr/share/livolo-ec/sources/nordic`.
+The project's fixed-port wrapper disables the vendor transport's automatic USB
+discovery and reset behavior; the vendor sources themselves remain unchanged.

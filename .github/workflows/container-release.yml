@@ -128,6 +128,10 @@ jobs:
               subprocess.run([name, "--help"], check=True, stdout=subprocess.DEVNULL)
           subprocess.run(["python", "-m", "universal_silabs_flasher", "--help"], check=True, stdout=subprocess.DEVNULL)
           subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd="/usr/share/livolo-ec/sources", check=True)
+          if tuple(map(int, version("livolo-ec-daemon").split("."))) >= (0, 13):
+              assert json.loads(pathlib.Path("/opt/nrfutil/livolo-runtime.json").read_text()) == {"python": [3, 10], "nrfutil": "6.1.7", "fixed_port": 1}
+              subprocess.run(["/opt/nrfutil/bin/python3.10", "-I", "-m", "nordicsemi", "dfu", "usb-serial", "--help"], check=True, stdout=subprocess.DEVNULL)
+              subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd="/usr/share/livolo-ec/sources/nordic", check=True)
           ' > evidence/package-checks.txt
           docker run --rm --network none --entrypoint cat "$IMAGE@$DIGEST" /usr/share/livolo-ec/sources/python-inventory.json > evidence/python-inventory.json
           docker run --rm --network none --entrypoint cat "$IMAGE@$DIGEST" /usr/share/livolo-ec/debian-packages.txt > evidence/debian-packages.txt
