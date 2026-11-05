@@ -1,0 +1,14 @@
+[
+  {
+    "version": "0.1.1",
+    "tag": "ha-0.1.1",
+    "commit": "fde0b494fed3b925e97c482524b874c1d98cd93b",
+    "latest": false
+  },
+  {
+    "version": "0.2.0",
+    "tag": "ha-0.2.0",
+    "commit": "6fe41cbdc909a6497776202b3eeae088655b9908",
+    "latest": true
+  }
+]
