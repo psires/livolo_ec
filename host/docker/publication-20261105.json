@@ -1,0 +1,90 @@
+{
+  "verified_at_utc": "2026-11-05T19:56:23.599876+00:00",
+  "registry_auth": "Anonymous scoped pull tokens; no account credentials",
+  "architecture": "linux/arm64",
+  "radio_access": false,
+  "live_testbed_upgrade": false,
+  "images": [
+    {
+      "image": "ghcr.io/psires/livolod:0.2.0",
+      "index_digest": "sha256:5448ae213340a610c01225d15cffc51e550966019daedbdc04dcc0c9b8ba2bdd",
+      "platform_digest": "sha256:66bc0273e50a3c89716b146cf5f8b2e57f105c3387ba2ce4bf3ef31e87754e94",
+      "config_digest": "sha256:8756a470741f273ad16a861b2b85ebf4937125b74f8b36a2c4ecdda5560823d5",
+      "source_tag": "standalone-0.2.0",
+      "source_commit": "b371ca9f30e091eceeea357169be8c602398702f",
+      "recipe_commit": "662b0c2668597a8904d42c3f9493a29fe50f7e55",
+      "daemon_version": "0.12",
+      "attestation_digests": [
+        "sha256:51ea18de5106ac47dd11f459f8436c65b555c8961b0db90a8f0bea4c7a755c52"
+      ],
+      "predicate_types": [
+        "https://spdx.dev/Document",
+        "https://slsa.dev/provenance/v1"
+      ],
+      "anonymous_registry_verification": true,
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42098198386/job/127493782370",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      },
+      "previous_image": null,
+      "persistence_test": "first install and same-image recreation"
+    },
+    {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.2.0",
+      "index_digest": "sha256:291dafff9bc9055737f41e9c2acebaf8562580ff7453c8f933b171fb18a5a80a",
+      "platform_digest": "sha256:55e2a9502f8132dbfbb4ad03a4a03a57ebe65518bf6be48b043a4790bc4f3d59",
+      "config_digest": "sha256:84b833b9f01451a213678848ff612c366ae9b6669178300ae92309469c6cc565",
+      "source_tag": "ha-0.2.0",
+      "source_commit": "6fe41cbdc909a6497776202b3eeae088655b9908",
+      "recipe_commit": "c75839d038462042f15731bc28a19cc579f5d630",
+      "daemon_version": "0.12",
+      "attestation_digests": [
+        "sha256:9ac51ffe9e86718442f19ba071805c222b77265d20a3a4e7cb8b1e361fb85f95"
+      ],
+      "predicate_types": [
+        "https://spdx.dev/Document",
+        "https://slsa.dev/provenance/v1"
+      ],
+      "anonymous_registry_verification": true,
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42096568296/job/127488105085",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      },
+      "previous_image": null,
+      "persistence_test": "first install and same-image recreation"
+    },
+    {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.2.1",
+      "index_digest": "sha256:7349943f15dde171d4938bc821f6405146f6306479fddf596a68592d64bd8edb",
+      "platform_digest": "sha256:f0e2a17cae53bcd4190702c4e44e058062c4991d2b29b0016ed03fc402fc05a1",
+      "config_digest": "sha256:8af3c3167efd34e2449c630fc5b7632493f354e393cc23904f519416f4868eef",
+      "source_tag": "ha-0.2.1",
+      "source_commit": "c75839d038462042f15731bc28a19cc579f5d630",
+      "recipe_commit": "662b0c2668597a8904d42c3f9493a29fe50f7e55",
+      "daemon_version": "0.12",
+      "attestation_digests": [
+        "sha256:aa67352e40ac43a5c0735d7ec9423978751e962a90dc7f8bfebb7aee251752de"
+      ],
+      "predicate_types": [
+        "https://spdx.dev/Document",
+        "https://slsa.dev/provenance/v1"
+      ],
+      "anonymous_registry_verification": true,
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42098198386/job/127493782632",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      },
+      "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:291dafff9bc9055737f41e9c2acebaf8562580ff7453c8f933b171fb18a5a80a",
+      "persistence_test": "version upgrade"
+    }
+  ]
+}

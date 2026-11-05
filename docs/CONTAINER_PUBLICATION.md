@@ -1,8 +1,16 @@
-# Container publication plan
+# Container publication
 
-Status: publication implementation prepared 2026-11-05; an enabled, reviewed
-request and passing CI are required before any image is advertised as published.
-Coordinate HA delivery with [HA_PUBLICATION.md](HA_PUBLICATION.md).
+Status: standalone **0.2.0** and HA app **0.2.0 / 0.2.1** were published for
+`linux/arm64` on 2026-11-05. Anonymous registry verification independently checked
+their index/platform/config digests, exact source labels, SPDX SBOM and SLSA
+provenance. Immutable digests and successful workflow gates are recorded in
+[publication evidence](../host/docker/publication-20261105.json).
+
+The standalone first-install/recreation test passed; HA additionally passed the
+actual **0.2.0 → 0.2.1** persistent-data upgrade test. These are isolated Docker
+tests, with no radio access or live testbed software upgrades. The HA specialist
+owns separate Supervisor installation/update qualification. Coordinate channel
+delivery with [HA_PUBLICATION.md](HA_PUBLICATION.md).
 
 ## Implemented release controls
 
@@ -86,16 +94,16 @@ built image. Preserve its original verification record and checksums.
 The current HA testbed likewise runs an older local app image. Neither local
 installation establishes that a public GHCR image exists.
 
-Use separate image repositories for the standalone entrypoint and HA wrapper:
+Separate image repositories serve the standalone entrypoint and HA wrapper:
 
-| Proposed image | Version authority | First publication scope |
+| Published image | Version authority | Exact source |
 | --- | --- | --- |
-| `ghcr.io/psires/livolod:0.2.0` | Standalone distribution `0.2.0` | Exact `standalone-0.2.0` source and recorded build inputs, once frozen and tested |
-| `ghcr.io/psires/livolo-ec-ha-app:0.2.0` | HA app `config.yaml` version | Optional historical build from the exact `ha-0.2.0` source, with limitations recorded |
-| `ghcr.io/psires/livolo-ec-ha-app:0.2.1` | Proposed next HA app version | New channel packaging only after that version is assigned and tested |
+| `ghcr.io/psires/livolod:0.2.0` | Standalone distribution `0.2.0` | `standalone-0.2.0`, commit `b371ca9` |
+| `ghcr.io/psires/livolo-ec-ha-app:0.2.0` | HA app `config.yaml` version | `ha-0.2.0`, commit `6fe41cb` |
+| `ghcr.io/psires/livolo-ec-ha-app:0.2.1` | HA app `config.yaml` version | `ha-0.2.1`, commit `c75839d` |
 
-These names are proposed, not download links. The daemon and radio compatibility
-version remains **0.12**; `livolod --version` must continue to report it. Client
+The daemon and radio compatibility version remains **0.12**;
+`livolod --version` continues to report it. Client
 and standalone distribution versions are **0.2.0**. Historical `ha-0.1.1`
 contains HA app/client **0.1.0**, so its app image would be tagged `0.1.0`, not
 `0.1.1`. Never rebuild historical releases from current `main` under old tags.
@@ -217,7 +225,7 @@ report firmware installation unavailable; do not add dummy keys, private signing
 material or unqualified radio binaries. Installing/upgrading the host must not
 flash a radio automatically. A helper import test is not a hardware flash test.
 
-Before the first public image, finish these release gates:
+For each subsequent public image, repeat these release gates:
 
 - Freeze the exact release source and build recipe; distinguish old local image
   evidence from the new digest's installed-artifact tests.
