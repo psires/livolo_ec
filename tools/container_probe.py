@@ -3,6 +3,7 @@
 
 import argparse
 import asyncio
+from importlib.metadata import version
 import json
 from pathlib import Path
 import subprocess
@@ -107,7 +108,7 @@ def firmware_preflight(base, headers, snapshot):
     firmware = snapshot["firmware_update"]
     if not firmware.get("preflight_supported"):
         # Previous release images remain part of the persisted-data upgrade test.
-        assert snapshot["diagnostics"]["host_version"] == "0.12"
+        assert version("livolo-ec-daemon") == "0.12"
         return False
     endpoint = base + "/api/v1/firmware/preflight"
     assert request(endpoint)[0] == 401

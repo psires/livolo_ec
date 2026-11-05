@@ -37,7 +37,7 @@
       "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:291dafff9bc9055737f41e9c2acebaf8562580ff7453c8f933b171fb18a5a80a"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "kind": "standalone",
       "image": "ghcr.io/psires/livolod",
       "version": "0.3.0",

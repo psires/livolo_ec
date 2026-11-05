@@ -21,6 +21,19 @@ import container_probe as probe
 class ReleaseChecks(unittest.TestCase):
     """Exercise release identity and fail-closed promotion without a registry."""
 
+    def test_offline_baseline_without_radio_diagnostics(self):
+        """An older offline HA image can seed an upgrade without radio-derived metadata."""
+        snapshot = {"firmware_update": {}, "diagnostics": {}}
+        with (
+            patch.object(probe, "request") as request,
+            patch.object(probe, "version", return_value="0.12"),
+        ):
+            self.assertFalse(probe.firmware_preflight("unused", {}, snapshot))
+            request.assert_not_called()
+        with patch.object(probe, "version", return_value="0.13"):
+            with self.assertRaises(AssertionError):
+                probe.firmware_preflight("unused", {}, snapshot)
+
     def test_mqtt_transient_offline_then_retained_recovery(self):
         """A registry-reconcile transition must recover and prove retained online."""
         client = unittest.mock.Mock()
