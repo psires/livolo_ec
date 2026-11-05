@@ -75,15 +75,21 @@ def mqtt_online():
         @param userdata Unused callback context.
         @param message Received status payload and retained flag.
         """
-        values.update(payload=message.payload.decode(), retained=message.retain)
-        event.set()
+        # Registry writes briefly mark the bridge offline while peers reconcile.
+        # Wait for recovery, then re-subscribe to prove the broker retained online.
+        if message.payload == b"online":
+            if message.retain:
+                values.update(payload="online", retained=True)
+                event.set()
+            else:
+                client.subscribe("container-test/simulated/bridge/state", 1)
 
     client.on_connect = connected
     client.on_message = received
     client.connect("broker", 1883, 30)
     client.loop_start()
     try:
-        assert event.wait(10), "No retained MQTT status"
+        assert event.wait(15), "Bridge did not recover to retained online status"
         assert values == {"payload": "online", "retained": True}, values
     finally:
         client.disconnect()

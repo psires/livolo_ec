@@ -7,6 +7,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import types
 import unittest
 from unittest.mock import patch
 import zipfile
@@ -14,10 +15,45 @@ import zipfile
 import container_prepare as prepare
 import container_registry as registry
 import container_sources as sources
+import container_probe as probe
 
 
 class ReleaseChecks(unittest.TestCase):
     """Exercise release identity and fail-closed promotion without a registry."""
+
+    def test_mqtt_transient_offline_then_retained_recovery(self):
+        """A registry-reconcile transition must recover and prove retained online."""
+        client = unittest.mock.Mock()
+        messages = [
+            types.SimpleNamespace(payload=b"offline", retain=True),
+            types.SimpleNamespace(payload=b"online", retain=False),
+            types.SimpleNamespace(payload=b"online", retain=True),
+        ]
+
+        def deliver():
+            """Model initial retained offline, live recovery, then subscription replay."""
+            for message in messages:
+                client.on_message(client, None, message)
+
+        client.loop_start.side_effect = deliver
+        paho = types.ModuleType("paho")
+        paho.mqtt = types.ModuleType("paho.mqtt")
+        paho.mqtt.client = types.ModuleType("paho.mqtt.client")
+        paho.mqtt.client.Client = unittest.mock.Mock(return_value=client)
+        paho.mqtt.client.CallbackAPIVersion = types.SimpleNamespace(VERSION2=2)
+        with patch.dict(
+            "sys.modules",
+            {
+                "paho": paho,
+                "paho.mqtt": paho.mqtt,
+                "paho.mqtt.client": paho.mqtt.client,
+            },
+        ):
+            probe.mqtt_online()
+        client.subscribe.assert_called_once_with(
+            "container-test/simulated/bridge/state", 1
+        )
+        client.disconnect.assert_called_once()
 
     def test_historical_contexts_preserve_code_and_record_overlay(self):
         """Both frozen sources must assemble without copying current application code."""

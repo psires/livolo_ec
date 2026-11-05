@@ -17,7 +17,7 @@
       "previous_image": null
     },
     {
-      "enabled": true,
+      "enabled": false,
       "kind": "ha",
       "image": "ghcr.io/psires/livolo-ec-ha-app",
       "version": "0.2.0",
@@ -25,6 +25,16 @@
       "source_tag": "ha-0.2.0",
       "source_commit": "6fe41cbdc909a6497776202b3eeae088655b9908",
       "previous_image": null
+    },
+    {
+      "enabled": true,
+      "kind": "ha",
+      "image": "ghcr.io/psires/livolo-ec-ha-app",
+      "version": "0.2.1",
+      "daemon_version": "0.12",
+      "source_tag": "ha-0.2.1",
+      "source_commit": "c75839d038462042f15731bc28a19cc579f5d630",
+      "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:291dafff9bc9055737f41e9c2acebaf8562580ff7453c8f933b171fb18a5a80a"
     }
   ]
 }

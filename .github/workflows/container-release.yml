@@ -172,7 +172,11 @@ jobs:
                   print('::error title=Container release incomplete::Inspect the failed gate and uploaded evidence; no successful public release is established by this run.')
               log = Path('evidence/runtime-checks.txt')
               if log.exists():
-                  f.write('\nRuntime check tail:\n\n```text\n' + '\n'.join(log.read_text()[-8000:].splitlines()[-60:]) + '\n```\n')
+                  tail = '\n'.join(log.read_text()[-8000:].splitlines()[-60:])
+                  f.write('\nRuntime check tail:\n\n```text\n' + tail + '\n```\n')
+                  if gates['runtime'] == 'failure':
+                      escaped = tail.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+                      print('::error title=Container runtime diagnostic::' + escaped)
           PY
       - name: Preserve release evidence, including failed candidates
         if: always()
