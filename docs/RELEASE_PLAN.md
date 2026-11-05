@@ -3,6 +3,19 @@
 Assessment date: 2026-11-01. Status: proposed release design; nothing has been
 published, deployed or flashed by this assessment.
 
+Distribution follow-up, **2026-11-05**: the manual HA
+[0.1.1](https://github.com/psires/livolo_ec/releases/tag/ha-0.1.1) and
+[0.2.0](https://github.com/psires/livolo_ec/releases/tag/ha-0.2.0) releases and the
+[standalone daemon/CLI 0.2.0](https://github.com/psires/livolo_ec/releases/tag/standalone-0.2.0)
+are now published. The standalone bundle preserves daemon/firmware version 0.12.
+The agreed [container publication plan](CONTAINER_PUBLICATION.md) and
+[HA installation/update channel plan](HA_PUBLICATION.md) supersede the earlier
+distribution proposals below. In particular, a dedicated integration repository
+is recommended; the main repository can host the Supervisor app catalog, so a
+third app repository is optional. Public container images and HACS/Marketplace
+publication remain future work; software publication has not qualified firmware
+payloads or changed the empty catalog.
+
 Follow-up: the owner selected **BSD-2-Clause** on 2026-11-01. The root `LICENSE`
 now records that decision. References below to selecting a licence describe the
 assessment baseline; dependency notices and release checks remain separate work.
