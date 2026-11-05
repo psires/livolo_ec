@@ -387,7 +387,9 @@ Integrated backends cover the codm CC2652P signed updater and the Sonoff
 ZBDongle-E / ZB-GW04 v1.2 application-only Gecko upload. The first qualified
 bundle contract uses 460800 application baud. TI retains signed-image checking
 and trial rollback; MG21 has no last-good application rollback. Nordic integrated
-DFU remains disabled pending a qualified helper and USB re-enumeration access.
+DFU is disabled by default. An explicit operator USB identity profile, isolated
+helper and dynamic device access are required; see the
+[Nordic standalone setup](docker/NORDIC.md).
 See the [board recovery procedures](../docs/FIRMWARE_RECOVERY.md).
 
 Install `./host[flash]` for both integrated backends, or `./host[update]` for TI
@@ -415,6 +417,41 @@ ID returns its durable result rather than running the update again.
 
 ### Emergency local CLI
 
+Inspect all supported application formats without a configuration or hardware:
+
+```sh
+livolod-firmware-manage inspect --board sonoff-zbdongle-e \
+  --artifact /absolute/path/application.gbl --version 0.12
+livolod-firmware-manage --config /etc/livolod/config.json preflight \
+  --board sonoff-zbdongle-e
+```
+
+These commands emit JSON. Default preflight validates the local catalog and
+helper availability without opening the radio, creating a database or starting
+a service. Missing live identity leaves `executable: false` and exit status 2.
+With the daemon stopped, add `--probe` for read-only application identity queries
+under both ownership locks. UART probes open with inactive DTR/RTS. An explicitly
+configured Nordic USB profile instead enables DTR for native CDC communication;
+that firmware does not use DTR to reset the board. Neither probe sends reset,
+bootloader-entry, disarm, network or flash commands.
+It may create the deployment's lock files, but does not initialize SQLite.
+Web/HA can obtain the same report from the authenticated preflight endpoints in
+[NATIVE_API.md](NATIVE_API.md).
+
+In the browser, open **Network → Gateway firmware → Run preflight** for read-only
+diagnostics. **Review update** repeats preflight and requires a matching successful
+report; installation remains a separate explicit action. Older daemons without
+the advertised preflight capability require a software upgrade for this workflow.
+
+The local `flash --operation update` command accepts a trusted operator-selected
+TI signed application, MG21 GBL or explicitly configured Nordic application ZIP,
+with exact board, version and reviewed
+SHA-256. It uses the shared validators, worker journal and normal confirmation
+lifecycle; remote clients still cannot select a local path. `--check-only`
+performs inspection, and `--check-only --probe` also checks current application
+identity without starting the service. See the complete CLI examples and board
+requirements in [FIRMWARE_FLASHING.md](../docs/FIRMWARE_FLASHING.md).
+
 `livolod-firmware-manage --config /etc/livolod/config.json status` reads the saved
 job without stopping the daemon. For `install` or `recover`, first stop the actual
 owner (systemd service, Docker container or HA app). Run the tool as the daemon's
@@ -429,11 +466,23 @@ livolod-firmware-manage --config /etc/livolod/config.json recover
 The CLI uses the same database/radio locks and manager. It starts a temporary
 radio service without MQTT/web listeners, restores the network and confirms a
 successful TI trial itself, then closes/disarms. Restart the normal owner after
-completion. `recover` applies only to a journaled TI update: it checks the board,
+completion. Without additional options, `recover` applies to a journaled TI update: it checks the board,
 key and digests, aborts/reboots an incomplete receive, activates only the matching
 committed candidate, or resumes trial confirmation. It never aborts a committed
 candidate. A failed application that cannot answer UART, and interrupted MG21 or
 Nordic flashes, require the board-specific bootloader procedure linked above.
+
+Nordic `flash --operation recovery` is an explicit local operation on an already
+entered factory DFU device. It requires an exact DFU path and unique USB serial,
+plus an explicitly selected isolated Python 3.10/nrfutil 6.1.7 helper. It never
+enters DFU automatically or enables the integrated Nordic backend. A successful
+transfer returns exit 2 with `manual_verification_required`, not `confirmed`.
+Only `recover --application-serial EXACT_SERIAL`, after the operator identifies
+the application device, can verify the successful-transfer journal, exact USB
+identity, board/version/rate and normal network restoration. A daemon restart or
+a same-version banner cannot clear a failed/partial transfer. Explicit
+`--retry-interrupted` may replace an interrupted same-board Nordic job; its earlier
+command result remains recorded. No automatic flash retry is performed.
 
 ### Existing signed UART command
 

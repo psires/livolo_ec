@@ -83,6 +83,34 @@ progress remains null. The separate browser snapshot may expose measured transfe
 progress, which does not imply installation or trial confirmation. `recovery`
 may block controls even when `in_progress` is false.
 
+`GET /api/v1/firmware/preflight` returns a read-only schema-1 report. It accepts
+at most one optional `candidate_id` query value; all other or duplicate query
+parameters are rejected. Bearer authentication remains required. The browser
+equivalent is `GET /api/firmware/preflight` with its normal browser/ingress access
+checks. Older daemons may return 404 for these optional endpoints.
+Current snapshots advertise `firmware_update.preflight_supported: true`.
+Clients should require that capability for the new preflight-driven workflow;
+older daemons can retain ordinary device control without firmware installation.
+
+The response contains `schema`, `operation` (`update`), `candidate_id`, `board`,
+`installed_version`, `target_version`, `compatible` (true/false/null),
+`executable`, `identity_source`, `checks`, `blocked_reason`,
+`requires_manual_action`, and `rollback_supported`. Each check has a stable `id`,
+`status` (`pass`, `fail`, `unknown`) and `code`. Unknown live identity is not a
+successful compatibility check. The endpoint revalidates local catalog bytes
+and helper availability against the currently owned session's identity facts;
+it sends no UART commands, creates no job and writes no SQLite state. Offline or
+busy sessions cannot become executable through this route. This is advisory:
+installation still rechecks identity and bytes before mutation. No report acts
+as permission to skip those checks. Raw paths, payloads, keys, serial identities
+and helper output are excluded.
+When the artifact is missing or invalid, verified live `board` and
+`installed_version` remain available while candidate/target fields can be null.
+
+Local operator `inspect`/`flash` commands are separate from these HTTP routes.
+The APIs do not accept local-artifact paths, helper executables, USB target
+overrides or manual Nordic recovery requests.
+
 `POST /api/v1/firmware/install` uses the same bearer authentication and accepts
 exactly:
 

@@ -2,9 +2,14 @@
 
 The daemon owns firmware installation, whether requested through the web UI,
 Home Assistant's update entity, or the offline maintenance CLI. Clients select
-an opaque candidate ID from the daemon. They cannot provide a firmware path,
+an opaque candidate ID from the daemon. Remote clients cannot provide a firmware path,
 URL, flash command, or arbitrary version. Installation is explicit, never
 automatic on discovery of a newer version.
+
+Trusted local operators can additionally inspect application files and run
+`flash --operation update|recovery` with explicit board/version/SHA-256 and the
+same deployment ownership locks. This does not relax the remote catalog or
+upload policy. See [the unified flashing CLI](FIRMWARE_FLASHING.md).
 
 The installer implementation does not constitute a qualified binary release.
 No official deployable firmware bundle accompanies this change. A missing
@@ -20,7 +25,7 @@ checks must never be packaged as installable firmware.
 | `codm-cc2652p` | Signed UART application update; bootloader 0.2 required | Trial rollback and independent ROM/GPIO recovery |
 | `sonoff-zbdongle-e` | Application-only Gecko GBL through pinned external helper | Preserved Gecko bootloader; no trial rollback |
 | `zb-gw04-1v2` | Application-only Gecko GBL through pinned external helper | Preserved Gecko bootloader; no trial rollback |
-| `nordic-pca10059` | Disabled pending integrated DFU qualification | Manual application-only factory USB DFU |
+| `nordic-pca10059` | Explicit USB identity profile and isolated helper required; default disabled | Manual application-only factory USB DFU |
 
 The initial integrated scope preserves **460800 application baud**. A deployment
 configured at another rate is not eligible for these bundles. MG21 bootloader
@@ -91,7 +96,7 @@ The schema-1 manifest has exactly three top-level fields: `schema` (integer 1),
 | --- | --- | --- |
 | `codm-cc2652p` | `ti_uart_signed_v1` | `ti-app-8000-20000` |
 | `sonoff-zbdongle-e`, `zb-gw04-1v2` | `mg21_gecko_gbl_v1` | `mg21-app-4000-30000` |
-| `nordic-pca10059` | `nrf52840_usb_dfu_v1` | `nrf-app-1000-e0000` (reserved; backend disabled) |
+| `nordic-pca10059` | `nrf52840_usb_dfu_v1` | `nrf-app-1000-e0000` (requires explicit deployment profile) |
 
 TI additionally requires `bootloader_min: "0.2"`, `public_key` (relative path
 to exactly 32 raw public-key bytes), and `public_key_sha256`. MG21 requires
@@ -121,6 +126,13 @@ Successful compilation alone does not qualify an artifact for distribution.
 
 ## Offline emergency CLI
 
+`inspect` validates supported TI, MG21 and Nordic application containers without
+hardware. `preflight` returns the shared JSON prerequisite report without starting
+the service or opening serial; `--probe` explicitly acquires database/radio locks
+and sends only PING/VERSION/CAPS/STATUS and, for supported TI, UPDATE_STATUS.
+No default dry-run path restores or arms the radio. A preflight report is advisory;
+the worker revalidates the selected digest before executing a mutation.
+
 Use the same configuration and database as the deployment:
 
 ```sh
@@ -137,7 +149,7 @@ runs the same update/restore lifecycle without web or MQTT services. Restart
 the deployment after maintenance completes. Do not run the low-level worker
 directly or invent an inherited lock descriptor.
 
-`recover` is limited to a journaled TI operation. It verifies board and signing
+Without `--application-serial`, `recover` handles a journaled TI operation. It verifies board and signing
 identity before considering any mutation. An incomplete receive may be aborted
 and rebooted only when the original version and image digest still match. A
 committed candidate is activated only when its digest matches the journal; it
@@ -188,11 +200,56 @@ obligations. See the repository and firmware third-party notices.
 
 ## Nordic manual recovery
 
-Integrated Nordic installation is intentionally unavailable. The validated
-legacy tooling uses `nrfutil` 6.1.7 in an isolated Python 3.10 environment; it
-does not run on the container's Python 3.13. Application-to-bootloader USB
-re-enumeration and device access must also be qualified for each deployment.
-Do not enable the backend merely because a DFU ZIP is present.
+Automatic Nordic installation is disabled unless the operator supplies the
+complete `firmware_nordic` profile and its protected device-node publisher.
+Current containers include `nrfutil` 6.1.7 in a separate Python 3.10 runtime at
+`/opt/nrfutil`; the daemon remains on Python 3.13. Native wheel installations
+must provide their own isolated helper. See the
+[standalone configuration and recovery guide](../host/docker/NORDIC.md).
+Application-to-bootloader USB re-enumeration and device access must be qualified
+for each deployment; a DFU ZIP alone cannot enable installation.
+
+For an opted-in automatic job, the worker checks exact physical USB topology,
+both mode-specific serials, VID/PID and character-device numbers. The fixed-port
+helper disables vendor discovery and port substitution. Only a successful worker
+exit plus the returning exact application/version records transfer completion.
+The manager verifies the physical target again before opening it and checks fresh
+VERSION/CAPS before NETWORK/ARM. Interrupted or failed transfers stay blocked;
+daemon restarts cannot silently retry them. A completed transfer may resume normal
+verification after a restart. Nordic has no application rollback slot.
+
+The unified CLI now provides an explicit journaled application-only DFU transfer
+for a board already in factory DFU mode. `flash --operation recovery` requires
+the exact board, reviewed package SHA-256, DFU device path, unique DFU serial and
+explicit legacy-helper interpreter. `--check-only` checks package, USB identity
+and helper prerequisites without opening serial or transferring bytes. The
+worker rechecks the file/hash and USB identity and waits for a durable `flash`
+acknowledgement before invoking the helper under the inherited radio guard.
+
+Helper success records `transfer_completed: true`, stage `transferred`, and
+`manual_verification_required`; it does not start the application service or
+claim network readiness. CLI exit 2 means verification remains required.
+Identify the returning application explicitly, then run:
+
+```sh
+livolod-firmware-manage --config /absolute/path/config.json recover \
+  --application-serial EXACT_APPLICATION_USB_SERIAL
+```
+
+The configured application path must resolve to exactly one `cafe:4001` device
+with that serial. No relation between factory-DFU and application serial strings
+is assumed. The CLI requires a completed-transfer journal, checks live board,
+version and baud before any network configuration, and explicitly restores the
+normal network under the shared manager. Only then is the job confirmed. A
+normal daemon restart lacks this ephemeral operator authorization and stays
+recovery-blocked without opening the radio. Failed or timed-out transfers cannot
+be cleared by an old application reporting the same version. Re-enter factory
+DFU and deliberately use `flash ... --retry-interrupted` for a fresh validated
+manual attempt; the earlier command result is retained.
+The explicit retry may also supersede an interrupted automatic Nordic job for
+the same board. With `firmware_nordic` configured, manual commands validate the
+published `/run/livolod-usb/dfu` and `application` nodes against that same physical
+profile, so they need no generic tty discovery inside the container.
 
 On the official PCA10059, use the small sideways SW2 RESET switch, not SW1.
 If pressing it while powered does not enter DFU, hold SW2 while reconnecting
