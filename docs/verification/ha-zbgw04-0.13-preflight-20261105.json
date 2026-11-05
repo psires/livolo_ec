@@ -1,0 +1,90 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-11-05T22:28:41.302192+00:00",
+  "scope": "Authorized HA ZB-GW04 0.13 preflight only",
+  "app_release": "0.3.0",
+  "daemon_version": "0.13",
+  "radio_version_unchanged": "0.12",
+  "catalog_board_count": 1,
+  "artifact_sha256": "5dc5624d45c48bd3003012a0391922d288a03d2ff22f00a2e92757b70028241c",
+  "catalog_manifest_sha256": "84e219d1b06b1c42a333e578c817ed6cf624d906af353d433138def35537d4c9",
+  "archive_sha256": "a0b45249aec9b513313a89cd99f3c0bb4a92a520e7d12fd4a616cb4b467ebea1",
+  "qualification": "Existing offline-qualified controlled local trial bundle; no live 0.13 ZB-GW04 flash qualification",
+  "preflight": {
+    "schema": 1,
+    "operation": "update",
+    "candidate_id": "zb-gw04-1v2-0.13:5dc5624d45c48bd3003012a0391922d288a03d2ff22f00a2e92757b70028241c",
+    "board": "zb-gw04-1v2",
+    "installed_version": "0.12",
+    "target_version": "0.13",
+    "compatible": true,
+    "executable": true,
+    "identity_source": "live_session",
+    "checks": [
+      {
+        "id": "artifact",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "expected_board",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "helper",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "live_identity",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "board",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "protocol",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "baudrate",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "version",
+        "status": "pass",
+        "code": "compatible"
+      }
+    ],
+    "blocked_reason": null,
+    "requires_manual_action": false,
+    "rollback_supported": false
+  },
+  "ha_form": {
+    "board": "zb-gw04-1v2",
+    "installed": "0.12",
+    "target": "0.13",
+    "compatible": "Yes",
+    "executable": "Yes",
+    "reason": "none",
+    "checks": "- artifact: pass (compatible)\n- expected board: pass (compatible)\n- helper: pass (compatible)\n- live identity: pass (compatible)\n- board: pass (compatible)\n- protocol: pass (compatible)\n- baudrate: pass (compatible)\n- version: pass (compatible)"
+  },
+  "firmware_job_created": false,
+  "firmware_flashes": 0,
+  "container_restarted": false,
+  "ha_core_restarted": false,
+  "configuration_registry_and_network_unchanged": true,
+  "persistent_bundle": "/data/firmware-zbgw04-0.13",
+  "catalog_activation_persistence": "Current container only; reapply after Supervisor app recreation",
+  "limitations": [
+    "App 0.3.0 has no persistent catalog option; runtime activation is lost when Supervisor recreates its container.",
+    "The normal firmware availability card caches catalog selection until radio reconnection; the preflight endpoint and HA form read current catalog bytes.",
+    "No install action or radio command was submitted by this preflight test."
+  ]
+}

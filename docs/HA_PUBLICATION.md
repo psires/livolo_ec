@@ -25,6 +25,14 @@ form identifies `zb-gw04-1v2` and installed 0.12. It reports `artifact_missing`
 because the public firmware catalog remains empty. This migration did not
 qualify a radio update or change physical switch outputs.
 
+A later user-authorized [ZB-GW04 preflight-only test](verification/ha-zbgw04-0.13-preflight-20261105.json)
+loaded the existing offline-qualified 0.13 local trial bundle. Native API and
+actual HA form checks all passed for installed 0.12 → candidate 0.13; no update
+job or flash was requested. App 0.3.0 does not expose a persistent catalog option:
+this test retains the bundle in app data but activates it only in the running
+container, so app recreation requires reactivation. Public images and their
+default empty catalogs remain unchanged.
+
 The Supervisor qualification below remains historical 0.2.0 → 0.2.1 evidence.
 Default-catalog acceptance is separate work. Software updates do not flash
 radio firmware.
