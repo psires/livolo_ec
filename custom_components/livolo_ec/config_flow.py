@@ -1,5 +1,7 @@
 """UI configuration, credential repair and bounded network management."""
 
+import re
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
@@ -152,13 +154,194 @@ class LivoloConfigFlow(ConfigFlow, domain=DOMAIN):
 class LivoloOptionsFlow(OptionsFlow):
     """Use the daemon's device registry and bounded pairing windows."""
 
+    def __init__(self):
+        """Keep the reviewed discovery only for this commissioning flow."""
+        self._review = None
+
+    def _client(self):
+        """Use the configured daemon without owning an HTTP session."""
+        data = self.config_entry.data
+        return Client(
+            async_get_clientsession(self.hass), data[CONF_URL], data[CONF_TOKEN]
+        )
+
+    async def _discoveries(self):
+        """Fetch current unregistered candidates, including unsupported observations.
+
+        @return Candidate mapping and current radio readiness.
+        """
+        data = (await self._client().snapshot())["data"]
+        if network_id(data) != self.config_entry.unique_id:
+            raise IncompatibleError("The daemon network changed")
+        registered = {device["id"] for device in data["devices"]}
+        candidates = {
+            item["device"]: item
+            for item in data.get("discoveries", [])
+            if isinstance(item, dict)
+            and isinstance(item.get("device"), str)
+            and re.fullmatch(r"[0-9a-f]{8}", item["device"])
+            and not item.get("configured")
+            and item["device"] not in registered
+        }
+        return candidates, data["ready"]
+
+    @staticmethod
+    def _detected_profile(candidate):
+        """Accept only a complete server-classified profile, never infer output count.
+
+        @param candidate Current discovery record, or an empty mapping.
+        @return Valid detected profile or None for unavailable evidence.
+        """
+        profile = candidate.get("profile")
+        if (
+            isinstance(profile, dict)
+            and profile.get("status") == "detected"
+            and type(profile.get("outputs")) is int
+            and profile["outputs"] in (1, 2)
+            and isinstance(profile.get("suffix"), str)
+            and re.fullmatch(r"[0-9a-f]{4}", profile["suffix"])
+            and isinstance(profile.get("token"), str)
+            and profile["token"]
+        ):
+            return profile
+        return None
+
     async def async_step_init(self, user_input=None):
         """Show management actions without changing user names or areas.
 
         @param user_input Unused menu input.
         """
         return self.async_show_menu(
-            step_id="init", menu_options=["add", "pair", "refresh", "forget"]
+            step_id="init",
+            menu_options=["add", "discover", "pair", "refresh", "forget"],
+        )
+
+    async def async_step_discover(self, user_input=None):
+        """Refresh observed candidates or review one explicitly selected switch.
+
+        @param user_input Optional candidate selection or manual setup request.
+        """
+        self._review = None
+        if user_input and user_input.get("manual"):
+            return await self.async_step_add()
+        errors = {}
+        candidates = {}
+        try:
+            candidates, ready = await self._discoveries()
+            if user_input and user_input.get("device"):
+                device = user_input["device"]
+                profile = self._detected_profile(candidates.get(device, {}))
+                if ready and profile:
+                    self._review = dict(device=device, **profile)
+                    return await self.async_step_detected()
+                errors["base"] = "detection_unavailable"
+            elif not ready:
+                errors["base"] = "radio_not_ready"
+        except AuthenticationError:
+            errors["base"] = "invalid_auth"
+        except IncompatibleError:
+            errors["base"] = "incompatible"
+        except LivoloError:
+            errors["base"] = "cannot_connect"
+        return self._discovery_form(candidates, errors)
+
+    def _discovery_form(self, candidates, errors):
+        """Offer selection, an explicit refresh, and a manual compatibility fallback.
+
+        @param candidates Unregistered observations from a fresh API snapshot.
+        @param errors Form-level failures to display.
+        """
+        fields = {}
+        if candidates:
+            options = []
+            for device, candidate in sorted(candidates.items()):
+                profile = self._detected_profile(candidate)
+                if profile:
+                    label = f"{device} — {profile['outputs']} output(s), experimental"
+                else:
+                    status = (candidate.get("profile") or {}).get("status")
+                    label = f"{device} — " + {
+                        "stale": "expired evidence",
+                        "ambiguous": "conflicting evidence",
+                    }.get(status, "unknown profile; manual setup available")
+                options.append({"value": device, "label": label})
+            fields[vol.Optional("device")] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            )
+        fields[vol.Optional("manual", default=False)] = bool
+        return self.async_show_form(
+            step_id="discover",
+            data_schema=vol.Schema(fields),
+            errors=errors,
+            description_placeholders={"count": str(len(candidates))},
+        )
+
+    async def async_step_detected(self, user_input=None):
+        """Register exactly the profile reviewed by the user, subject to revalidation.
+
+        @param user_input Chosen name or request to return to discovery.
+        """
+        if not self._review or (user_input and user_input.get("rescan")):
+            return await self.async_step_discover()
+        review = self._review
+        errors = {}
+        if user_input is not None:
+            try:
+                candidates, ready = await self._discoveries()
+                current = self._detected_profile(candidates.get(review["device"], {}))
+                if (
+                    not ready
+                    or not current
+                    or any(
+                        current[key] != review[key]
+                        for key in ("token", "outputs", "suffix")
+                    )
+                ):
+                    self._review = None
+                    return self._discovery_form(
+                        candidates, {"base": "detection_changed"}
+                    )
+                await self._client().command(
+                    "add",
+                    {
+                        "device": review["device"],
+                        "name": user_input["name"],
+                        "auto_detect": True,
+                        "profile_token": review["token"],
+                    },
+                )
+                return self.async_create_entry(
+                    title="", data=dict(self.config_entry.options)
+                )
+            except CommandFailed:
+                # A fresh selection is required after rejection or uncertain completion.
+                self._review = None
+                return self._discovery_form({}, {"base": "detection_failed"})
+            except AuthenticationError:
+                errors["base"] = "invalid_auth"
+            except IncompatibleError:
+                errors["base"] = "incompatible"
+            except LivoloError:
+                errors["base"] = "cannot_connect"
+        return self.async_show_form(
+            step_id="detected",
+            data_schema=vol.Schema(
+                {
+                    vol.Required("name", default=f"Livolo {review['device']}"): vol.All(
+                        str, vol.Length(min=1, max=100)
+                    ),
+                    vol.Optional("rescan", default=False): bool,
+                }
+            ),
+            errors=errors,
+            description_placeholders={
+                "device": review["device"],
+                "outputs": str(review["outputs"]),
+                "suffix": review["suffix"],
+            },
         )
 
     async def _action(self, step, action, schema, user_input):

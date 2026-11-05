@@ -16,6 +16,7 @@ capabilities described below; hardware results apply to the tested switch models
 Implemented:
 
 - Up to 256 configured peers; explicit one/two-output profiles and wire-order IDs.
+- Optional experimental detection of captured one/two-gang pairing profiles.
 - SQLite device registry, names, reported state and durable request deduplication.
 - MQTT set commands, state, availability, discovery candidates and diagnostics.
 - Optional MQTT and a separate authenticated native HTTP/WebSocket API v1.
@@ -27,7 +28,7 @@ Implemented:
 
 This is a first implementation for the directly reachable, tested EC switch
 family. Full route discovery/recovery, four-gang profiles, generic Zigbee support,
-and automatic capability inference are not implemented.
+and general capability discovery are not implemented.
 One-gang configuration was validated on switch `66780945` on 2026-11-01:
 targeted pairing, a fresh state query, and a physical ON-to-OFF report succeeded
 alongside two-gang switch `46715621`. Its suffix was `0001` and full-state mask
@@ -38,7 +39,9 @@ only 3/8 recorded ON requests were confirmed, versus 7/7 OFF requests; failures
 persisted with the original EC gateway off. MQTT delivery worked, but reliable
 one-gang output control is not yet validated. See
 `analysis/development/onegang-control-20261101.json`.
-The `0002` suffix is **not** used to infer output count. Pairing
+The suffix alone is **not** used to infer output count. The optional experimental
+add flow matches both the suffix and the captured pairing-request payload;
+manual setup still takes an explicit output count. Pairing
 reproduces the successful spare-switch trial; it is not a claim that every Livolo
 model or factory-reset sequence is supported.
 
@@ -259,6 +262,33 @@ device is currently reachable. Require both bridge and device availability in a
 consumer. Removing a device clears its retained state and availability.
 
 ## Pair another switch
+
+Manual setup remains the default and follows the existing procedure below.
+For the optional **Auto-detect · Experimental** flow, open **Add device → Setup
+method**, select that method, and put the intended unpaired switch into its
+documented pairing mode. Select a detected candidate, review its identity and
+gang count, enter a name, then choose **Save only** or **Save & start pairing**.
+The latter opens the existing targeted 120-second pairing window after adding
+the device; detection itself never sends probes or admits a device.
+
+Automatic detection currently recognizes only the captured one- and two-gang
+pairing signatures, not arbitrary Livolo models. See [profile evidence and
+limitations](../docs/DEVICE_PROFILES.md). Both suffix and native payload must
+match. State bits, property values and a suffix alone are insufficient.
+
+The daemon requires a fresh, consistent observation from the current radio
+session, no older than 60 seconds. A continuous series of conflicting signatures
+remains ambiguous until observations stop for over 60 seconds; additional
+matching packets cannot erase that conflict. Expiry, reconnects and changed
+evidence invalidate the reviewed selection. Unknown or ambiguous devices can
+still use manual setup with a profile verified by the operator.
+
+The shared `add` action accepts `auto_detect: true` with the selected discovery's
+`profile_token`, device ID, name and optional slot. Omit `outputs` and `suffix`;
+the server derives and rechecks them. A stale or mismatched token is rejected
+without changing the registry. Manual requests retain their original shape,
+including the default suffix `0002` when omitted. This is an experimental profile
+association, not a claim of reliable output control or a complete model interview.
 
 1. Observe `bridge/discovery` while the intended switch is in its pairing mode.
    Discovery is passive and never acknowledges admission on its own.

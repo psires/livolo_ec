@@ -184,12 +184,31 @@ Preserve a working image and consistent database backup before trying it on hard
 The integration's **Configure** dialog supports:
 
 - Register a device using its wire ID, name, output count and verified suffix.
+- Detect a switch experimentally from its observed pairing signature, review
+  its output count, and register it with a friendly name.
 - Open a targeted pairing window, or close it with a zero-second duration.
 - Request a bounded read-only state refresh.
 - Forget a host record after confirmation. This is not a physical factory reset.
 
-Register before pairing. Profile fields are explicit; suffix is not an inferred
-gang count. Pairing acceptance opens the window, and the management UI shows
+For detection, choose **Configure → Detect a switch (experimental)** and put
+only the intended new switch into physical pairing mode, with pairing on the
+original EC gateway disabled. Submit the form without selecting a device to
+refresh the list, then select its observed ID. HA displays the daemon's detected
+output count and suffix for review; it does not infer the count from state bits.
+Submit a name to register that reviewed profile. The daemon rechecks its token
+against fresh evidence from the current radio session. Changed, expired or
+conflicting evidence requires reselection. Unknown devices and older daemons
+without profile metadata retain **Use manual setup instead** and the original
+manual registration menu. No switch is selected or registered automatically.
+
+Detection currently recognizes only the tested one- and two-gang pairing
+signatures; see [experimental detection limits](../docs/DEVICE_PROFILES.md).
+It does not qualify sockets, curtains or other switch variants. Once registered,
+wait for radio readiness and reopen **Configure → Open or close pairing** with
+the selected device ID. Registration alone does not complete physical pairing.
+
+Register before pairing. Manual profile fields remain explicit; suffix alone is
+not an inferred gang count. Pairing acceptance opens the window, and the management UI shows
 later confirmation/expiry. No generic automatic admission is enabled.
 
 New registry devices appear without reloading HA. Forgotten channels become

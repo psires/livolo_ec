@@ -132,14 +132,31 @@ def native_snapshot(service):
         {k: v for k, v in result.items() if k in result_fields}
         for result in service.store.recent_results()
     ]
-    discoveries = [
-        {
+    discoveries = []
+    for item in service.discovery_snapshot():
+        discovery = {
             k: v
             for k, v in item.items()
             if k in {"device", "suffix", "configured", "rssi", "lqi", "last_seen"}
         }
-        for item in service.discoveries.values()
-    ]
+        profile = item.get("profile")
+        if isinstance(profile, dict):
+            discovery["profile"] = {
+                key: value
+                for key, value in profile.items()
+                if key
+                in {
+                    "experimental",
+                    "status",
+                    "outputs",
+                    "suffix",
+                    "reason",
+                    "expires_at",
+                    "token",
+                }
+                and isinstance(value, (str, int, float, bool, type(None)))
+            }
+        discoveries.append(discovery)
     data = dict(
         gateway=service.config.gateway,
         tag=service.config.tag,

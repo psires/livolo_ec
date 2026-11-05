@@ -199,3 +199,88 @@ async def test_firmware_job_through_native_api_and_ha(hass, tmp_path):
                 await hass.config_entries.async_unload(entry.entry_id)
             await api.close()
             store.close()
+
+
+@pytest.mark.parametrize(
+    "device,outputs,raw",
+    [
+        (
+            "66780945",
+            1,
+            "018825ffffffff667809450000000000000000ff009e01667809450001000101053401040014ad",
+        ),
+        (
+            "46715621",
+            2,
+            "01880effffffff467156210000000000000000ff009e014671562100020002030534010400ffc6",
+        ),
+    ],
+)
+async def test_detected_registration_through_native_api(
+    hass, tmp_path, device, outputs, raw
+):
+    """Captured pairing evidence reaches HA review and creates the correct native entities.
+
+    @param hass Actual HA instance.
+    @param tmp_path Isolated registry and command ledger directory.
+    @param device Wire identity from the embedded CRC-valid observation.
+    @param outputs Expected physical output count from daemon classification.
+    @param raw Captured native pairing frame; no radio is opened or transmitted to.
+    """
+    root = Path(__file__).resolve().parents[2]
+    config = replace(
+        load(root / "host/config.example.json"),
+        devices=(),
+        database=str(tmp_path / "detection.db"),
+        mqtt={"enabled": False},
+    )
+    store = Store(config.database, config.gateway + ":" + config.tag)
+    service = Service(config, store, simulated=True)
+    service.ready = True
+    service.session = "detection-test-session"
+    service.handle_rx(time.monotonic(), f"RX 1 0 -42 99 {len(raw) // 2} {raw}")
+    api = NativeAPI(service, token="detection-test-token", port=0)
+    await api.start()
+    entry = MockConfigEntry(
+        domain="livolo_ec",
+        unique_id=config.gateway + ":" + config.tag,
+        data={
+            "url": f"http://127.0.0.1:{api.port}",
+            "token": "detection-test-token",
+            "allow_simulated": True,
+        },
+    )
+    entry.add_to_hass(hass)
+    loaded = False
+    try:
+        assert await hass.config_entries.async_setup(entry.entry_id)
+        loaded = True
+        result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "discover"}
+        )
+        assert result["description_placeholders"]["count"] == "1"
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"device": device}
+        )
+        assert result["description_placeholders"]["outputs"] == str(outputs)
+        assert not service.devices
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"name": "Detected switch"}
+        )
+        assert result["type"] == "create_entry"
+        assert service.devices[device].outputs == outputs
+        assert service.devices[device].suffix == f"{outputs:04x}"
+        assert service.devices[device].name == "Detected switch"
+        await eventually(lambda: len(hass.states.async_all("switch")) == outputs)
+        assert all(s.state == "unavailable" for s in hass.states.async_all("switch"))
+        assert service.pairing is None
+        assert service.gateway is None
+        assert service.broker is None
+        results = store.recent_results()
+        assert len(results) == 1 and results[0]["status"] == "confirmed"
+    finally:
+        if loaded:
+            await hass.config_entries.async_unload(entry.entry_id)
+        await api.close()
+        store.close()

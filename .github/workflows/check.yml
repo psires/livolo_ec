@@ -34,7 +34,7 @@ jobs:
       - name: Test host service and local integrations
         run: |
           PYTHONPATH=host python -m unittest discover -s host/tests -p 'test_*.py'
-          node --test host/tests/test_web_firmware.js
+          node --test host/tests/test_web_*.js
       - name: Test gateway UART and peer management
         run: python -m unittest discover -s firmware/gateway/tests -p 'test_*.py'
       - name: Test update authentication and rollback

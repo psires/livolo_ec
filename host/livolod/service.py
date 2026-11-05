@@ -13,6 +13,7 @@ import time
 import uuid
 
 from .config import Device, hex_value, identity, integer, mqtt_config
+from .device_profile import pairing_profile
 from .homeassistant import discovery_messages
 from .protocol import decode, frame, heartbeat, key_values, rx_envelope
 from .phase import PhaseClient
@@ -35,6 +36,7 @@ REFRESH_QUERY_INTERVAL = 0.2
 REFRESH_QUERY_INTERVAL_460800 = 0.224
 REFRESH_RESPONSE_WAIT = 4.0
 REFRESH_TIMEOUT = 14.0
+DISCOVERY_PROFILE_TTL = 60.0
 
 
 def refresh_query_interval(baudrate):
@@ -124,6 +126,7 @@ class Service:
         self.last_rx = None
         self.discovery_seen = {}
         self.discoveries = {}
+        self.discovery_profiles = {}
         self.started = time.monotonic()
         self.change_listeners = set()
         self.command_inflight = None
@@ -380,16 +383,132 @@ class Service:
                 )
                 for device in self.devices.values()
             ],
-            "discoveries": [
-                dict(value, configured=device in self.devices)
-                for device, value in self.discoveries.items()
-            ],
+            "discoveries": self.discovery_snapshot(),
             "results": self.store.recent_results(),
             "mqtt": self.mqtt_summary(),
             "firmware_update": self.firmware_update_snapshot(),
         }
 
     api_snapshot = web_snapshot
+
+    def discovery_profile(self, device, now=None):
+        """Describe current experimental evidence without trusting wall-clock freshness.
+
+        @param device Wire-order source identity of a discovery candidate.
+        @param now Optional monotonic time used for a consistent snapshot.
+        @return Public profile with a review token only for eligible evidence.
+        """
+        now = time.monotonic() if now is None else now
+        observation = self.discovery_profiles.get(device)
+        result = dict(
+            experimental=True,
+            status="unknown",
+            outputs=None,
+            suffix=None,
+            reason="no_pairing_evidence",
+            expires_at=None,
+            token=None,
+        )
+        if observation is None:
+            return result
+        result["expires_at"] = observation["expires_at"]
+        age = now - observation["received"]
+        if (
+            not self.ready
+            or observation["session"] != self.session
+            or not 0 <= age <= DISCOVERY_PROFILE_TTL
+        ):
+            result.update(status="stale", reason="pairing_evidence_expired")
+        elif observation["conflict"]:
+            result.update(status="ambiguous", reason="conflicting_pairing_profiles")
+        elif observation["profile"]["status"] != "detected":
+            result["reason"] = observation["profile"]["reason"]
+        else:
+            result.update(
+                status="detected",
+                outputs=observation["profile"]["outputs"],
+                suffix=observation["profile"]["suffix"],
+                reason=observation["profile"]["reason"],
+                token=observation["token"],
+            )
+        return result
+
+    def discovery_snapshot(self):
+        """Return detached discovery profiles with eligibility evaluated at read time."""
+        now = time.monotonic()
+        return [
+            dict(
+                value,
+                configured=device in self.devices,
+                profile=self.discovery_profile(device, now),
+            )
+            for device, value in self.discoveries.items()
+        ]
+
+    def observe_discovery(self, packet, received, rssi, lqi):
+        """Aggregate all pairing announcements before throttling discovery publication.
+
+        @param packet Checksum-validated packet from the current UART stream.
+        @param received Monotonic timestamp assigned when the packet arrived.
+        @param rssi Received signal strength in dBm.
+        @param lqi Received link quality indicator.
+        """
+        profile = pairing_profile(packet, gateway=self.config.gateway)
+        if profile is None:
+            return
+        device = packet.source
+        now = time.monotonic()
+        if device not in self.discoveries and len(self.discoveries) >= 256:
+            self.discoveries.clear()
+            self.discovery_profiles.clear()
+            self.discovery_seen.clear()
+        changed = False
+        if self.ready and self.session and 0 <= now - received <= DISCOVERY_PROFILE_TTL:
+            previous = self.discovery_profiles.get(device)
+            if (
+                previous is None
+                or previous["session"] != self.session
+                or received - previous["received"] > DISCOVERY_PROFILE_TTL
+            ):
+                previous = dict(
+                    session=self.session,
+                    received=received,
+                    profile=profile,
+                    conflict=False,
+                    token=secrets.token_hex(16),
+                    expires_at=time.time() - (now - received) + DISCOVERY_PROFILE_TTL,
+                )
+                self.discovery_profiles[device] = previous
+                changed = True
+            elif (
+                profile["signature"] != previous["profile"]["signature"]
+                and not previous["conflict"]
+            ):
+                previous["conflict"] = True
+                previous["token"] = secrets.token_hex(16)
+                changed = True
+            if received >= previous["received"]:
+                previous["received"] = received
+                previous["expires_at"] = (
+                    time.time() - (now - received) + DISCOVERY_PROFILE_TTL
+                )
+        candidate = dict(
+            device=device,
+            suffix=packet.suffix,
+            configured=device in self.devices,
+            rssi=rssi,
+            lqi=lqi,
+            last_seen=time.time(),
+        )
+        self.discoveries[device] = candidate
+        if received - self.discovery_seen.get(device, -100) >= 5:
+            self.discovery_seen[device] = received
+            self.publish(
+                "bridge/discovery",
+                dict(candidate, profile=self.discovery_profile(device, now)),
+            )
+        elif changed:
+            self.notify_changed()
 
     def mqtt_summary(self):
         """Expose editable broker settings and connection health without credentials.
@@ -517,6 +636,7 @@ class Service:
                 self.state_received.pop(device_id, None)
                 self.discoveries.pop(device_id, None)
                 self.discovery_seen.pop(device_id, None)
+                self.discovery_profiles.pop(device_id, None)
                 self.publish(device_id + "/state", "", True)
                 self.publish(device_id + "/availability", "", True)
             self.snapshot()
@@ -549,7 +669,9 @@ class Service:
         if action in ("add", "rename"):
             allowed.add("name")
         if action == "add":
-            allowed.update(("outputs", "slot", "suffix"))
+            allowed.update(
+                ("outputs", "slot", "suffix", "auto_detect", "profile_token")
+            )
         if set(request) - allowed:
             raise ValueError("Unknown registry command fields")
         device_id = identity(request.get("device"))
@@ -562,8 +684,29 @@ class Service:
                 raise ValueError("Name must contain 1..100 characters")
             values["name"] = name.strip()
         if action == "add":
-            values["outputs"] = integer(request.get("outputs"), 1, 2, "outputs")
-            values["suffix"] = hex_value(request.get("suffix", "0002"), 4, "suffix")
+            if type(request.get("auto_detect", False)) is not bool:
+                raise ValueError("auto_detect must be boolean")
+            if request.get("auto_detect", False):
+                if "outputs" in request or "suffix" in request:
+                    raise ValueError(
+                        "Automatic detection cannot include manual profile overrides"
+                    )
+                profile = self.discovery_profile(device_id)
+                if profile["status"] != "detected":
+                    raise ValueError(
+                        "Experimental detection needs fresh unambiguous pairing evidence"
+                    )
+                token = request.get("profile_token")
+                if not isinstance(token, str) or token != profile["token"]:
+                    raise ValueError(
+                        "Detected profile changed; review the discovery again"
+                    )
+                values.update(outputs=profile["outputs"], suffix=profile["suffix"])
+            else:
+                if "profile_token" in request:
+                    raise ValueError("profile_token requires auto_detect")
+                values["outputs"] = integer(request.get("outputs"), 1, 2, "outputs")
+                values["suffix"] = hex_value(request.get("suffix", "0002"), 4, "suffix")
             if "slot" in request:
                 values["slot"] = integer(request["slot"], 0, 255, "slot")
         return values
@@ -635,6 +778,7 @@ class Service:
         """Establish and verify a fresh adapter session before accepting radio work."""
         self.ready = False
         self.phase_client = None
+        self.discovery_profiles.clear()
         self.scheduler = None
         self.state_sequences.clear()
         self.phase_reference_missing = True
@@ -1036,30 +1180,8 @@ class Service:
         except ValueError:
             self.diagnostics["invalid_rx"] += 1
             return
-        if (
-            packet.family == 0x9E
-            and packet.opcode == 1
-            and packet.tag == "ff"
-            and packet.source == packet.subject
-            and packet.source not in ("00000000", "ffffffff")
-            and packet.destination in (self.config.gateway, "ffffffff")
-            and received - self.discovery_seen.get(packet.source, -100) >= 5
-        ):
-            if len(self.discovery_seen) >= 256:
-                self.discovery_seen.clear()
-            self.discovery_seen[packet.source] = received
-            candidate = {
-                "device": packet.source,
-                "suffix": packet.suffix,
-                "configured": packet.source in self.devices,
-                "rssi": rssi,
-                "lqi": lqi,
-                "last_seen": time.time(),
-            }
-            if len(self.discoveries) >= 256:
-                self.discoveries.clear()
-            self.discoveries[packet.source] = candidate
-            self.publish("bridge/discovery", candidate)
+        if not retained:
+            self.observe_discovery(packet, received, rssi, lqi)
         device = self.devices.get(packet.source)
         if (
             not device

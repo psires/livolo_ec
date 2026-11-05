@@ -35,6 +35,41 @@ Heartbeat-only protocol frames need not each cause an HA event. State,
 availability, registry, readiness, pairing and result changes must be delivered.
 Snapshots omit MQTT configuration, credentials, raw packets and browser tokens.
 
+### Experimental device-profile detection
+
+Each discovery may include an additive `profile` object:
+
+```json
+{"experimental":true,"status":"detected","outputs":1,"suffix":"0001","reason":"known_pairing_signature","expires_at":1793894000.0,"token":"opaque-review-token"}
+```
+
+`status` is `detected`, `unknown`, `ambiguous` or `stale`. Count, suffix and token
+are null when not detected. `expires_at` is a Unix timestamp for display;
+the daemon checks freshness using monotonic receive time and the current radio
+session. Older daemons may omit `profile`; clients must preserve manual setup.
+The token binds a reviewed profile, not an authentication privilege.
+
+Use the existing `POST /api/v1/commands` envelope for an explicit automatic add:
+
+```json
+{"action":"add","payload":{"request_id":"add-auto-1","device":"66780945","name":"Hall","auto_detect":true,"profile_token":"opaque-review-token"}}
+```
+
+Optional `slot` retains its existing meaning. Do not include `outputs` or
+`suffix` in an automatic request. The server requires the matching reviewed
+token and fresh, unambiguous evidence no older than 60 seconds from the current
+ready radio session. It validates every qualifying pairing packet, including
+contradictions inside the discovery publication throttle. Counter changes alone
+do not change the profile. Conflicts persist throughout a continuous observation
+cohort; a quiet gap longer than 60 seconds starts a new cohort and token.
+
+Automatic detection matches the captured pairing suffix **and** payload, not
+state bits or generic properties. It does not transmit, pair, update an existing
+registry profile or make output changes. Pairing remains a separate targeted
+action after the radio restores the added registry. Omit `auto_detect` (or set
+it to false) for the unchanged manual `outputs` and optional `suffix` contract;
+`profile_token` is rejected on that manual path.
+
 ### Firmware maintenance
 
 Newer daemons add `data.firmware_update` to HTTP/WebSocket snapshots. Older

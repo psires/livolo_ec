@@ -39,6 +39,7 @@ let snapshot = null,
   filter = 'all',
   selectedId = null,
   refreshPromise = null;
+const addUi = { selection: null, manual: null };
 const busyDevices = new Set();
 const watched = new Map();
 const localResults = new Map();
@@ -530,20 +531,137 @@ function renderDeviceDetails() {
   $('#pair-device').disabled = busy || !connected || !snapshot.ready || Boolean(snapshot.pairing);
   $('#forget-device').disabled = busy || !connected || busyDevices.has(d.id);
 }
+/** Return whether the user explicitly selected experimental device setup. */
+function autoSetup() {
+  return $('#add-method').value === 'auto';
+}
 /**
- * Offer nearby unregistered pairing candidates in the add-device dialog.
+ * Check whether a discovery contains a currently usable experimental profile.
+ * @param {Object|undefined} candidate - Unregistered discovery from the daemon.
+ * @returns {boolean} Whether the profile can be reviewed and submitted now.
  */
+function detectedProfile(candidate) {
+  const profile = candidate?.profile;
+  return Boolean(
+    candidate &&
+      !candidate.configured &&
+      !deviceById(candidate.device) &&
+      profile?.experimental === true &&
+      profile.status === 'detected' &&
+      typeof profile.token === 'string' &&
+      profile.token.length > 0 &&
+      ((profile.outputs === 1 && profile.suffix === '0001') ||
+        (profile.outputs === 2 && profile.suffix === '0002')) &&
+      Number.isFinite(profile.expires_at) &&
+      profile.expires_at * 1000 > Date.now(),
+  );
+}
+/**
+ * Explain why an experimental candidate can or cannot be selected.
+ * @param {Object} candidate - Nearby pairing announcement and optional profile.
+ * @returns {string} Plain text suitable for an escaped candidate label.
+ */
+function detectionLabel(candidate) {
+  if (detectedProfile(candidate)) return `${candidate.profile.outputs}-gang switch · Select`;
+  const status = candidate.profile?.status;
+  if (status === 'ambiguous') return 'Conflicting reports · Use manual setup';
+  if (status === 'stale' || status === 'detected')
+    return 'Expired · Put switch in pairing mode again';
+  if (!candidate.profile) return 'Auto-detection unavailable · Use manual setup';
+  return 'Unrecognized switch · Use manual setup';
+}
+/**
+ * Match the current profile to the exact output count and suffix the user reviewed.
+ * @returns {boolean} Whether the selected candidate remains safe to submit.
+ */
+function reviewedDetection() {
+  const selected = addUi.selection;
+  const current = snapshot?.discoveries.find((c) => c.device === selected?.device);
+  return Boolean(
+    selected &&
+      detectedProfile(current) &&
+      current.profile.token === selected.token &&
+      current.profile.outputs === selected.outputs &&
+      current.profile.suffix === selected.suffix,
+  );
+}
+/** Keep manual fields editable and experimental fields bound to the reviewed discovery. */
+function renderAddSetup() {
+  const auto = autoSetup();
+  const blocked = !connected || firmwareBusy() || $('#add-form').dataset.busy === 'true';
+  $('#add-dialog').classList.toggle('auto-setup', auto);
+  $('#device-fields').hidden = auto;
+  $('#auto-help').hidden = !auto;
+  $('#auto-review').hidden = !auto;
+  $('#device-advanced').hidden = auto;
+  $('#new-id').readOnly = auto;
+  $('#new-suffix').readOnly = auto;
+  $('#new-outputs').disabled = blocked || auto;
+  $('#add-method').disabled = blocked;
+  for (const id of ['#add-save', '#add-pair']) {
+    $(id).disabled = blocked || (auto && (!snapshot?.ready || !reviewedDetection()));
+  }
+  if (!auto) return;
+  const selected = addUi.selection;
+  $('#new-id').value = selected?.device || '';
+  $('#new-outputs').value = selected ? String(selected.outputs) : '';
+  $('#new-suffix').value = selected?.suffix || '';
+  $('#auto-review').textContent = !snapshot?.ready
+    ? 'Waiting for the radio to reconnect. Detection requires a live gateway.'
+    : !selected
+      ? 'Select a detected switch below. Check that its ID and output count match your switch.'
+      : reviewedDetection()
+        ? `Review: ${selected.device} · ${selected.outputs}-gang switch · suffix ${selected.suffix}.`
+        : 'This detection expired or changed. Put the switch in pairing mode again and reselect it, or use manual setup.';
+}
+/** Offer nearby unregistered pairing candidates without automatically selecting any device. */
 function renderDiscoveries() {
-  const candidates = snapshot.discoveries.filter((c) => !deviceById(c.device));
-  $('#discoveries').innerHTML = candidates.length
+  const auto = autoSetup();
+  const candidates = snapshot.discoveries.filter((c) => !c.configured && !deviceById(c.device));
+  const blocked = !connected || firmwareBusy() || $('#add-form').dataset.busy === 'true';
+  const markup = candidates.length
     ? '<strong>Nearby devices requesting pairing</strong>' +
       candidates
-        .map(
-          (c) =>
-            `<button type="button" class="candidate" data-candidate="${escapeHTML(c.device)}"><span>${escapeHTML(c.device)}</span><span>${Number.isFinite(c.rssi) ? c.rssi + ' dBm' : 'Detected'} · Select</span></button>`,
-        )
+        .map((c) => {
+          const unavailable = blocked || (auto && (!snapshot.ready || !detectedProfile(c)));
+          const label = auto
+            ? detectionLabel(c)
+            : `${Number.isFinite(c.rssi) ? c.rssi + ' dBm' : 'Detected'} · Select`;
+          return `<button type="button" class="candidate" data-candidate="${escapeHTML(c.device)}"${unavailable ? ' disabled' : ''}${auto ? ` aria-pressed="${addUi.selection?.device === c.device}"` : ''}><span>${escapeHTML(c.device)}</span><span>${escapeHTML(label)}</span></button>`;
+        })
         .join('')
-    : 'No unregistered switch detected yet. You can enter its ID below.';
+    : auto
+      ? 'Listening for an unpaired switch. Follow its documented pairing procedure to make it discoverable.'
+      : 'No unregistered switch detected yet. You can enter its ID below.';
+  if ($('#discoveries').innerHTML !== markup) $('#discoveries').innerHTML = markup;
+  renderAddSetup();
+}
+/**
+ * Build a manual request or an opt-in request bound to the reviewed detected profile.
+ * @returns {Object} Add-device fields for shared command submission.
+ * @throws {Error} If experimental evidence is missing, expired, or changed.
+ */
+function addDeviceFields() {
+  const name = $('#new-name').value.trim();
+  if (!name) throw new Error('Enter a friendly name.');
+  if (autoSetup()) {
+    if (!connected || !snapshot?.ready || !reviewedDetection()) {
+      throw new Error('Select a fresh detected switch before saving, or use manual setup.');
+    }
+    const selected = addUi.selection;
+    return {
+      device: selected.device,
+      name,
+      auto_detect: true,
+      profile_token: selected.token,
+    };
+  }
+  return {
+    device: $('#new-id').value.trim().toLowerCase(),
+    name,
+    outputs: Number($('#new-outputs').value),
+    suffix: $('#new-suffix').value.trim().toLowerCase(),
+  };
 }
 /**
  * Select the hash-addressed view and synchronize accessible navigation state.
@@ -633,21 +751,54 @@ $('#search').addEventListener('input', () => {
  */
 $('#add-device').addEventListener('click', () => {
   $('#add-form').reset();
+  addUi.selection = null;
+  addUi.manual = null;
+  $('#pairing-instructions').open = true;
   showError('#add-error', '');
   renderDiscoveries();
   openDialog('#add-dialog');
 });
+/** Preserve manual entries when switching into or out of experimental setup. */
+$('#add-method').addEventListener('change', () => {
+  $('#pairing-instructions').open = !autoSetup();
+  if (autoSetup()) {
+    addUi.manual = {
+      device: $('#new-id').value,
+      outputs: $('#new-outputs').value,
+      suffix: $('#new-suffix').value,
+    };
+    addUi.selection = null;
+  } else if (addUi.manual) {
+    $('#new-id').value = addUi.manual.device;
+    $('#new-outputs').value = addUi.manual.outputs;
+    $('#new-suffix').value = addUi.manual.suffix;
+  }
+  showError('#add-error', '');
+  renderDiscoveries();
+});
 /**
- * Fill registration identity fields from a selected nearby pairing candidate.
- *
+ * Fill identity fields or pin the experimental profile the user selected for review.
  * @param {MouseEvent} event - Click whose target may identify a discovery candidate.
  */
 $('#discoveries').addEventListener('click', (event) => {
   const button = event.target.closest('[data-candidate]');
-  if (!button) return;
+  if (!button || button.disabled) return;
   const candidate = snapshot.discoveries.find((c) => c.device === button.dataset.candidate);
-  $('#new-id').value = candidate.device;
-  $('#new-suffix').value = candidate.suffix || '0002';
+  if (!candidate || candidate.configured || deviceById(candidate.device)) return;
+  if (autoSetup()) {
+    if (!detectedProfile(candidate)) return;
+    addUi.selection = {
+      device: candidate.device,
+      outputs: candidate.profile.outputs,
+      suffix: candidate.profile.suffix,
+      token: candidate.profile.token,
+    };
+  } else {
+    $('#new-id').value = candidate.device;
+    $('#new-suffix').value = candidate.suffix || '0002';
+  }
+  showError('#add-error', '');
+  renderDiscoveries();
   $('#new-name').focus();
 });
 /**
@@ -737,17 +888,14 @@ $('#stop-pairing').addEventListener('click', async () => {
 $('#add-form').addEventListener('submit', (event) => {
   event.preventDefault();
   const pair = event.submitter?.value === 'pair';
-  const fields = {
-    device: $('#new-id').value.trim().toLowerCase(),
-    name: $('#new-name').value.trim(),
-    outputs: Number($('#new-outputs').value),
-    suffix: $('#new-suffix').value.trim().toLowerCase(),
-  };
-  if (!fields.name) {
-    showError('#add-error', 'Enter a friendly name.');
+  let fields;
+  try {
+    fields = addDeviceFields();
+  } catch (error) {
+    showError('#add-error', error.message);
     return;
   }
-  formAction(event.currentTarget, '#add-error', async () => {
+  return formAction(event.currentTarget, '#add-error', async () => {
     await command('add', fields);
     $('#add-dialog').close();
     toast(`${fields.name} saved.`);

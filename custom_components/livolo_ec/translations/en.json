@@ -50,10 +50,11 @@
     "step": {
       "init": {
         "menu_options": {
-          "add": "Register a device",
+          "add": "Register a device manually",
           "pair": "Open or close pairing",
           "refresh": "Refresh reported state",
-          "forget": "Forget a device"
+          "forget": "Forget a device",
+          "discover": "Detect a switch (experimental)"
         }
       },
       "add": {
@@ -88,6 +89,22 @@
           "device": "Registered device ID",
           "confirm": "Forget this device"
         }
+      },
+      "discover": {
+        "title": "Detect a switch · Experimental",
+        "description": "Put only the intended new switch into physical pairing mode, with pairing on the original EC gateway disabled. Observed unregistered devices: {count}. Select an ID to review its profile. Submit without selecting a device to refresh the list. Unknown, conflicting or expired profiles require fresh evidence or manual setup. Older daemons may support only manual setup.",
+        "data": {
+          "device": "Observed switch",
+          "manual": "Use manual setup instead"
+        }
+      },
+      "detected": {
+        "title": "Review detected switch · Experimental",
+        "description": "Device: **{device}**. Detected outputs: **{outputs}**. Wire suffix: **{suffix}**. Check the physical button count and enter a name. This experimental detection recognizes the tested one- and two-gang pairing signatures only. Submit to register this profile. Registration does not complete physical pairing: afterwards, reopen Configure → Open or close pairing for this device once the radio is ready. Evidence must still be fresh when submitted; otherwise select the switch again.",
+        "data": {
+          "name": "Device name",
+          "rescan": "Return to discovery without registering"
+        }
       }
     },
     "error": {
@@ -97,7 +114,11 @@
       "invalid_url": "Enter a valid HTTP or HTTPS URL and token.",
       "simulation_disabled": "This endpoint is a simulator. Enable simulation explicitly for testing.",
       "command_failed": "The command was not confirmed. Check daemon status before retrying.",
-      "confirm_required": "Confirm that you want to forget this device."
+      "confirm_required": "Confirm that you want to forget this device.",
+      "detection_unavailable": "This switch has no fresh, unambiguous supported profile. Put it into pairing mode and refresh, or use manual setup.",
+      "detection_changed": "The reviewed profile expired, changed, was registered elsewhere, or the radio is unavailable. Refresh and select the switch again.",
+      "detection_failed": "Registration was rejected or could not be confirmed. Check the daemon registry before retrying. Refresh and select again if it was not added; pairing has not been opened.",
+      "radio_not_ready": "The radio is not ready. Wait for it to reconnect before detecting a switch."
     }
   }
 }
