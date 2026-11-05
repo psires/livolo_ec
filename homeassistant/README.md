@@ -206,6 +206,23 @@ healthy daemon when the adapter is unplugged.
 
 ## Radio firmware updates
 
+Integration/client **0.3.0** add **Configure → Check firmware update (read-only)**.
+The report shows the identified board, installed and candidate versions,
+compatibility checks and blocking reason. Refresh repeats only read requests;
+it does not open the radio, send UART commands, create an update job or write the
+daemon database. Unknown identity is not a successful compatibility check.
+
+The gateway's standard **Firmware** update entity remains the installation
+control. HA requests fresh preflight for that exact candidate before submitting
+one durable job, and rejects a changed candidate or blocked report. The daemon
+independently repeats its admission checks; a prior report cannot bypass them.
+Older daemons without `preflight_supported` retain switch control and firmware
+status, but must be updated before the HA install action is enabled. A failed
+preflight means no installation was requested; a lost response after submission
+retains the existing uncertain-job handling and never automatically flashes again.
+Manual local-artifact and recovery operations remain in the operator CLI; the
+HA API does not accept firmware paths, helper executables or serial overrides.
+
 Integration and client 0.2.0 add a **Firmware** update entity to the existing
 Livolo EC gateway device. It reports the running version and the daemon's selected
 compatible candidate. Use HA's standard update dialog or the `update.install`

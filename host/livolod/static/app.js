@@ -45,6 +45,7 @@ const watched = new Map();
 const localResults = new Map();
 const finalErrors = new Set(['rejected', 'unknown', 'unconfirmed', 'busy', 'timeout']);
 const firmwareUi = {
+  preflight: { sequence: 0, key: null, checking: false, report: null, error: '' },
   review: null,
   request: null,
   storageKey: null,
@@ -1110,6 +1111,41 @@ function firmwareBusy() {
 }
 
 /**
+ * Translate public firmware reason codes without exposing private backend details.
+ * @param {string} code - Sanitized daemon or preflight reason.
+ * @returns {string} User-facing explanation.
+ */
+function firmwareReason(code) {
+  const reasons = {
+    board_identity_unknown: 'The gateway has not identified the connected radio board.',
+    bundle_missing: 'No firmware bundle is installed on this gateway.',
+    bundle_invalid: 'The installed firmware bundle did not pass validation.',
+    artifact_missing: 'No firmware payload is installed for this exact board.',
+    artifact_invalid: 'The firmware payload did not pass integrity or signature checks.',
+    artifact_unqualified: 'This firmware has not been qualified for installation.',
+    incompatible_host: 'The firmware bundle does not match the installed daemon release.',
+    incompatible_baudrate: 'The firmware does not support the configured serial rate.',
+    unsupported_board: 'Firmware installation is not supported for this board.',
+    backend_unavailable: 'The required firmware installation backend is unavailable.',
+    bootloader_install_required: 'This radio needs its one-time bootloader installation first.',
+    signing_key_mismatch: 'The firmware signing key does not match the trusted key.',
+    radio_offline: 'Connect the radio and wait for it to become ready.',
+    simulation: 'Firmware installation is disabled in simulation mode.',
+    radio_busy: 'The radio is busy. Wait for current device activity to finish.',
+    live_identity_required: 'A connected, identified radio is required.',
+    board_mismatch: 'The firmware is for a different radio board.',
+    board_identity_changed: 'The radio identity changed. Reconnect and check again.',
+    incompatible_protocol: 'The firmware and radio protocol versions do not match.',
+    version_not_newer: 'The candidate is not newer than the installed firmware.',
+    candidate_stale: 'The firmware candidate changed. Review the current update.',
+    recovery_required: 'Firmware recovery is required before another installation.',
+    update_in_progress: 'A firmware update is already in progress.',
+  };
+
+  return reasons[code] || String(code || 'Check unavailable').replaceAll('_', ' ');
+}
+
+/**
  * Explain why the daemon's currently advertised artifact cannot be installed.
  *
  * @returns {string} Blocking reason, or empty text for an eligible candidate.
@@ -1120,27 +1156,10 @@ function firmwareBlockedReason() {
   if (!firmware) return 'This daemon does not provide firmware installation through the web UI.';
   if (firmware.recovery) return 'Firmware recovery is required before device changes can resume.';
   if (firmwareBusy()) return 'An update is in progress or its outcome is being checked.';
+  if (firmware.preflight_supported !== true)
+    return 'Update the daemon to enable firmware preflight and installation.';
   if (firmware.blocked_reason) {
-    const reasons = {
-      board_identity_unknown: 'The gateway has not identified the connected radio board.',
-      bundle_missing: 'No firmware bundle is installed on this gateway.',
-      bundle_invalid: 'The installed firmware bundle did not pass validation.',
-      artifact_missing: 'No firmware payload is installed for this exact board.',
-      artifact_invalid: 'The firmware payload did not pass integrity or signature checks.',
-      artifact_unqualified: 'This firmware has not been qualified for installation.',
-      incompatible_host: 'The firmware bundle does not match the installed daemon release.',
-      incompatible_baudrate: 'The firmware does not support the configured serial rate.',
-      unsupported_board: 'Firmware installation is not supported for this board.',
-      backend_unavailable: 'The required firmware installation backend is unavailable.',
-      bootloader_install_required: 'This radio needs its one-time bootloader installation first.',
-      signing_key_mismatch: 'The firmware signing key does not match the trusted key.',
-      radio_offline: 'Connect the radio and wait for it to become ready.',
-      simulation: 'Firmware installation is disabled in simulation mode.',
-      candidate_stale: 'The firmware candidate changed. Review the current update.',
-      recovery_required: 'Firmware recovery is required before another installation.',
-      update_in_progress: 'A firmware update is already in progress.',
-    };
-    return reasons[firmware.blocked_reason] || String(firmware.blocked_reason).replaceAll('_', ' ');
+    return firmwareReason(firmware.blocked_reason);
   }
   if ((firmware.status || firmwareUi.result?.status) === 'unknown')
     return 'The previous update needs recovery before another install.';
@@ -1259,14 +1278,231 @@ function firmwareReviewMatches() {
   );
 }
 
+/** Return the current gateway and candidate facts that a preflight review depends on. */
+function firmwarePreflightKey() {
+  const firmware = snapshot?.firmware_update || {};
+  return JSON.stringify([
+    connected,
+    snapshot?.ready,
+    snapshot?.gateway,
+    snapshot?.tag,
+    snapshot?.session,
+    ...[
+      'board',
+      'candidate_id',
+      'latest_version',
+      'installed_version',
+      'rollback_supported',
+      'preflight_supported',
+      'install_supported',
+      'update_available',
+      'blocked_reason',
+      'in_progress',
+      'status',
+      'recovery',
+    ].map((key) => firmware[key]),
+  ]);
+}
+
+/**
+ * Require an explicit positive result and no failed or missing individual checks.
+ * @param {Object|null} report - Validated advisory response, if available.
+ * @returns {boolean} Whether the report has completely passed.
+ */
+function firmwareReportPassed(report) {
+  const required = [
+    'artifact',
+    'expected_board',
+    'helper',
+    'live_identity',
+    'board',
+    'protocol',
+    'baudrate',
+    'version',
+  ];
+  const identities = new Set(report?.checks.map((item) => item.id));
+  return Boolean(
+    report &&
+      report.executable === true &&
+      report.compatible === true &&
+      report.blocked_reason === null &&
+      report.requires_manual_action === false &&
+      report.checks.length <= 32 &&
+      identities.size === report.checks.length &&
+      required.every((id) => identities.has(id)) &&
+      report.checks.every((item) => item.status === 'pass'),
+  );
+}
+
+/**
+ * Compare an advisory report with the board and artifact presented to the user.
+ * @param {Object} report - Validated schema-one preflight response.
+ * @param {Object|undefined} firmware - Snapshot or pinned artifact review.
+ * @returns {boolean} Whether all installation identity facts match.
+ */
+function firmwareReportMatches(report, firmware) {
+  return Boolean(
+    firmware &&
+      report.candidate_id === firmware.candidate_id &&
+      report.board === firmware.board &&
+      report.target_version === firmware.latest_version &&
+      report.installed_version === firmware.installed_version &&
+      report.rollback_supported === firmware.rollback_supported &&
+      report.identity_source === 'live_session',
+  );
+}
+
+/**
+ * Keep installation blocked until a successful preflight describes the reviewed artifact.
+ * @returns {string} Blocking explanation, or empty text after a complete matching check.
+ */
+function firmwarePreflightReason() {
+  const check = firmwareUi.preflight;
+  const report = check.report;
+  if (check.checking) return 'Preflight is checking the firmware and gateway.';
+  if (check.error) return check.error;
+  if (!report || check.key !== firmwarePreflightKey()) return 'Run preflight before installing.';
+  if (!firmwareReportPassed(report))
+    return report.blocked_reason
+      ? firmwareReason(report.blocked_reason)
+      : 'Preflight has failed or incomplete checks.';
+  if (!firmwareReportMatches(report, firmwareUi.review))
+    return 'Preflight does not match this gateway and reviewed firmware. Check again.';
+  return '';
+}
+
+/**
+ * Run an advisory GET only; superseded responses cannot authorize an installation.
+ * @returns {Promise<void>} Completion after displaying a report or a retryable read error.
+ */
+async function runFirmwarePreflight() {
+  if (!connected || snapshot?.firmware_update?.preflight_supported !== true) return;
+  const check = firmwareUi.preflight;
+  const sequence = ++check.sequence;
+  check.key = firmwarePreflightKey();
+  check.checking = true;
+  check.report = null;
+  check.error = '';
+  const candidate = snapshot.firmware_update.candidate_id;
+  renderFirmware();
+  try {
+    const report = await api(
+      '/api/firmware/preflight' +
+        (candidate ? '?candidate_id=' + encodeURIComponent(candidate) : ''),
+    );
+    if (sequence !== check.sequence) return;
+    if (
+      !report ||
+      report.schema !== 1 ||
+      report.operation !== 'update' ||
+      !Array.isArray(report.checks) ||
+      report.checks.some(
+        (item) =>
+          !item ||
+          typeof item.id !== 'string' ||
+          typeof item.code !== 'string' ||
+          !['pass', 'fail', 'unknown'].includes(item.status),
+      )
+    )
+      throw new Error('Unsupported preflight report.');
+    check.report = report;
+  } catch {
+    if (sequence !== check.sequence) return;
+    check.error =
+      'Preflight could not be completed. Reconnect and try again; older daemons may need an update.';
+  } finally {
+    if (sequence === check.sequence) {
+      check.checking = false;
+      renderFirmware();
+    }
+  }
+}
+
+/** Show escaped advisory checks in both the network card and the installation review. */
+function renderFirmwarePreflight() {
+  const check = firmwareUi.preflight;
+  if (check.key && check.key !== firmwarePreflightKey()) {
+    check.sequence++;
+    check.key = null;
+    check.report = null;
+    check.checking = false;
+    check.error = 'Gateway or firmware details changed. Run preflight again.';
+  }
+  const labels = {
+    artifact: 'Firmware integrity',
+    expected_board: 'Expected board',
+    helper: 'Installation helper',
+    live_identity: 'Connected radio',
+    board: 'Board identity',
+    protocol: 'Radio protocol',
+    baudrate: 'Serial rate',
+    version: 'Firmware version',
+    bootloader: 'Bootloader',
+    signing_key: 'Trusted signing key',
+    previous_update: 'Previous update',
+    lifecycle: 'Radio availability',
+  };
+  const statuses = { pass: 'Passed', fail: 'Failed', unknown: 'Unknown' };
+  const report = check.report;
+  const message = check.checking
+    ? 'Running preflight…'
+    : check.error ||
+      (report
+        ? firmwareReportPassed(report)
+          ? firmwareReportMatches(report, snapshot?.firmware_update)
+            ? 'Preflight passed. Installation will recheck the radio and firmware.'
+            : 'Preflight does not match the current radio and firmware. Check again.'
+          : 'Preflight did not pass. Installation is unavailable.'
+        : 'Run preflight to check this firmware before installing.');
+  const markup =
+    `<strong>${escapeHTML(message)}</strong><p class="muted">Read-only check · No radio commands, flashing or device changes.</p>` +
+    (report
+      ? '<ul class="preflight-checks">' +
+        report.checks
+          .map(
+            (item) =>
+              `<li><span>${escapeHTML(labels[item.id] || item.id.replaceAll('_', ' '))}</span><span class="check-${item.status}">${statuses[item.status]}${item.status !== 'pass' ? ' · ' + escapeHTML(firmwareReason(item.code)) : ''}</span></li>`,
+          )
+          .join('') +
+        '</ul>' +
+        (report.blocked_reason && !report.checks.some((item) => item.code === report.blocked_reason)
+          ? `<p>${escapeHTML(firmwareReason(report.blocked_reason))}</p>`
+          : '') +
+        (report.requires_manual_action
+          ? '<p>Manual preparation or recovery is required before this update can run.</p>'
+          : '')
+      : '');
+  $('#firmware-preflight-report').innerHTML = markup;
+  $('#firmware-preflight-report').hidden = !check.checking && !report && !check.error;
+  $('#firmware-review-preflight').innerHTML = markup;
+  $('#firmware-preflight').disabled =
+    !connected || snapshot?.firmware_update?.preflight_supported !== true || check.checking;
+  $('#firmware-recheck').disabled =
+    !connected ||
+    snapshot?.firmware_update?.preflight_supported !== true ||
+    check.checking ||
+    !firmwareReviewMatches();
+}
+
+/** Run diagnostics without starting or reserving an installation job. */
+$('#firmware-preflight').addEventListener('click', runFirmwarePreflight);
+/** Refresh the advisory report for the exact artifact still open for review. */
+$('#firmware-recheck').addEventListener('click', () => {
+  if (firmwareReviewMatches()) return runFirmwarePreflight();
+});
+
 /**
  * Show daemon-owned eligibility, genuine progress and durable recovery information.
  */
 function renderFirmware() {
+  renderFirmwarePreflight();
   const firmware = snapshot?.firmware_update || {};
   const local = firmwareUi.result;
   const status = firmware.status || local?.status;
   const busy = firmwareBusy();
+  const checked = firmwareUi.preflight.report;
+  const preflightBlocked =
+    checked && (!firmwareReportPassed(checked) || !firmwareReportMatches(checked, firmware));
   $('#firmware-details').innerHTML = firmwareDetails({
     ...firmware,
     installed_version:
@@ -1286,13 +1522,20 @@ function renderFirmware() {
             ? 'Needs recovery'
             : status === 'rejected'
               ? 'Not installed'
-              : firmwareBlockedReason()
-                ? 'Unavailable'
-                : 'Update available';
+              : preflightBlocked
+                ? 'Preflight blocked'
+                : firmwareBlockedReason()
+                  ? 'Unavailable'
+                  : 'Update available';
   $('#firmware-status').className =
     'badge' + (connected && !busy && status === 'confirmed' ? ' online' : '');
   $('#firmware-reason').textContent =
-    firmwareBlockedReason() || 'A verified update is ready for review.';
+    firmwareBlockedReason() ||
+    (preflightBlocked
+      ? checked.blocked_reason
+        ? firmwareReason(checked.blocked_reason)
+        : 'Preflight did not pass for this radio and firmware.'
+      : 'A verified update is ready for review.');
   $('#firmware-review').disabled = Boolean(firmwareBlockedReason());
   const request = firmware.request_id || firmwareUi.request || local?.request_id;
   $('#firmware-job').hidden = !request && !busy;
@@ -1344,10 +1587,7 @@ function renderFirmware() {
   $('#firmware-recovery').textContent =
     recovery === 'recovery_required'
       ? 'The daemon could not verify a safe completion. Follow the emergency recovery procedure for this exact board before restarting device control.'
-      : recovery ||
-        (firmware.board === 'nordic-pca10059'
-          ? 'Automatic Nordic installation is unavailable. Use the documented PCA10059 USB DFU recovery procedure.'
-          : '');
+      : recovery || '';
   $('#firmware-recovery').hidden = !$('#firmware-recovery').textContent;
   $('#firmware-notes-text').textContent = firmware.release_notes || '';
   const link = $('#firmware-release-link');
@@ -1368,14 +1608,14 @@ function renderFirmware() {
   if ($('#firmware-dialog').open) {
     const reason = !firmwareReviewMatches()
       ? 'The firmware candidate changed. Close this dialog and review the current update.'
-      : firmwareBlockedReason();
+      : firmwareBlockedReason() || firmwarePreflightReason();
     $('#firmware-install').disabled = Boolean(reason);
     showError('#firmware-review-error', reason);
   }
 }
 
 /** Pin exact artifact details before asking for an explicit installation decision. */
-$('#firmware-review').addEventListener('click', () => {
+$('#firmware-review').addEventListener('click', async () => {
   if (firmwareBlockedReason()) return;
   firmwareUi.review = { ...snapshot.firmware_update };
   $('#firmware-review-details').innerHTML = firmwareDetails(firmwareUi.review);
@@ -1383,7 +1623,7 @@ $('#firmware-review').addEventListener('click', () => {
     ? 'This radio supports trial rollback. Installation is complete only after the daemon verifies it.'
     : 'This radio has no automatic rollback. If installation is interrupted, bootloader recovery may be required.';
   openDialog('#firmware-dialog');
-  renderFirmware();
+  await runFirmwarePreflight();
 });
 
 /**
@@ -1393,7 +1633,7 @@ $('#firmware-review').addEventListener('click', () => {
  */
 $('#firmware-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!firmwareReviewMatches() || firmwareBlockedReason()) {
+  if (!firmwareReviewMatches() || firmwareBlockedReason() || firmwarePreflightReason()) {
     renderFirmware();
     return;
   }

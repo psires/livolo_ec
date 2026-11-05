@@ -7,12 +7,24 @@ from collections.abc import AsyncIterator
 import re
 import time
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 import uuid
 
 import aiohttp
 
 API_VERSION = 1
+PREFLIGHT_REQUIRED_CHECKS = frozenset(
+    {
+        "artifact",
+        "expected_board",
+        "helper",
+        "live_identity",
+        "board",
+        "protocol",
+        "baudrate",
+        "version",
+    }
+)
 
 
 class LivoloError(Exception):
@@ -114,6 +126,94 @@ def snapshot_data(envelope: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def preflight_data(value, candidate_id=None):
+    """Validate advisory evidence and retain only bounded public report fields.
+
+    @param value Decoded schema-1 firmware preflight response.
+    @param candidate_id Explicit requested candidate, or None for automatic selection.
+    @return Sanitized report; malformed or contradictory evidence is rejected.
+    """
+    if (
+        not isinstance(value, dict)
+        or type(value.get("schema")) is not int
+        or value["schema"] != 1
+        or value.get("operation") != "update"
+        or any(
+            type(value.get(key)) is not bool
+            for key in ("executable", "requires_manual_action", "rollback_supported")
+        )
+        or "compatible" not in value
+        or (value["compatible"] is not None and type(value["compatible"]) is not bool)
+    ):
+        raise IncompatibleError("Invalid firmware preflight schema")
+    result = {
+        key: value[key]
+        for key in (
+            "schema",
+            "operation",
+            "compatible",
+            "executable",
+            "requires_manual_action",
+            "rollback_supported",
+        )
+    }
+    for key in (
+        "candidate_id",
+        "board",
+        "installed_version",
+        "target_version",
+        "identity_source",
+        "blocked_reason",
+    ):
+        field = value.get(key)
+        if key not in value or (
+            field is not None
+            and (
+                not isinstance(field, str)
+                or not re.fullmatch(r"[A-Za-z0-9_.:+-]{1,256}", field)
+            )
+        ):
+            raise IncompatibleError("Invalid firmware preflight field")
+        result[key] = field
+    if candidate_id is not None and result["candidate_id"] not in (None, candidate_id):
+        raise IncompatibleError("Firmware preflight candidate changed")
+    if result["identity_source"] not in ("live_session", "unknown"):
+        raise IncompatibleError("Invalid firmware preflight identity source")
+    checks = value.get("checks")
+    if not isinstance(checks, list) or not 1 <= len(checks) <= 32:
+        raise IncompatibleError("Invalid firmware preflight checks")
+    result["checks"] = []
+    identities = set()
+    for check in checks:
+        if (
+            not isinstance(check, dict)
+            or check.get("status") not in ("pass", "fail", "unknown")
+            or any(
+                not isinstance(check.get(key), str)
+                or not re.fullmatch(r"[a-z0-9_]{1,64}", check[key])
+                for key in ("id", "code")
+            )
+            or check["id"] in identities
+        ):
+            raise IncompatibleError("Invalid firmware preflight check")
+        identities.add(check["id"])
+        result["checks"].append({key: check[key] for key in ("id", "status", "code")})
+    if result["executable"] and (
+        result["compatible"] is not True
+        or result["identity_source"] != "live_session"
+        or not PREFLIGHT_REQUIRED_CHECKS.issubset(identities)
+        or not all(
+            result[key]
+            for key in ("candidate_id", "board", "target_version", "installed_version")
+        )
+        or result["blocked_reason"] is not None
+        or result["requires_manual_action"]
+        or any(check["status"] != "pass" for check in result["checks"])
+    ):
+        raise IncompatibleError("Contradictory firmware preflight result")
+    return result
+
+
 class Client:
     """Use a caller-owned aiohttp session without creating background tasks."""
 
@@ -156,6 +256,13 @@ class Client:
                         "Daemon does not support firmware installation"
                     )
                 if response.status != 200:
+                    if (
+                        response.status == 404
+                        and path.split("?", 1)[0] == "/api/v1/firmware/preflight"
+                    ):
+                        raise IncompatibleError(
+                            "Daemon does not support firmware preflight; update the daemon"
+                        )
                     raise LivoloError(f"API returned HTTP {response.status}")
                 value = await response.json()
                 if not isinstance(value, dict):
@@ -231,6 +338,22 @@ class Client:
             timeout,
             ("confirmed", "pairing") if action == "pair" else ("confirmed",),
         )
+
+    async def firmware_preflight(self, candidate_id=None):
+        """Read compatibility evidence without submitting a job or touching the radio.
+
+        @param candidate_id Optional opaque catalog candidate to check explicitly.
+        @return Validated advisory report; installation must recheck independently.
+        """
+        if candidate_id is not None and (
+            not isinstance(candidate_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,256}", candidate_id)
+        ):
+            raise ValueError("Invalid firmware candidate ID")
+        path = "/api/v1/firmware/preflight"
+        if candidate_id is not None:
+            path += "?" + urlencode({"candidate_id": candidate_id})
+        return preflight_data(await self._request("GET", path), candidate_id)
 
     async def install_firmware(self, candidate_id, request_id=None, timeout=600):
         """Request one daemon-owned firmware job and await its verified outcome.

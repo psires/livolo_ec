@@ -97,11 +97,71 @@ async def test_broker_free_native_control(hass, tmp_path):
         store.close()
 
 
-async def test_firmware_job_through_native_api_and_ha(hass, tmp_path):
+async def test_preflight_options_through_native_api_do_not_mutate(hass, tmp_path):
+    """Actual HA dry-run reads the real daemon report without UART or ledger changes.
+
+    @param hass Actual Home Assistant instance.
+    @param tmp_path Isolated database and absent catalog location.
+    """
+    root = Path(__file__).resolve().parents[2]
+    config = replace(
+        load(root / "host/config.example.json"),
+        database=str(tmp_path / "preflight.db"),
+        mqtt={"enabled": False},
+        firmware_bundle_dir=str(tmp_path / "no-bundle"),
+    )
+    store = Store(config.database, config.gateway + ":" + config.tag)
+    service = Service(config, store, simulated=True)
+    api = NativeAPI(service, token="preflight-test-token", port=0)
+    try:
+        await api.start()
+        entry = MockConfigEntry(
+            domain="livolo_ec",
+            unique_id=config.gateway + ":" + config.tag,
+            data={
+                "url": f"http://127.0.0.1:{api.port}",
+                "token": "preflight-test-token",
+                "allow_simulated": True,
+            },
+        )
+        entry.add_to_hass(hass)
+        before = tuple(store.db.iterdump())
+        with (
+            patch(
+                "livolod.service.Gateway.open",
+                side_effect=AssertionError("No serial access"),
+            ) as opened,
+            patch.object(
+                service,
+                "start_firmware_update",
+                side_effect=AssertionError("No install"),
+            ) as install,
+        ):
+            result = await hass.config_entries.options.async_init(entry.entry_id)
+            result = await hass.config_entries.options.async_configure(
+                result["flow_id"], {"next_step_id": "firmware_preflight"}
+            )
+            assert not result["errors"]
+            assert result["description_placeholders"]["executable"] == "No"
+            assert (
+                result["description_placeholders"]["reason"] == "board identity unknown"
+            )
+            opened.assert_not_called()
+            install.assert_not_called()
+        assert tuple(store.db.iterdump()) == before
+        assert service.gateway is None and not service.ready
+        assert service.firmware_manager.job is None
+    finally:
+        await api.close()
+        store.close()
+
+
+async def test_firmware_job_through_native_api_and_ha(hass, tmp_path, preflight_report):
     """HA awaits a durable firmware result through real HTTP and push snapshots.
 
     @param hass Actual HA instance.
     @param tmp_path Isolated command ledger; no firmware payload or radio is opened.
+    @param preflight_report Stubbed hardware qualification evidence for the API fixture.
     """
     root = Path(__file__).resolve().parents[2]
     config = replace(
@@ -117,6 +177,7 @@ async def test_firmware_job_through_native_api_and_ha(hass, tmp_path):
         "latest_version": "0.13",
         "candidate_id": "a" * 96 + ":" + "b" * 64,
         "install_supported": True,
+        "preflight_supported": True,
         "in_progress": False,
         "progress_percent": None,
     }
@@ -142,6 +203,11 @@ async def test_firmware_job_through_native_api_and_ha(hass, tmp_path):
     task = None
     with (
         patch.object(service, "start_firmware_update", side_effect=submit),
+        patch.object(
+            service,
+            "firmware_preflight",
+            return_value=dict(preflight_report, candidate_id=firmware["candidate_id"]),
+        ),
         patch.object(
             service, "firmware_update_snapshot", side_effect=lambda: dict(firmware)
         ),

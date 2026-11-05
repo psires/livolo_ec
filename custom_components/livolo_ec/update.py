@@ -82,6 +82,7 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
             features |= UpdateEntityFeature.PROGRESS
         if (
             self.firmware.get("install_supported") is True
+            and self.firmware.get("preflight_supported") is True
             and not self.firmware.get("blocked_reason")
             and self.firmware.get("candidate_id")
             and self.latest_version
@@ -132,6 +133,7 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
             "error",
             "recovery",
             "rollback_supported",
+            "preflight_supported",
         )
         value = {
             key: self.firmware[key]
@@ -141,6 +143,10 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
         }
         if not self.firmware:
             value["blocked_reason"] = "Daemon does not advertise firmware updates"
+        elif self.firmware.get("preflight_supported") is not True and not value.get(
+            "blocked_reason"
+        ):
+            value["blocked_reason"] = "Update the daemon to enable firmware preflight"
         return value
 
     async def async_release_notes(self):
@@ -169,10 +175,36 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
                 or "Livolo firmware install is unavailable"
             )
         candidate = self.firmware["candidate_id"]
+        board, target = self.firmware.get("board"), self.latest_version
+        installed = self.installed_version
         request_id = str(uuid.uuid4())
+        submitted = False
         self._installing = True
         self.async_write_ha_state()
         try:
+            report = await self.coordinator.client.firmware_preflight(candidate)
+            if report["executable"] is not True or report["compatible"] is not True:
+                reason = report.get("blocked_reason") or "compatibility not established"
+                raise HomeAssistantError(
+                    f"Firmware preflight blocked: {reason}. No installation was requested."
+                )
+            if (
+                report["candidate_id"] != candidate
+                or report["board"] != board
+                or report["target_version"] != target
+                or report["installed_version"] != installed
+                or self.firmware.get("candidate_id") != candidate
+                or self.firmware.get("board") != board
+                or self.latest_version != target
+                or self.installed_version != installed
+                or self.firmware.get("in_progress") is True
+                or not self.available
+                or not (self.supported_features & UpdateEntityFeature.INSTALL)
+            ):
+                raise HomeAssistantError(
+                    "Firmware candidate or availability changed during preflight. Check again before installing."
+                )
+            submitted = True
             await self.coordinator.client.install_firmware(
                 candidate, request_id=request_id
             )
@@ -189,6 +221,10 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
                 f"{result.get('error') or 'Inspect the job status and recovery guidance before retrying.'}"
             ) from error
         except (LivoloError, ValueError) as error:
+            if not submitted:
+                raise HomeAssistantError(
+                    "Firmware preflight failed. No installation was requested; check the daemon connection and version."
+                ) from error
             raise HomeAssistantError(
                 f"Livolo firmware job {request_id} could not be observed. "
                 "It may still be running; inspect its status before retrying."

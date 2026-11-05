@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-05",
+  "scope": "HA/client 0.3.0 firmware preflight and standard update service, isolated tests only",
+  "homeassistant": "2026.10.4",
+  "python": "3.14.7",
+  "native_api_revision": 1,
+  "tests": {
+    "command": "python -m pytest -c homeassistant/pytest.ini homeassistant/tests -q",
+    "passed": 105,
+    "failed": 0,
+    "hassfest_valid_integrations": 1,
+    "hassfest_invalid_integrations": 0,
+    "black_version": "24.8.0",
+    "formatting_and_documentation_checks": "passed"
+  },
+  "verified": [
+    "Authenticated preflight uses GET only and filters unknown/private report fields",
+    "Malformed, contradictory, wrong-candidate and incomplete executable reports are rejected",
+    "Executable reports require current live-session identity and all schema-1 prerequisite checks",
+    "Options flow presents and refreshes the report without installing or changing options",
+    "Actual options flow through real native HTTP API opens no UART, starts no job and changes no database rows",
+    "Standard update.install requires advertised capability and fresh matching candidate/board/version evidence",
+    "Blocked preflight, transport failure or changed push state prevents installation submission",
+    "A started update retains one durable request ID through acceptance, uncertainty and confirmation",
+    "Older daemon firmware status and native switch entities remain available while preflight-dependent installation is disabled",
+    "Existing detection, switch control, packaging and client regression tests pass"
+  ],
+  "limits": [
+    "No live HA host or radio was contacted, updated or flashed",
+    "Successful firmware job tests use a stubbed worker and synthetic qualification report",
+    "This does not qualify any physical firmware image, Nordic automatic lifecycle or recovery procedure",
+    "Public 0.3.0 release installation and upgrade validation remains a separate release gate"
+  ]
+}

@@ -1586,3 +1586,31 @@ dialog::backdrop {
 #add-dialog.auto-setup {
   width:600px;
 }
+
+.firmware-preflight {
+  padding:16px;
+  margin:20px 0;
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-size:12px;
+  line-height:1.6;
+  overflow-wrap:anywhere;
+}
+.preflight-checks {
+  list-style:none;
+  padding:0;
+  margin:12px 0 0;
+}
+.preflight-checks li {
+  display:flex;
+  justify-content:space-between;
+  gap:16px;
+  padding:7px 0;
+  border-top:1px solid var(--border);
+}
+.preflight-checks li span:last-child { text-align:right; }
+.check-pass { color:var(--green); }
+.check-fail { color:#a43a32; }
+.check-unknown { color:var(--muted); }
+
+.preflight-checks li span:first-child { flex:0 0 36%; }

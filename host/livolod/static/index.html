@@ -53,7 +53,8 @@
           <p id="firmware-error" class="form-error" role="alert" hidden></p>
           <p id="firmware-recovery" class="firmware-recovery" hidden></p>
           <details id="firmware-notes" hidden><summary>Release notes</summary><p id="firmware-notes-text"></p><a id="firmware-release-link" target="_blank" rel="noopener noreferrer" hidden>Read full release notes</a></details>
-          <div class="dialog-actions"><button type="button" class="button primary" id="firmware-review" disabled>Review update</button></div>
+          <div id="firmware-preflight-report" class="firmware-preflight" role="status" aria-live="polite" hidden></div>
+          <div class="dialog-actions"><button type="button" class="button" id="firmware-preflight">Run preflight</button><button type="button" class="button primary" id="firmware-review" disabled>Review update</button></div>
         </section>
         <div class="surface network-details" id="network-details"></div>
         <section class="surface mqtt-settings" aria-labelledby="mqtt-title">
@@ -84,6 +85,8 @@
       <div class="dialog-heading"><h2 id="firmware-dialog-title">Install gateway firmware?</h2><button type="button" class="icon-button close-dialog" aria-label="Close firmware review">×</button></div>
       <dl id="firmware-review-details" class="firmware-details"></dl>
       <p class="dialog-intro">Device control and pairing will pause while the gateway updates. Keep the gateway powered and the radio connected until the daemon verifies the result.</p>
+      <div id="firmware-review-preflight" class="firmware-preflight" role="status" aria-live="polite"></div>
+      <button type="button" class="button small" id="firmware-recheck">Run preflight again</button>
       <p id="firmware-rollback" class="muted"></p>
       <p id="firmware-review-error" class="form-error" role="alert" hidden></p>
       <div class="dialog-actions"><button type="button" class="button close-dialog">Not now</button><button type="submit" class="button primary" id="firmware-install" disabled>Install firmware</button></div>

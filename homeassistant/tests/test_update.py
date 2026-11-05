@@ -11,15 +11,16 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 import pytest
 
-from custom_components.livolo_ec._client import CommandFailed
+from custom_components.livolo_ec._client import CommandFailed, IncompatibleError
 
 
 @pytest.fixture
-async def gateway(hass, envelope):
+async def gateway(hass, envelope, preflight_report):
     """Load a real HA update entity with a controllable firmware snapshot stream.
 
     @param hass Home Assistant test instance.
     @param envelope Valid native snapshot fixture.
+    @param preflight_report Valid advisory compatibility response.
     """
     envelope["data"]["firmware_update"] = {
         "board": "zb-gw04-1v2",
@@ -28,6 +29,7 @@ async def gateway(hass, envelope):
         "candidate_id": "candidate-1",
         "update_available": True,
         "install_supported": True,
+        "preflight_supported": True,
         "blocked_reason": None,
         "in_progress": False,
         "stage": "idle",
@@ -78,6 +80,10 @@ async def gateway(hass, envelope):
             side_effect=lambda: copy.deepcopy(envelope),
         ),
         patch("custom_components.livolo_ec._client.Client.events", events),
+        patch(
+            "custom_components.livolo_ec._client.Client.firmware_preflight",
+            return_value=preflight_report,
+        ) as preflight,
     ):
         assert await hass.config_entries.async_setup(entry.entry_id)
         await hass.async_block_till_done()
@@ -88,6 +94,8 @@ async def gateway(hass, envelope):
             entity_id=states[0].entity_id,
             envelope=envelope,
             publish=publish,
+            preflight=preflight,
+            report=preflight_report,
         )
         await hass.config_entries.async_unload(entry.entry_id)
         await hass.async_block_till_done()
@@ -177,6 +185,7 @@ async def test_install_service_waits_for_verified_result(hass, gateway):
         await task
         await hass.async_block_till_done()
         submit.assert_awaited_once()
+        gateway.preflight.assert_awaited_once_with("candidate-1")
     state = hass.states.get(gateway.entity_id)
     assert state.state == "off"
     assert state.attributes["installed_version"] == "0.13"
@@ -282,3 +291,98 @@ async def test_old_daemon_keeps_switches_and_unavailable_update(hass, gateway):
     state = hass.states.get(gateway.entity_id)
     assert state.state == "unavailable"
     assert state.attributes["supported_features"] == 0
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"executable": False, "blocked_reason": "radio_busy"},
+        {
+            "compatible": None,
+            "executable": False,
+            "blocked_reason": "live_identity_required",
+        },
+        {"candidate_id": "changed"},
+        {"board": "other-board"},
+        {"target_version": "0.14"},
+    ],
+)
+async def test_preflight_blocks_standard_install(hass, gateway, change):
+    """Unusable or changed advisory evidence prevents any installation submission.
+
+    @param hass Actual Home Assistant instance.
+    @param gateway Loaded update entity and mutable preflight response.
+    @param change Blocking or changed candidate evidence.
+    """
+    gateway.report.update(change)
+    with patch.object(gateway.entry.runtime_data.client, "install_firmware") as submit:
+        with pytest.raises(HomeAssistantError, match="preflight"):
+            await hass.services.async_call(
+                "update", "install", {"entity_id": gateway.entity_id}, blocking=True
+            )
+        submit.assert_not_called()
+    assert not hass.states.get(gateway.entity_id).attributes["in_progress"]
+
+
+async def test_preflight_transport_failure_is_not_an_uncertain_job(hass, gateway):
+    """A failed read reports that no installation was requested and clears busy state.
+
+    @param hass Actual Home Assistant instance.
+    @param gateway Loaded entity with a controllable preflight client.
+    """
+    gateway.preflight.side_effect = IncompatibleError("Old daemon")
+    with patch.object(gateway.entry.runtime_data.client, "install_firmware") as submit:
+        with pytest.raises(HomeAssistantError, match="No installation was requested"):
+            await hass.services.async_call(
+                "update", "install", {"entity_id": gateway.entity_id}, blocking=True
+            )
+        submit.assert_not_called()
+    assert not hass.states.get(gateway.entity_id).attributes["in_progress"]
+
+
+async def test_candidate_push_change_during_preflight_blocks_install(hass, gateway):
+    """A fresh snapshot superseding the checked candidate prevents a stale request.
+
+    @param hass Actual Home Assistant instance.
+    @param gateway Loaded entity and push stream control.
+    """
+    started, complete = asyncio.Event(), asyncio.Event()
+
+    async def preflight(candidate_id):
+        """Delay a valid report while a newer snapshot arrives.
+
+        @param candidate_id Requested candidate before the push change.
+        """
+        assert candidate_id == "candidate-1"
+        started.set()
+        await complete.wait()
+        return gateway.report
+
+    gateway.preflight.side_effect = preflight
+    with patch.object(gateway.entry.runtime_data.client, "install_firmware") as submit:
+        task = asyncio.create_task(
+            hass.services.async_call(
+                "update", "install", {"entity_id": gateway.entity_id}, blocking=True
+            )
+        )
+        await asyncio.wait_for(started.wait(), 2)
+        gateway.envelope["sequence"] += 1
+        gateway.envelope["data"]["firmware_update"]["candidate_id"] = "new-candidate"
+        gateway.entry.runtime_data.accept(copy.deepcopy(gateway.envelope))
+        complete.set()
+        with pytest.raises(HomeAssistantError, match="changed during preflight"):
+            await task
+        submit.assert_not_called()
+
+
+async def test_old_firmware_api_has_no_install_capability(hass, gateway):
+    """An older firmware API keeps observations available but cannot bypass preflight.
+
+    @param hass Actual Home Assistant instance.
+    @param gateway Existing update entity and authoritative state stream.
+    """
+    await gateway.publish({"preflight_supported": False})
+    state = hass.states.get(gateway.entity_id)
+    assert not state.attributes["supported_features"] & UpdateEntityFeature.INSTALL
+    assert "preflight" in state.attributes["blocked_reason"]
+    assert len(hass.states.async_all("switch")) == 2

@@ -213,7 +213,78 @@ class LivoloOptionsFlow(OptionsFlow):
         """
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add", "discover", "pair", "refresh", "forget"],
+            menu_options=[
+                "add",
+                "discover",
+                "pair",
+                "refresh",
+                "forget",
+                "firmware_preflight",
+            ],
+        )
+
+    async def async_step_firmware_preflight(self, user_input=None):
+        """Display advisory firmware checks without starting maintenance or a job.
+
+        @param user_input Optional refresh request; otherwise submit closes the report.
+        """
+        if user_input is not None and not user_input.get("refresh"):
+            return self.async_create_entry(
+                title="", data=dict(self.config_entry.options)
+            )
+        errors = {}
+        placeholders = {
+            key: "Unknown"
+            for key in (
+                "board",
+                "installed",
+                "target",
+                "compatible",
+                "executable",
+                "reason",
+                "checks",
+            )
+        }
+        try:
+            client = self._client()
+            data = (await client.snapshot())["data"]
+            if network_id(data) != self.config_entry.unique_id:
+                raise IncompatibleError("The daemon network changed")
+            firmware = data.get("firmware_update")
+            if (
+                not isinstance(firmware, dict)
+                or firmware.get("preflight_supported") is not True
+            ):
+                errors["base"] = "preflight_unsupported"
+            else:
+                report = await client.firmware_preflight()
+                placeholders = {
+                    "board": report["board"] or "Unknown",
+                    "installed": report["installed_version"] or "Unknown",
+                    "target": report["target_version"] or "None available",
+                    "compatible": (
+                        "Unknown"
+                        if report["compatible"] is None
+                        else "Yes" if report["compatible"] else "No"
+                    ),
+                    "executable": "Yes" if report["executable"] else "No",
+                    "reason": (report["blocked_reason"] or "none").replace("_", " "),
+                    "checks": "\n".join(
+                        f"- {item['id'].replace('_', ' ')}: {item['status']} ({item['code'].replace('_', ' ')})"
+                        for item in report["checks"]
+                    ),
+                }
+        except AuthenticationError:
+            errors["base"] = "invalid_auth"
+        except IncompatibleError:
+            errors["base"] = "incompatible"
+        except LivoloError:
+            errors["base"] = "cannot_connect"
+        return self.async_show_form(
+            step_id="firmware_preflight",
+            data_schema=vol.Schema({vol.Optional("refresh", default=False): bool}),
+            errors=errors,
+            description_placeholders=placeholders,
         )
 
     async def async_step_discover(self, user_input=None):
