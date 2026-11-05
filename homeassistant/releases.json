@@ -9,6 +9,12 @@
     "version": "0.2.0",
     "tag": "ha-0.2.0",
     "commit": "6fe41cbdc909a6497776202b3eeae088655b9908",
+    "latest": false
+  },
+  {
+    "version": "0.3.0",
+    "tag": "ha-0.3.0",
+    "commit": "aa661ef56e11755f00b154289021cc41374797bb",
     "latest": true
   }
 ]
