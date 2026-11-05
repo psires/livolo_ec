@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import aiohttp
 
+from livolod import __version__
 from livolod.config import load, parse
 from livolod.native_api import NativeAPI, start_api
 from livolod.service import Service
@@ -264,7 +265,7 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual((await self.get("/health"))[0], 200)
         _, info = await self.get("/api/v1/info")
-        self.assertEqual(info["host_version"], "0.12")
+        self.assertEqual(info["host_version"], __version__)
         self.assertEqual(info["api_version"], 1)
         self.assertTrue(info["simulated"])
         _, envelope = await self.get("/api/v1/snapshot")
