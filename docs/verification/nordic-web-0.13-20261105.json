@@ -1,0 +1,170 @@
+{
+  "schema": 1,
+  "scope": "One authorized standalone PCA10059 Web update; local trial catalog, not broad board qualification",
+  "verified_at_utc": "2026-11-05T21:19:42.030760+00:00",
+  "board": "nordic-pca10059",
+  "host_version": "0.13",
+  "previous_firmware": "0.12",
+  "firmware": "0.13",
+  "artifact_sha256": "cdfd23a9da61cf8c1dddf2c9353e3638d14c8f8021f28886bf11abf84ce52e86",
+  "image": "livolod:dev-013-nordic-r3",
+  "image_id": "sha256:04efa6beb2edfefa1e6cf6e6dd9e0b7a3097c6cf62e17576094e83eaa7094218",
+  "candidate_id": "nordic-pca10059-0.13:cdfd23a9da61cf8c1dddf2c9353e3638d14c8f8021f28886bf11abf84ce52e86",
+  "request_id": "web-1283b9a36a26229832eba4bd6b7e0fb7",
+  "trigger": "Single actual browser Install firmware click",
+  "preflight": {
+    "schema": 1,
+    "operation": "update",
+    "candidate_id": "nordic-pca10059-0.13:cdfd23a9da61cf8c1dddf2c9353e3638d14c8f8021f28886bf11abf84ce52e86",
+    "board": "nordic-pca10059",
+    "installed_version": "0.12",
+    "target_version": "0.13",
+    "compatible": true,
+    "executable": true,
+    "identity_source": "live_session",
+    "checks": [
+      {
+        "id": "artifact",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "expected_board",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "helper",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "live_identity",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "board",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "protocol",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "baudrate",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "version",
+        "status": "pass",
+        "code": "compatible"
+      }
+    ],
+    "blocked_reason": null,
+    "requires_manual_action": false,
+    "rollback_supported": false
+  },
+  "observed_stages": [
+    "preparing",
+    "bootloader_entry",
+    "flash",
+    "transferred",
+    "restoring",
+    "confirmed"
+  ],
+  "usb_modes": [
+    "application",
+    "dfu",
+    "application"
+  ],
+  "usb_topology_and_mode_serials_matched": true,
+  "publisher_followed_modes": true,
+  "transfer_completed": true,
+  "confirmed": true,
+  "ready": true,
+  "mqtt_connected": true,
+  "registered_devices": 0,
+  "network_and_saved_settings_preserved": true,
+  "database_integrity": "ok",
+  "confirmed_journal_survived_restart": true,
+  "post_restart_preflight": {
+    "schema": 1,
+    "operation": "update",
+    "candidate_id": "nordic-pca10059-0.13:cdfd23a9da61cf8c1dddf2c9353e3638d14c8f8021f28886bf11abf84ce52e86",
+    "board": "nordic-pca10059",
+    "installed_version": "0.13",
+    "target_version": "0.13",
+    "compatible": false,
+    "executable": false,
+    "identity_source": "live_session",
+    "checks": [
+      {
+        "id": "artifact",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "expected_board",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "helper",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "live_identity",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "board",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "protocol",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "baudrate",
+        "status": "pass",
+        "code": "compatible"
+      },
+      {
+        "id": "version",
+        "status": "fail",
+        "code": "version_not_newer"
+      }
+    ],
+    "blocked_reason": "version_not_newer",
+    "requires_manual_action": false,
+    "rollback_supported": false
+  },
+  "container_nonroot": true,
+  "container_read_only": true,
+  "container_capabilities_dropped": true,
+  "container_privileged": false,
+  "device_access": "Read-only narrow published node directory; cgroup c 166:* rw",
+  "ha_modified": false,
+  "additional_firmware_flashes": 0,
+  "preflash_failure": {
+    "reason": "Initial /run publisher directory inherited nodev; serial open denied before any firmware job",
+    "automatic_container_config_rollback": true,
+    "radio_firmware_unchanged": true,
+    "fix": "Publisher under /dev/livolod-usb plus read-only statvfs nodev rejection"
+  },
+  "qualification_limits": [
+    "One physical PCA10059 and USB host topology",
+    "No real failure injection or manual recovery flash during this trial",
+    "No same-version reinstall or other-board hardware trial",
+    "Public catalog remains empty; operator profile is required"
+  ],
+  "source_snapshot_sha256": "79d7f022f85e91f3ddabebdac1f6639ae430c0a7845dd37e1f5ce24934408b1c"
+}

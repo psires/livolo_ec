@@ -88,18 +88,44 @@ bootloaders, stock recovery packages and vendor flashing helpers are not bundled
 ## Live qualification boundary
 
 Nordic update qualification is scoped to a dedicated standalone test deployment;
-the separate Home Assistant gateway is excluded. At preparation time, the Nordic
-automatic Web update path is still being implemented and must remain disabled
-until its USB identity, helper access, transfer, application return and daemon
-restoration have been observed. A catalog entry alone cannot establish those
-properties. Manual DFU recovery is already available separately.
+the separate Home Assistant gateway is excluded. The **0.12 → 0.13** trial
+completed successfully on 2026-11-05 through the actual browser interface:
 
-The later verification record must distinguish an observed Nordic lifecycle
-from the offline/carry-forward evidence for the other three boards. It must
-record the exact image hash and final application version; it must not treat a
-successful transfer alone as a restored gateway. Failed transfers must retain
-their durable recovery state. The normal strictly-newer-version check remains
-in force, so a successful 0.12-to-0.13 test consumes that update opportunity.
+1. The Web preflight passed all eight checks: image integrity, expected board,
+   helper, connected radio, live board identity, protocol, rate and version.
+2. The review dialog displayed the exact Nordic image hash listed above. One
+   **Install firmware** click submitted one durable update job.
+3. The recorder observed application → factory DFU → application, followed by
+   transfer completion, normal restoration and a confirmed job. The narrowly
+   published device nodes followed the selected board through both USB modes.
+4. The page displayed **Firmware installation verified**, installed version
+   **0.13**, radio ready and MQTT connected. The empty test registry, network
+   identity and saved settings were preserved.
+5. One controlled daemon restart preserved the confirmed journal unchanged and
+   restored radio/MQTT readiness. SQLite integrity passed. Post-restart
+   preflight rejected a repeat 0.13 installation with `version_not_newer`.
+
+This qualifies one observed Nordic update lifecycle on the named deployment,
+including daemon restart recovery. It does not qualify arbitrary USB layouts,
+power-loss recovery, a Nordic rollback mechanism, or new RF/endurance behavior.
+The other three images retain the offline/carry-forward evidence above; they
+did not receive a new 0.13 live update test in this session. Default deployments
+still require explicit profile/helper/device setup and a matching trusted
+catalog before automatic Nordic installation becomes available.
+
+The tested runtime was the standalone development image
+`livolod:dev-013-nordic-r3`, image ID
+`sha256:04efa6beb2edfefa1e6cf6e6dd9e0b7a3097c6cf62e17576094e83eaa7094218`.
+The local catalog archive SHA-256 was
+`bb8f016e95658e68845e9cb1af233bd5739e62448f1489188ae700b43d62dac7`.
+Firmware images and their hashes remained unchanged throughout qualification.
+The [sanitized lifecycle and restart record](verification/nordic-web-0.13-20261105.json)
+contains the preflight checks, observed stages, USB transitions and preserved
+state checks.
+
+A post-success Web wording bug incorrectly described the same-version candidate
+as missing. Commit `2a966b9` corrects that message to report the installed
+firmware as up to date; it does not change flashing or require another update.
 
 ### Pre-flash deployment finding
 
