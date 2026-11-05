@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-11-05T22:23:59.023391+00:00",
+  "release": "0.3.0",
+  "image": "ghcr.io/psires/livolo-ec-ha-app@sha256:0c7710060237f32094bee76d53ef685197766af14c5f5da07e42759bbdab7268",
+  "daemon_version": "0.13",
+  "radio_version_before": "0.12",
+  "radio_version_after": "0.12",
+  "old_app": "local_livolo_ec",
+  "new_app": "3fbd5450_livolo_ec",
+  "old_app_retained_stopped": true,
+  "old_app_boot": "manual",
+  "new_app_boot": "auto",
+  "options_and_api_credential_preserved": true,
+  "network_identity_preserved": true,
+  "registered_switches": 2,
+  "registered_switches_preserved": true,
+  "existing_ha_entry_preserved": true,
+  "existing_ha_entities_preserved": 4,
+  "existing_switch_entities_preserved": 3,
+  "entity_ids_names_areas_preserved": true,
+  "device_registry_preserved": true,
+  "database_integrity": "ok",
+  "durable_commands_tokens_preserved": true,
+  "preflight": {
+    "schema": 1,
+    "operation": "update",
+    "candidate_id": null,
+    "board": "zb-gw04-1v2",
+    "installed_version": "0.12",
+    "target_version": null,
+    "compatible": false,
+    "executable": false,
+    "identity_source": "live_session",
+    "checks": [
+      {
+        "id": "artifact",
+        "status": "fail",
+        "code": "artifact_missing"
+      }
+    ],
+    "blocked_reason": "artifact_missing",
+    "requires_manual_action": false,
+    "rollback_supported": false
+  },
+  "radio_ready": true,
+  "existing_switches_available": true,
+  "firmware_flashes": 0,
+  "firmware_job_created": false,
+  "ha_core_restarted": false,
+  "protected_backup_created": true,
+  "ingress_page_ok": true,
+  "published_web_asset_matches": true,
+  "web_app_sha256": "83e47b2c2a10ac16456392bfd6a63fb82a6eb3c09f123a8c8848041110afab16",
+  "web_radio_ready": true,
+  "web_device_count": 2,
+  "ha_preflight_form": {
+    "errors": {},
+    "display": {
+      "board": "zb-gw04-1v2",
+      "installed": "0.12",
+      "target": "None available",
+      "compatible": "No",
+      "executable": "No",
+      "reason": "artifact missing",
+      "checks": "- artifact: fail (artifact missing)"
+    }
+  },
+  "pre_migration_retry": "Supervisor removed the stopped old container; automatic restoration succeeded, then persistent-directory backup was used for the successful migration."
+}

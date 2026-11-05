@@ -10,10 +10,24 @@ anonymous registry checks before the app catalog was advanced.
 - [Container publication and upgrade evidence](../host/docker/publication-0.3.0-20261105.json)
 - [Standalone and manual HA release asset checks](verification/software-release-0.3.0-20261105.json)
 
-The live HA host was unchanged. The actual Supervisor qualification below is
-historical 0.2.0 → 0.2.1 evidence, not a claim of a new HA OS 0.3.0 trial.
-Default-catalog acceptance and migration from a local development app remain
-separate work. Software updates do not flash radio firmware.
+Publication itself left the live HA host unchanged. A subsequent authorized
+migration moved its local development daemon app to published **0.3.0**;
+see the [live migration evidence](verification/ha-app-migration-0.3.0-20261105.json).
+The existing Marketplace integration entry, four existing HA entities (three
+switch controls), two registered physical switches, custom names/areas, API
+credential, network identity and durable command/token records were preserved.
+The old app is retained stopped with manual boot; only the published app starts
+automatically. Protected backups remain on the HA host.
+
+The radio stayed on firmware **0.12**; no firmware job or HA Core restart was
+needed. The new ingress serves the published Web UI, and the actual HA preflight
+form identifies `zb-gw04-1v2` and installed 0.12. It reports `artifact_missing`
+because the public firmware catalog remains empty. This migration did not
+qualify a radio update or change physical switch outputs.
+
+The Supervisor qualification below remains historical 0.2.0 → 0.2.1 evidence.
+Default-catalog acceptance is separate work. Software updates do not flash
+radio firmware.
 
 ## Earlier channel qualification
 
