@@ -40,6 +40,17 @@
     "temporary_repository_removed_after_test": true,
     "protected_on_host_backup_retained": true
   },
+  "production_catalog_check": {
+    "repository": "https://github.com/psires/livolo_ec",
+    "app_slug": "3fbd5450_livolo_ec",
+    "nested_config": "homeassistant/app/config.yaml",
+    "listed_version": "0.2.1",
+    "image": "ghcr.io/psires/livolo-ec-ha-app",
+    "architecture": "aarch64",
+    "production_app_installed": false,
+    "temporary_catalog_entry_removed": true,
+    "original_app_unchanged": true
+  },
   "limits": [
     "The test used a distinct Supervisor app identity and synthetic registry record.",
     "No hardware radio access, live migration, flashing, physical pairing, or new switch-control qualification was performed.",
