@@ -1,5 +1,5 @@
 name: Livolo EC channel test (no radio)
-version: "0.2.0"
+version: "0.2.1"
 slug: livolo_ec_channel_test
 description: Disposable isolated software installation and upgrade validation
 arch:
