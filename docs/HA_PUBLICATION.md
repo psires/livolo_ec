@@ -33,6 +33,14 @@ this test retains the bundle in app data but activates it only in the running
 container, so app recreation requires reactivation. Public images and their
 default empty catalogs remain unchanged.
 
+The [catalog refresh check on 2026-11-06](verification/ha-catalog-refresh-20261106.json)
+then restarted the same daemon container without recreating it. The Web UI and
+existing HA update entity now advertise the 0.13 candidate while the radio stays
+on 0.12. No firmware job or flash occurred; configuration, registry and catalog
+files were preserved. This refreshed the daemon's cached selection, not the
+product implementation: persistent HA catalog configuration and automatic
+candidate refresh remain unsupported in app 0.3.0.
+
 The Supervisor qualification below remains historical 0.2.0 → 0.2.1 evidence.
 Default-catalog acceptance is separate work. Software updates do not flash
 radio firmware.
