@@ -2,13 +2,13 @@
 
 Capture-based analysis of the EC gateway and a two-gang switch.
 
-Release versions use **major.minor**, currently **0.12**. The root [VERSION](VERSION)
+Daemon/firmware versions use **major.minor**, currently **0.13**. The root [VERSION](VERSION)
 is the release source; `python3 tools/project_version.py` checks host and firmware
 metadata, and `--write` propagates a new release number. UART protocol and data
 schema numbers are separate compatibility identifiers.
 
-The [standalone daemon/CLI distribution 0.2.0](host/release/README.md) packages
-daemon 0.12 and client 0.2.0 for native Linux installation without a checkout.
+The [standalone daemon/CLI distribution 0.3.0](host/release/README.md) packages
+daemon 0.13 and client 0.3.0 for native Linux installation without a checkout.
 Its bundle version is separate from the radio compatibility version above.
 
 Published ARM64 containers are `ghcr.io/psires/livolod:0.2.0` and
@@ -29,8 +29,9 @@ The daemon also owns a shared firmware installation job for the web UI and
 Home Assistant's standard firmware update entity. It validates an exact-board
 local bundle, pauses radio operations, records progress and verifies the restored
 session before reporting success. Initial backends cover TI signed UART and the
-two MG21 profiles; integrated Nordic DFU remains disabled pending runtime and USB
-handoff qualification. No qualified release firmware is bundled yet, so the
+two MG21 profiles; Nordic USB DFU requires an explicit standalone profile and
+the [documented deployment prerequisites](host/docker/NORDIC.md). It remains off
+in default configurations; see the [0.13 trial scope](docs/FIRMWARE_013_TRIAL.md). No qualified release firmware is bundled yet, so the
 source-only installation reports that no candidate is available. See the
 [emergency recovery procedure](docs/FIRMWARE_RECOVERY.md) before qualifying updates
 on hardware.
