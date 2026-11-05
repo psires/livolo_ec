@@ -8,11 +8,31 @@ import argparse
 import binascii
 import hashlib
 import json
+import os
 from pathlib import Path
+import re
+import stat
 import sys
 
 SIZE = 352 * 1024
 BL_OFFSET = 0x57FD8
+
+
+def read_image(path):
+    """Read one full image without blocking on special files or following a file symlink.
+
+    @param path Operator-selected full-image file path.
+    @return Immutable complete flash bytes, bounded to the supported chip size.
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_NOFOLLOW", 0))
+    with os.fdopen(fd, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size != SIZE:
+            raise ValueError("Expected a regular full-size CC2652P image")
+        image = stream.read(SIZE + 1)
+        if len(image) != SIZE:
+            raise ValueError("Full image changed while being read")
+    return image
 
 
 def validate_image(image):
@@ -44,17 +64,39 @@ def validate_image(image):
     }
 
 
-def main():
-    """Validate, flash and verify the selected image, optionally resetting the board."""
+def main(argv=None):
+    """Validate, flash and verify the selected image, optionally resetting the board.
+
+    @param argv Optional CLI arguments for offline testing; None uses process arguments.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("image", type=Path)
-    parser.add_argument("--port", required=True)
-    parser.add_argument("--bsl-source", required=True, type=Path)
+    parser.add_argument("--port")
+    parser.add_argument("--bsl-source", type=Path)
     parser.add_argument("--reset", action="store_true")
-    args = parser.parse_args()
-    image = args.image.read_bytes()
+    parser.add_argument(
+        "--check-only",
+        action="store_true",
+        help="Validate without opening a serial port",
+    )
+    parser.add_argument(
+        "--sha256", help="Expected full-image SHA-256 from a trusted source"
+    )
+    args = parser.parse_args(argv)
+    if args.check_only and args.reset:
+        parser.error("--check-only cannot request --reset")
+    if not args.check_only and (not args.port or not args.bsl_source):
+        parser.error("Flashing requires --port and --bsl-source")
+    image = read_image(args.image)
     metadata = validate_image(image)
+    if args.sha256 is not None and (
+        not re.fullmatch(r"[0-9a-f]{64}", args.sha256)
+        or args.sha256 != metadata["sha256"]
+    ):
+        raise ValueError("Full-image SHA-256 does not match the expected artifact")
     print(json.dumps(metadata), flush=True)
+    if args.check_only:
+        return
     sys.path.insert(0, str(args.bsl_source.resolve()))
     import serial
     from cc2538_bsl.cc2538_bsl import CommandInterface

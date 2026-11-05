@@ -1,5 +1,11 @@
 import unittest
-from flash_cc26xx import SIZE, BL_OFFSET, validate_image
+import io
+import json
+import os
+from pathlib import Path
+import tempfile
+from unittest.mock import patch
+from flash_cc26xx import SIZE, BL_OFFSET, main, read_image, validate_image
 
 
 class FirmwareGuardTests(unittest.TestCase):
@@ -46,6 +52,26 @@ class FirmwareGuardTests(unittest.TestCase):
             image[offset] = 0
             with self.subTest(offset=offset), self.assertRaises(ValueError):
                 validate_image(image)
+
+    def test_check_only_needs_no_port_or_bootloader_dependency(self):
+        """Offline bootstrap checks stop before importing any flashing dependency."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "factory.bin"
+            path.write_bytes(self.image())
+            output = io.StringIO()
+            with patch("sys.stdout", output):
+                main([str(path), "--check-only"])
+            self.assertEqual(json.loads(output.getvalue())["bytes"], SIZE)
+            with self.assertRaises(ValueError):
+                main([str(path), "--check-only", "--sha256", "0" * 64])
+
+    def test_full_image_reader_refuses_fifo_without_waiting_for_writer(self):
+        """Image validation cannot hang on an accidentally selected named pipe."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "pipe"
+            os.mkfifo(path)
+            with self.assertRaises(ValueError):
+                read_image(path)
 
 
 if __name__ == "__main__":
