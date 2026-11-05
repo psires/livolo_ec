@@ -248,7 +248,7 @@ DFU and deliberately use `flash ... --retry-interrupted` for a fresh validated
 manual attempt; the earlier command result is retained.
 The explicit retry may also supersede an interrupted automatic Nordic job for
 the same board. With `firmware_nordic` configured, manual commands validate the
-published `/run/livolod-usb/dfu` and `application` nodes against that same physical
+published `/dev/livolod-usb/dfu` and `application` nodes against that same physical
 profile, so they need no generic tty discovery inside the container.
 
 On the official PCA10059, use the small sideways SW2 RESET switch, not SW1.

@@ -31,7 +31,7 @@ SETTINGS = dict(
     usb_path="/sys/devices/test/usb3/3-1",
     application_serial="application-serial",
     dfu_serial="dfu-serial",
-    device_directory="/run/livolod-usb",
+    device_directory="/dev/livolod-usb",
     helper_python="/opt/nrfutil/bin/python3.10",
 )
 
@@ -72,7 +72,7 @@ class NordicTests(unittest.TestCase):
             dict(
                 raw,
                 firmware_nordic=SETTINGS,
-                serial_port="/run/livolod-usb/application",
+                serial_port="/dev/livolod-usb/application",
             )
         )
         self.assertEqual(configured.firmware_nordic, SETTINGS)
@@ -91,14 +91,21 @@ class NordicTests(unittest.TestCase):
             node = SimpleNamespace(
                 st_mode=stat.S_IFCHR | 0o660, st_rdev=os.makedev(166, 0)
             )
+            mount = SimpleNamespace(f_flag=0)
             with (
                 patch.object(Path, "lstat", return_value=node),
                 patch("os.access", return_value=True),
+                patch("os.statvfs", return_value=mount),
             ):
                 self.assertEqual(
                     nordic.target(SETTINGS, "application"),
-                    "/run/livolod-usb/application",
+                    "/dev/livolod-usb/application",
                 )
+                mount.f_flag = getattr(os, "ST_NODEV", 4)
+                with self.assertRaises(BundleError) as blocked:
+                    nordic.target(SETTINGS, "application")
+                self.assertEqual(blocked.exception.code, "device_access_unavailable")
+                mount.f_flag = 0
                 node.st_rdev = os.makedev(166, 1)
                 with self.assertRaises(BundleError):
                     nordic.target(SETTINGS, "application")
@@ -147,7 +154,7 @@ class NordicTests(unittest.TestCase):
         ):
             args = dict(
                 helper_python=SETTINGS["helper_python"],
-                dfu_port="/run/livolod-usb/dfu",
+                dfu_port="/dev/livolod-usb/dfu",
                 serial_number=SETTINGS["dfu_serial"],
                 usb_profile=SETTINGS,
             )
@@ -165,14 +172,14 @@ class NordicTests(unittest.TestCase):
             )
             self.assertTrue(
                 application_target_status(
-                    "/run/livolod-usb/application",
+                    "/dev/livolod-usb/application",
                     SETTINGS["application_serial"],
                     usb_profile=SETTINGS,
                 )
             )
             self.assertFalse(
                 application_target_status(
-                    "/run/livolod-usb/application",
+                    "/dev/livolod-usb/application",
                     SETTINGS["dfu_serial"],
                     usb_profile=SETTINGS,
                 )
@@ -216,7 +223,7 @@ class NordicTests(unittest.TestCase):
             try:
                 nordic.install(
                     self.candidate,
-                    "/run/livolod-usb/application",
+                    "/dev/livolod-usb/application",
                     9,
                     acknowledgement or phases.append,
                     progress,
@@ -240,7 +247,7 @@ class NordicTests(unittest.TestCase):
         command = spawn.call_args.args[0]
         self.assertEqual(command[:2], [SETTINGS["helper_python"], "-I"])
         self.assertTrue(command[2].endswith("/nordic_helper.py"))
-        self.assertEqual(command[-2:], ["--port", "/run/livolod-usb/dfu"])
+        self.assertEqual(command[-2:], ["--port", "/dev/livolod-usb/dfu"])
         self.assertEqual(spawn.call_args.kwargs["pass_fds"], (9,))
         self.assertNotIn("start_new_session", spawn.call_args.kwargs)
         progress.assert_called_once_with({"stage": "transferred"})
@@ -288,7 +295,7 @@ class NordicRestoreTests(unittest.IsolatedAsyncioTestCase):
             load(Path(__file__).parents[1] / "config.example.json"),
             database=self.temp.name + "/state.db",
             serial_baudrate=460800,
-            serial_port="/run/livolod-usb/application",
+            serial_port="/dev/livolod-usb/application",
             firmware_nordic=SETTINGS,
         )
         self.store = Store(self.config.database, "network")

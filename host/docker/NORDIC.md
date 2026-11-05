@@ -34,7 +34,7 @@ does not require a host daemon installation. Create root-owned mode 0600
   "usb_path": "/sys/devices/EXACT_PHYSICAL_USB_PARENT",
   "application_serial": "EXACT_APPLICATION_SERIAL",
   "dfu_serial": "EXACT_FACTORY_DFU_SERIAL",
-  "device_directory": "/run/livolod-usb",
+  "device_directory": "/dev/livolod-usb",
   "helper_python": "/opt/nrfutil/bin/python3.10"
 }
 ```
@@ -42,7 +42,7 @@ does not require a host daemon installation. Create root-owned mode 0600
 Create `/etc/tmpfiles.d/livolod-usb.conf`:
 
 ```text
-d /run/livolod-usb 0750 root dialout -
+d /dev/livolod-usb 0750 root dialout -
 ```
 
 Create `/etc/udev/rules.d/99-livolod-nordic.rules`:
@@ -68,7 +68,7 @@ also run inside the worker and daemon, independently of the publisher.
 
 Retain existing config/data mounts and security settings. Remove the static
 `devices:` mapping; it cannot follow USB re-enumeration. Add read-only bind mounts
-from `/run/livolod-usb` to the same container path, and from your protected catalog
+from `/dev/livolod-usb` to the same container path, and from your protected catalog
 directory to `/etc/livolod/firmware`, with `create_host_path: false` for both.
 Grant the numeric host `dialout` group through `group_add` and only:
 
@@ -80,7 +80,7 @@ device_cgroup_rules:
 Keep the non-root user, read-only root filesystem and `cap_drop: [ALL]`; the
 container needs neither privileged mode, host `/dev`, nor mknod permission.
 In the existing JSON configuration set `serial_port` to
-`/run/livolod-usb/application`, `firmware_bundle_dir` to
+`/dev/livolod-usb/application`, `firmware_bundle_dir` to
 `/etc/livolod/firmware`, and `firmware_nordic` to the same complete profile above.
 Keep the configured database and network identity unchanged.
 
@@ -102,7 +102,7 @@ mounts and ownership locks. Explicit recovery requires all of:
 --config /etc/livolod/config.json flash --operation recovery
 --board nordic-pca10059 --artifact /etc/livolod/firmware/EXACT_APPLICATION.zip
 --version MATCHING_HOST_VERSION --sha256 REVIEWED_PACKAGE_SHA256
---dfu-port /run/livolod-usb/dfu --dfu-serial EXACT_FACTORY_DFU_SERIAL
+--dfu-port /dev/livolod-usb/dfu --dfu-serial EXACT_FACTORY_DFU_SERIAL
 --helper-python /opt/nrfutil/bin/python3.10 --retry-interrupted
 ```
 

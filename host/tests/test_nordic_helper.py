@@ -103,7 +103,7 @@ class NordicHelperTests(unittest.TestCase):
                     "--package",
                     "/private/application.zip",
                     "--port",
-                    "/run/livolod-usb/dfu",
+                    "/dev/livolod-usb/dfu",
                 ],
             )
         )
@@ -116,7 +116,7 @@ class NordicHelperTests(unittest.TestCase):
         self.assertEqual(
             transport.settings,
             dict(
-                com_port="/run/livolod-usb/dfu",
+                com_port="/dev/livolod-usb/dfu",
                 baud_rate=115200,
                 flow_control=False,
                 prn=0,

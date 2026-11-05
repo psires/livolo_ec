@@ -118,8 +118,8 @@ def publish(settings, group):
     if os.geteuid() != 0 or not settings:
         raise ValueError("A configured root-owned publisher is required")
     destination = Path(settings["device_directory"])
-    if str(destination) != "/run/livolod-usb":
-        raise ValueError("Publisher directory must be /run/livolod-usb")
+    if str(destination) != "/dev/livolod-usb":
+        raise ValueError("Publisher directory must be /dev/livolod-usb")
     gid = grp.getgrnam(group).gr_gid
     destination.mkdir(mode=0o750, parents=False, exist_ok=True)
     info = destination.lstat()

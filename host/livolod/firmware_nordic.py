@@ -35,6 +35,8 @@ def target(settings, mode):
             record["major"], record["minor"]
         ):
             raise ValueError("Device node does not match USB identity")
+        if os.statvfs(path).f_flag & getattr(os, "ST_NODEV", 4):
+            raise ValueError("Device node is on a nodev filesystem")
         if not os.access(path, os.R_OK | os.W_OK):
             raise ValueError("Device node is not accessible")
     except (OSError, ValueError) as error:

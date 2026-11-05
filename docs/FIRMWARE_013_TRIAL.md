@@ -100,3 +100,14 @@ record the exact image hash and final application version; it must not treat a
 successful transfer alone as a restored gateway. Failed transfers must retain
 their durable recovery state. The normal strictly-newer-version check remains
 in force, so a successful 0.12-to-0.13 test consumes that update opportunity.
+
+### Pre-flash deployment finding
+
+The first container rollout could identify and stat the narrowly published
+device nodes, but Linux refused to open them because the host's `/run` mount
+has `nodev`. Startup verification caught this before any firmware job or
+`BOOTLOADER` command. The previous container and configuration were restored;
+the radio remained on 0.12. The revised publisher uses `/dev/livolod-usb` on the
+host's device filesystem, keeping the same exact-identity checks, restricted
+nodes and container device permissions. This is a deployment correction, not a
+failed firmware transfer or evidence of RF instability.

@@ -189,7 +189,7 @@ chooses the first serial device or automatically enters DFU. It verifies the
 pinned runtime and that its USB command imports before the write boundary.
 
 When the configuration includes the exact Nordic USB profile, manual recovery
-also verifies that profile and can use `/run/livolod-usb/dfu` with the isolated
+also verifies that profile and can use `/dev/livolod-usb/dfu` with the isolated
 `/opt/nrfutil/bin/python3.10` helper. The explicit `--dfu-serial` must still match.
 Without that profile, the host's serial-device metadata must identify the
 operator-selected port. Both routes invoke the fixed-port transport; neither
