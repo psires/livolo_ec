@@ -1165,13 +1165,12 @@ function firmwareBlockedReason() {
     return 'The previous update needs recovery before another install.';
   if (firmware.install_supported !== true)
     return 'Firmware installation is unavailable for this radio.';
-  if (
-    firmware.update_available !== true ||
-    !firmware.candidate_id ||
-    !firmware.latest_version ||
-    !firmware.board
-  )
+  if (!firmware.candidate_id || !firmware.latest_version || !firmware.board)
     return 'No verified firmware candidate is available for this radio.';
+  if (firmware.update_available !== true)
+    return firmware.installed_version === firmware.latest_version
+      ? 'Your gateway firmware is up to date.'
+      : 'No newer verified firmware update is available for this radio.';
   return '';
 }
 

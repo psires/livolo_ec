@@ -449,3 +449,31 @@ test('incomplete or contradictory all-pass reports never enable install', async 
     assert.equal(ui.calls[0].options.method, undefined);
   }
 });
+
+/** A verified installed candidate is up to date, not missing, and cannot trigger another install. */
+test('installed candidate is distinguished from missing or non-newer firmware', async () => {
+  const ui = harness();
+  ui.snapshot({
+    ...candidate(),
+    installed_version: '0.13',
+    update_available: false,
+    status: 'confirmed',
+  });
+  ui.run('renderFirmware()');
+  assert.equal(ui.element('#firmware-status').textContent, 'Verified');
+  assert.equal(ui.element('#firmware-reason').textContent, 'Your gateway firmware is up to date.');
+  assert.equal(ui.element('#firmware-review').disabled, true);
+  await ui.element('#firmware-review').events.click();
+  assert.equal(ui.calls.length, 0);
+  ui.snapshot({ ...candidate(), installed_version: '0.14', update_available: false });
+  ui.run('renderFirmware()');
+  assert.match(ui.element('#firmware-reason').textContent, /No newer verified firmware update/);
+  ui.snapshot({
+    ...candidate(),
+    candidate_id: null,
+    latest_version: null,
+    update_available: false,
+  });
+  ui.run('renderFirmware()');
+  assert.match(ui.element('#firmware-reason').textContent, /No verified firmware candidate/);
+});
