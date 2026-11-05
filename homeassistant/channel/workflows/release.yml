@@ -1,0 +1,63 @@
+name: Publish integration release
+on:
+  push:
+    tags: ['*.*.*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact integration version, also used as the immutable tag
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: integration-release
+  cancel-in-progress: false
+jobs:
+  validate:
+    uses: ./.github/workflows/validate.yml
+  release:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - name: Build exact reviewed package
+        env:
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: python scripts/build_release.py --tag "$RELEASE_VERSION"
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_VERSION: ${{ inputs.version || github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_VERSION" > /dev/null 2>&1; then
+            echo 'Release already exists; refusing replacement.'
+            exit 1
+          fi
+          if git rev-parse "refs/tags/$RELEASE_VERSION" > /dev/null 2>&1; then
+            test "$(git rev-parse "refs/tags/$RELEASE_VERSION^{commit}")" = "$GITHUB_SHA"
+          fi
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          source = json.loads(Path('source.json').read_text())
+          Path('notes.md').write_text(
+              'Native Livolo EC integration ' + os.environ['RELEASE_VERSION'] + '.\n\n'
+              'Install through HACS/Marketplace and restart Home Assistant. Keep existing integration entries. '
+              'The daemon app is installed/updated separately; no radio firmware is flashed.\n\n'
+              'Source: ' + source['source_repository'] + '/commit/' + source['source_commit'] + '\n'
+          )
+          PY
+          gh release create "$RELEASE_VERSION" --target "$GITHUB_SHA" --draft \
+            --title "Livolo EC $RELEASE_VERSION" --notes-file notes.md
+          gh release upload "$RELEASE_VERSION" dist/livolo_ec.zip dist/source.json dist/SHA256SUMS
+          gh release edit "$RELEASE_VERSION" --draft=false --latest=true

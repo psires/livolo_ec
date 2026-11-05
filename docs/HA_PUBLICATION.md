@@ -5,6 +5,17 @@ container image, catalog entry, or update channel. The existing `ha-0.1.1` and
 `ha-0.2.0` releases are manual-install distributions and remain immutable.
 Source inspection for this plan used `c2b2f5f`.
 
+Implementation update: the authorized channel work now provides
+`homeassistant/export_channel.py`, component-root ZIP packaging, original
+project branding, pinned source and packaging-file hashes, reusable validation,
+and ordinary SemVer tag-triggered release workflows. HA integration/app source
+is 0.2.1. The production root catalog remains withheld until public image checks
+pass; `homeassistant/catalog/repository.yaml` is its unpublished template.
+`homeassistant/stage_supervisor_probe.py` creates the separate no-radio
+0.2.0/0.2.1 validation catalog. These artifacts are not proof of public channel
+installation, default catalog acceptance, or live deployment; those outcomes
+must be recorded separately after execution.
+
 ## Recommended channel layout
 
 Keep development in `psires/livolo_ec`. Publish the assembled integration through

@@ -28,7 +28,7 @@ Build an archive from the repository root:
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.2.0.zip` into the HA configuration directory so
+Extract `dist/livolo-ec-ha-0.2.1.zip` into the HA configuration directory so
 `custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
@@ -40,6 +40,36 @@ project's BSD-2-Clause license. The app image also retains it under
 
 This is a manual custom integration, not yet a HACS repository or an HA Core
 integration. Do not copy just `custom_components/livolo_ec` from source.
+
+## Integration channel packaging
+
+The source now includes generated-repository tooling for the separate
+`psires/ha-livolo-ec` HACS/Marketplace channel. Its public installation and upgrade
+checks must pass before the channel is announced as ready. The main repository's
+historical `ha-0.1.1` and `ha-0.2.0` manual releases remain unchanged.
+
+Maintainers export a reviewed, committed source revision with:
+
+```sh
+python3 homeassistant/export_channel.py --commit <full-source-commit> \
+  --version 0.2.1 --output dist/ha-channel-0.2.1
+python3 dist/ha-channel-0.2.1/scripts/build_release.py --tag 0.2.1
+```
+
+The generated repository contains the complete integration, client, original
+project branding, pinned source/packaging provenance, and repository-local
+validation and tag-triggered release workflows. A dirty packaging recipe or
+explicit `--preview` export cannot be released. Push the generated repository
+and ordinary matching SemVer tag only after review. Its `livolo_ec.zip` contains
+component files at its root, unlike the manual archive above.
+
+The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.2.1`. The production
+repository catalog template is withheld in `homeassistant/catalog/repository.yaml`
+until the exact image is publicly pullable and verified. Do not publish it as
+root `repository.yaml` before that gate. For isolated Supervisor qualification,
+`stage_supervisor_probe.py` prepares a separate app with no USB mapping or host
+ports; it never modifies the existing installation. See the
+[publication plan](../docs/HA_PUBLICATION.md) for channel and migration details.
 
 ## Connect to a daemon on an existing Pi/container
 

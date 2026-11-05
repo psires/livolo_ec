@@ -1,0 +1,5 @@
+# Publish as /repository.yaml only after the advertised app image is public
+# and its exact version has passed anonymous pull and runtime checks.
+name: Livolo EC apps
+url: https://github.com/psires/livolo_ec
+maintainer: Dariusz Swiderski (@psires)
