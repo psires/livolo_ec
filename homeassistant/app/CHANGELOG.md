@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0
+
+- Add shared read-only firmware preflight to the daemon Web UI and native API.
+- Include unified inspection, dry-run and emergency firmware maintenance commands.
+- Package daemon 0.13 and the isolated Nordic helper; the HA wrapper keeps the
+  opt-in Nordic USB profile disabled.
+- Preserve the existing configuration, network identity and persistent registry
+  when updating the repository app. Updating this app does not flash a radio.
+- Keep the public firmware catalog empty until exact-board payloads qualify for
+  public distribution. Update the separate HA integration to 0.3.0 for its new
+  preflight and standard firmware-update flow.
+
 ## 0.2.1
 
 - Publish the HA wrapper as a versioned GHCR image for repository installation.
