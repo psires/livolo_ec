@@ -1,0 +1,27 @@
+name: Livolo EC channel test (no radio)
+version: "0.2.0"
+slug: livolo_ec_channel_test
+description: Disposable isolated software installation and upgrade validation
+arch:
+  - aarch64
+image: ghcr.io/psires/livolo-ec-ha-app
+startup: application
+boot: manual
+init: false
+stage: experimental
+options:
+  serial_port: /dev/livolo-channel-test-no-radio
+  serial_baudrate: 460800
+  gateway: "8a314b72"
+  tag: "5d"
+  api_token: ""
+  ha_origin: http://homeassistant.local:8123
+  output_mode: disabled
+schema:
+  serial_port: match(^/dev/livolo-channel-test-no-radio$)
+  serial_baudrate: list(460800)
+  gateway: match(^8a314b72$)
+  tag: match(^5d$)
+  api_token: password
+  ha_origin: url
+  output_mode: list(disabled)
