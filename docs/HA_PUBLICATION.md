@@ -1,30 +1,78 @@
-# Home Assistant installation and update publication plan
+# Home Assistant installation and update publication
 
-Status: proposed, reviewed 2026-11-05. This document does not publish a repository,
-container image, catalog entry, or update channel. The existing `ha-0.1.1` and
-`ha-0.2.0` releases are manual-install distributions and remain immutable.
-Source inspection for this plan used `c2b2f5f`.
+Status on **2026-11-05**: integration releases **0.2.0** and **0.2.1** and the
+matching ARM64 app images are public. Public integration installation and upgrade
+tests passed; actual Supervisor installation and upgrade passed using an isolated
+app without a radio. Root `repository.yaml` publishes the app catalog after
+these gates. The existing main-repository `ha-0.1.1` and `ha-0.2.0` manual-install
+releases remain immutable. Default-catalog acceptance and migration of the
+existing local development app are separate, incomplete work.
 
-Implementation update: the authorized channel work now provides
-`homeassistant/export_channel.py`, component-root ZIP packaging, original
-project branding, pinned source and packaging-file hashes, reusable validation,
-and ordinary SemVer tag-triggered release workflows. HA integration/app source
-is 0.2.1. The production root catalog remains withheld until public image checks
-pass; `homeassistant/catalog/repository.yaml` is its unpublished template.
-`homeassistant/stage_supervisor_probe.py` creates the separate no-radio
-0.2.0/0.2.1 validation catalog. These artifacts are not proof of public channel
-installation, default catalog acceptance, or live deployment; those outcomes
-must be recorded separately after execution.
+## Installation links
 
-## Recommended channel layout
+- [Integration repository](https://github.com/psires/ha-livolo-ec) and
+  [0.2.1 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.2.1).
+  [Open in HACS or Marketplace](https://my.home-assistant.io/redirect/hacs_repository/?owner=psires&repository=ha-livolo-ec&category=integration)
+  as a custom integration repository, then install and restart HA.
+- [Add the HA OS app repository](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fpsires%2Flivolo_ec).
+  Its URL is `https://github.com/psires/livolo_ec`; app configuration is nested at
+  `homeassistant/app/config.yaml`. Configure the dedicated radio, existing
+  network identity and generated API secret before starting it.
+- [Full setup and local-app migration distinction](../homeassistant/README.md).
+  Installing the repository app does not migrate `local_livolo_ec`. Keep the
+  existing HA entry and arrange a consistent data transfer before changing its
+  endpoint; never start two daemons on the same serial adapter.
+
+## Verified scope
+
+| Check | Evidence and limits |
+| --- | --- |
+| Public integration releases | Exact-source exports, component-root ZIPs, checksums, HACS validation and hassfest; both version tags are immutable. |
+| HACS installation and upgrade | Upstream HACS installer on HA 2026.10.4 installed public 0.2.0 and upgraded to public 0.2.1. |
+| Marketplace installation and upgrade | Upstream Marketplace installer on HA 2026.11.0 installed public 0.2.0 and upgraded to public 0.2.1. |
+| Integration persistence | Existing entry, entity IDs, custom name, assigned area, credential and simulated daemon state preserved; restart requirement and available update checked. Release metadata was explicitly fetched; subsequent repository refresh was mocked. OAuth and catalog UI were not exercised. |
+| Public ARM64 images | Anonymous pulls, labels, SBOM/provenance, wrapper runtime and container upgrade checks; see [container evidence](../host/docker/publication-20261105.json). |
+| Actual Supervisor upgrade | HA OS 18.4, Core 2026.10.4, Supervisor 2026.10.5 on Pi 5: install 0.2.0, discover nested configuration and update to 0.2.1; private data, registry, command history, options and secret preserved, UID/GID 10001. |
+| Isolation and cleanup | Separate synthetic network and app, no radio device mapping or published ports; original app image/start time and HA entry/three entity records unchanged. Temporary app/repository removed, protected backup retained on host. |
+
+The [integration verification record](../homeassistant/verification/integration-channel-20261105.json)
+records public asset hashes, upstream installer versions and results;
+[reproduction instructions](../homeassistant/channel_tests/README.md) describe
+the isolated test environments. The
+[Supervisor verification record](../homeassistant/verification/channel-publication-20261105.json)
+contains image digests and exact scope. These tests do not qualify live migration,
+fresh physical pairing, USB hotplug, opt-in automatic upgrades, rollback or
+breaking-version blocking. Integration tests check the restart requirement and
+entry reload, not a full HA process restart. Ingress was excluded from the isolated app test;
+previous live preview and container-wrapper checks cover their own scopes.
+
+Switch detection is included from integration/app **0.2.0**. The existing live
+development installation was inspected as integration **0.1.1** and local app
+**0.1.0**, with a daemon build predating detection. It was deliberately retained
+during publication checks. Runtime version **0.12** alone cannot distinguish
+that older daemon from the newer detection-capable build. The native detection
+and API tests passed again (23 tests), including one-/two-gang registration and
+stale evidence rejection; this is not a new live commissioning test.
+
+## Release tooling
+
+`homeassistant/export_channel.py` exports the assembled integration, original
+branding and pinned source/packaging hashes. The generated repository validates
+and publishes releases on ordinary SemVer tags. Source `c75839d` supplies 0.2.1;
+`6fe41cb` supplies the immutable 0.2.0 integration baseline.
+`homeassistant/stage_supervisor_probe.py` creates a disposable no-radio catalog
+for subsequent isolated qualification. Never connect that app to a live radio
+or an existing HA entry.
+
+## Channel layout
 
 Keep development in `psires/livolo_ec`. Publish the assembled integration through
-a small, generated distribution repository, provisionally
+a small, generated distribution repository,
 `psires/ha-livolo-ec`. Use the main repository as the Supervisor app repository
-after adding its repository metadata and a prebuilt-image reference. A third
+with its repository metadata and prebuilt-image reference. A third
 repository for apps is optional, not required.
 
-| Delivery | Proposed channel | Version authority |
+| Delivery | Channel | Version authority |
 | --- | --- | --- |
 | Native HA integration | Dedicated GitHub repository, HACS and Marketplace | Integration manifest and matching SemVer release tag |
 | HA OS daemon app | Main repository's app metadata plus public GHCR image | App `config.yaml` version and matching image tag |
@@ -66,7 +114,7 @@ new channel. A distribution repository avoids changing old releases or imposing
 a single release cadence on all project components.
 [HACS manifest reference](https://contributors.home-assistant.io/marketplace/reference/hacs-json/)
 
-## Implementation and publication sequence
+## Release procedure and remaining work
 
 1. **Prepare the integration distribution.** Generate it from a reviewed source
    commit, including the assembled `custom_components/livolo_ec` directory,
@@ -100,15 +148,15 @@ a single release cadence on all project components.
    verified by the build.
    [Release and ZIP requirements](https://contributors.home-assistant.io/marketplace/guides/releases/)
 
-   Start the new channel with a reviewed packaging release, proposed **0.2.1**,
-   whose tag matches its integration manifest. Do not relabel or replace the
+   The new channel starts with a separately exported **0.2.0** baseline and
+   **0.2.1** packaging release, whose tags match their manifests. Do not relabel or replace the
    already published main-repository 0.2.0. Record the source commit and explain
    any differences from it. Publish only after the complete assets and checksums
    are ready. Keep older channel releases for rollback.
 
 3. **Build and verify HA app images.** Follow the companion container publication
    plan for exact-source builds, smoke tests and image provenance. Use a distinct
-   HA-wrapper image, provisionally `ghcr.io/psires/livolo-ec-ha-app`. Build the
+   HA-wrapper image, `ghcr.io/psires/livolo-ec-ha-app`. Build the
    historical app images from their historical source, under app versions 0.1.0
    and 0.2.0 if those artifacts are being provided. Advertise only tested
    architectures: `aarch64` is currently qualified; add `amd64` after its build,
@@ -206,7 +254,8 @@ serial radio. Verify device and entity IDs survive; do not instruct users to
 delete/re-add the integration. Retain the previous app and database backup until
 the new installation is verified. This migration is not implemented by this plan.
 
-Acceptance checks before announcing the new channels:
+Release qualification checklist (completed subset is recorded above; remaining
+hardware/migration and automatic-update cases must not be implied by it):
 
 - Install the exact public ZIP through HACS on 2026.10.4 and Marketplace on
   2026.11; verify bundled imports, existing entry adoption and restart behavior.
@@ -221,13 +270,12 @@ Acceptance checks before announcing the new channels:
 
 ## One-time owner and user actions
 
-The publisher needs authority to create the public integration distribution
-repository, set its metadata and enable release workflows. These are proposed
-actions, not completed ones. App/standalone GHCR packages must be public for
-anonymous pulls: first publication is private by default, and package visibility
-is a separate setting from repository visibility. An account/package administrator
-may have to perform that visibility change. Test it instead of assuming that a
-public source repository makes its images public.
+The owner created the public integration repository and saved its description
+and topics. Release workflows are enabled, both integration releases passed
+validation, and all advertised GHCR images passed anonymous pulls. For future
+packages, check visibility separately from repository visibility: new packages
+may require an account administrator to make them public. Test access before
+advertising them.
 [GitHub container registry access](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
 
 Use repository-local workflow tokens for release and package publishing where

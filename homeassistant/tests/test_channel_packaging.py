@@ -130,9 +130,7 @@ def test_disposable_supervisor_catalog_is_radio_free(tmp_path):
     configs = []
     for version in ("0.2.0", "0.2.1"):
         output = probe.stage(version, tmp_path / version)
-        config = yaml.safe_load(
-            (output / "livolo_ec_channel_test/config.yaml").read_text()
-        )
+        config = yaml.safe_load((output / "homeassistant/app/config.yaml").read_text())
         assert config["version"] == version
         assert not set(config) & {
             "uart",

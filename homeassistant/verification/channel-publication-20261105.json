@@ -1,0 +1,49 @@
+{
+  "date": "2026-11-05",
+  "scope": "Actual Supervisor installation and update of an isolated no-radio app using the public production wrapper images",
+  "platform": {
+    "hardware": "Raspberry Pi 5",
+    "architecture": "aarch64",
+    "home_assistant_os": "18.4",
+    "core": "2026.10.4",
+    "supervisor": "2026.10.5"
+  },
+  "baseline": {
+    "app_version": "0.2.0",
+    "image": "ghcr.io/psires/livolo-ec-ha-app:0.2.0",
+    "index_digest": "sha256:291dafff9bc9055737f41e9c2acebaf8562580ff7453c8f933b171fb18a5a80a",
+    "installed_image_id": "sha256:84b833b9f01451a213678848ff612c366ae9b6669178300ae92309469c6cc565"
+  },
+  "updated": {
+    "app_version": "0.2.1",
+    "source_commit": "c75839d038462042f15731bc28a19cc579f5d630",
+    "image": "ghcr.io/psires/livolo-ec-ha-app:0.2.1",
+    "index_digest": "sha256:7349943f15dde171d4938bc821f6405146f6306479fddf596a68592d64bd8edb",
+    "installed_image_id": "sha256:8af3c3167efd34e2449c630fc5b7632493f354e393cc23904f519416f4868eef"
+  },
+  "checks": {
+    "supervisor_installed_public_baseline": true,
+    "supervisor_offered_and_applied_update": true,
+    "nested_homeassistant_app_config_discovered": true,
+    "authenticated_native_api_available_without_radio": true,
+    "unauthenticated_native_api_status": 401,
+    "registry_and_durable_command_preserved": true,
+    "options_and_generated_secret_preserved": true,
+    "private_data_mount_preserved": true,
+    "runtime_uid_and_gid": 10001,
+    "no_device_mapping_or_published_ports": true,
+    "not_privileged": true,
+    "original_app_image_and_start_time_unchanged": true,
+    "original_integration_entry_unchanged": true,
+    "original_three_entity_registry_records_unchanged": true,
+    "disposable_app_removed_after_test": true,
+    "temporary_repository_removed_after_test": true,
+    "protected_on_host_backup_retained": true
+  },
+  "limits": [
+    "The test used a distinct Supervisor app identity and synthetic registry record.",
+    "No hardware radio access, live migration, flashing, physical pairing, or new switch-control qualification was performed.",
+    "Supervisor ingress and USB permissions were excluded from this isolated test; earlier live preview and container wrapper evidence have separate scopes.",
+    "This record does not qualify opt-in automatic updates, breaking-version blocking, rollback, or default catalog acceptance."
+  ]
+}

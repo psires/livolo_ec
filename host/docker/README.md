@@ -5,6 +5,42 @@ MQTT/Home Assistant integration. Use a 64-bit Raspberry Pi OS (`uname -m` should
 print `aarch64`). It requires a radio already running compatible Livolo EC UART
 firmware. The image does not flash firmware, change GPIOs or contain a broker.
 
+## Public standalone distribution 0.2.0
+
+The current published image is **`ghcr.io/psires/livolod:0.2.0`** for Linux
+ARM64. It includes daemon 0.12, the native API, maintenance commands, web UI and
+firmware-update helpers. Pulling it requires no GitHub login:
+
+```sh
+docker pull ghcr.io/psires/livolod:0.2.0
+docker run --rm ghcr.io/psires/livolod:0.2.0 --version
+```
+
+The version command reports daemon **0.12**. Distribution **0.2.0** identifies
+this particular package; older local images also reported 0.12. The published
+OCI index digest is
+`sha256:5448ae213340a610c01225d15cffc51e550966019daedbdc04dcc0c9b8ba2bdd`.
+See [publication evidence](publication-20261105.json) for source, architecture,
+SBOM/provenance and installed-container test results. No qualified radio
+firmware payload is bundled yet.
+
+Follow the deployment steps below, but replace the `image:` line in your copied
+`compose.yaml` with:
+
+```yaml
+    image: ghcr.io/psires/livolod:0.2.0
+```
+
+Preserve configuration, network identity and the persistent data directory when
+upgrading an existing installation. Back up the database with the daemon stopped,
+pull the new version and use `docker compose up -d` to replace the container.
+Do not run the native service or another container on the same radio. Future
+release tags are offered explicitly; there is no mutable `latest` tag or automatic
+standalone updater. HA OS users use the separate
+[HA app channel](../../homeassistant/README.md#install-the-daemon-app-on-ha-os).
+
+## Historical local image
+
 The prepared archive is approximately **44 MB**. Its checksum accompanies it in
 `dist/`; [build verification](../verification/docker-arm64-0.12-20261101.json)
 records the image ID and exact daemon source hashes. Native ARM smoke checks

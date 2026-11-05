@@ -1,4 +1,4 @@
-# Native Livolo EC integration (development preview)
+# Native Livolo EC integration
 
 The native integration runs without MQTT. It connects to `livolod` over an
 authenticated local API, creates one HA device per configured physical switch,
@@ -20,7 +20,57 @@ official Nordic PCA10059 now also has a qualified gateway build; support remains
 specific to the boards and tests recorded in the matrix. A radio running Livolo
 firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 
-## Install the native integration
+## Install through HACS or Marketplace
+
+Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
+**Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
+Install **Livolo EC**, then restart HA. Public releases
+[0.2.0](https://github.com/psires/ha-livolo-ec/releases/tag/0.2.0) and
+[0.2.1](https://github.com/psires/ha-livolo-ec/releases/tag/0.2.1) contain the
+assembled client and component. Shared default-catalog inclusion is separate;
+this installation uses a custom repository. Marketplace custom repositories
+require the user's GitHub authorization.
+
+HACS/Marketplace discover future integration updates automatically; installing
+one still requires an HA restart. Supervisor discovers app updates separately.
+Automatic app updates are optional and restart the daemon when installed.
+
+[Open the integration repository in HA](https://my.home-assistant.io/redirect/hacs_repository/?owner=psires&repository=ha-livolo-ec&category=integration)
+
+Existing installations should update the integration files while retaining the
+existing HA configuration entry. Do not delete and re-add it. Detection requires
+the matching current daemon, not just the new integration. Older daemon builds
+also report runtime version **0.12**, so use the app/distribution release and
+source revision to distinguish them.
+
+## Install the daemon app on HA OS
+
+Add `https://github.com/psires/livolo_ec` under the app store's **Repositories**,
+then install **Livolo EC**. The repository supplies the public **aarch64** wrapper
+image `ghcr.io/psires/livolo-ec-ha-app:0.2.1`; it does not build on the HA host.
+Configure the options documented below before starting the app. Install the
+native integration separately and use the app's actual internal hostname and
+the same API secret.
+
+[Add the app repository to HA](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fpsires%2Flivolo_ec)
+
+**An existing local development app is a separate installation.** Adding this
+repository does not update `local_livolo_ec` or copy its database. Keep that
+working app until a planned migration preserves its network identity, token and
+database and reconfigures the existing HA entry. Never start a second daemon on
+the same radio. HA Container users instead use the
+[standalone daemon container](../host/docker/README.md).
+
+Public integration install/update paths were exercised on HA 2026.10.4 and
+2026.11. The public app was installed and updated from 0.2.0 to 0.2.1 through
+Supervisor on HA OS 18.4 using an isolated app without a radio. Its registry,
+command history, options and secret persisted; the original live installation
+was unchanged. This does not qualify a local-app migration, new physical
+pairing, USB hotplug or automatic upgrades. See the
+[publication record](../docs/HA_PUBLICATION.md) and
+[Supervisor verification](verification/channel-publication-20261105.json).
+
+## Manual integration installation
 
 Build an archive from the repository root:
 
@@ -38,14 +88,14 @@ The client package, assembled integration and app build context include the
 project's BSD-2-Clause license. The app image also retains it under
 `/usr/share/licenses/livolo-ec/LICENSE`.
 
-This is a manual custom integration, not yet a HACS repository or an HA Core
-integration. Do not copy just `custom_components/livolo_ec` from source.
+This is a custom integration, not an HA Core integration. Do not copy just
+`custom_components/livolo_ec` from source.
 
 ## Integration channel packaging
 
-The source now includes generated-repository tooling for the separate
+The source includes generated-repository tooling for the separate
 `psires/ha-livolo-ec` HACS/Marketplace channel. Its public installation and upgrade
-checks must pass before the channel is announced as ready. The main repository's
+checks passed on the versions documented above. The main repository's
 historical `ha-0.1.1` and `ha-0.2.0` manual releases remain unchanged.
 
 Maintainers export a reviewed, committed source revision with:
@@ -64,12 +114,11 @@ and ordinary matching SemVer tag only after review. Its `livolo_ec.zip` contains
 component files at its root, unlike the manual archive above.
 
 The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.2.1`. The production
-repository catalog template is withheld in `homeassistant/catalog/repository.yaml`
-until the exact image is publicly pullable and verified. Do not publish it as
-root `repository.yaml` before that gate. For isolated Supervisor qualification,
+root `repository.yaml` is published after anonymous image verification and the
+actual Supervisor install/update checks passed. For isolated Supervisor qualification,
 `stage_supervisor_probe.py` prepares a separate app with no USB mapping or host
 ports; it never modifies the existing installation. See the
-[publication plan](../docs/HA_PUBLICATION.md) for channel and migration details.
+[publication record](../docs/HA_PUBLICATION.md) for channel and migration details.
 
 ## Connect to a daemon on an existing Pi/container
 

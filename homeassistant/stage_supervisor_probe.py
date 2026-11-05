@@ -20,8 +20,8 @@ def stage(version, output):
     (output / "repository.yaml").write_text(
         "name: Livolo EC isolated channel validation\nurl: https://github.com/psires/livolo_ec\nmaintainer: Dariusz Swiderski (@psires)\n"
     )
-    app = output / "livolo_ec_channel_test"
-    app.mkdir()
+    app = output / "homeassistant" / "app"
+    app.mkdir(parents=True)
     (app / "config.yaml").write_text(
         f"""name: Livolo EC channel test (no radio)
 version: "{version}"
