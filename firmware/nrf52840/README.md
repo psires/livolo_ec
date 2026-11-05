@@ -1,6 +1,6 @@
 # Nordic PCA10059 gateway
 
-Application-only nRF52840 port of the shared gateway core, release 0.12.
+Application-only nRF52840 port of the shared gateway core, source release 0.13.
 Native USB CDC carries UART protocol v3; the advertised 460800 value preserves
 host configuration compatibility, but does not set a physical UART bit rate.
 IEEE automatic ACKs, BLE and Zigbee stacks are disabled. Channel 11, 0 dBm,
@@ -54,6 +54,15 @@ counted. The USB controller runs below the radio IRQ priority.
 
 ## Installation and recovery
 
+The shared [firmware flashing tools](../../docs/FIRMWARE_FLASHING.md) validate
+application-only DFU ZIPs offline and provide explicit, journaled CLI recovery.
+The recovery command requires a separately identified factory-DFU port/serial
+and isolated legacy helper. The 0.13 host adds an opt-in automatic USB handoff
+for the standalone trial, requiring both mode identities and the exact physical
+USB path. It remains off in default deployments. See the
+[0.13 trial record](../../docs/FIRMWARE_013_TRIAL.md) for observed qualification
+status; a successful transfer alone is not proof of restored gateway operation.
+
 Preserve the PCA10059 factory **Open DFU Bootloader**. Enter it initially with
 the small sideways RESET switch (SW2); LD2 pulses red. SW1 is the user button.
 The bootloader enumerates as Nordic `1915:521f`, independently of the application.
@@ -61,8 +70,8 @@ Use Nordic's USB serial DFU tool and an **application-only** package:
 
 ```sh
 nrfutil pkg generate --hw-version 52 --sd-req 0x00 \
-  --application-version 12 --application build/ec-nrf52840.hex gateway-0.12.zip
-nrfutil dfu usb-serial --package gateway-0.12.zip --port /dev/serial/by-id/EXACT_DFU_ID
+  --application-version 13 --application build/ec-nrf52840.hex gateway-0.13.zip
+nrfutil dfu usb-serial --package gateway-0.13.zip --port /dev/serial/by-id/EXACT_DFU_ID
 ```
 
 These commands use legacy Nordic `nrfutil` 6.1.7. On the development Pi it runs
@@ -89,7 +98,7 @@ experimental GPIO/timer stall-recovery mechanism failed qualification and was
 removed. No autonomous watchdog is currently qualified; an unresponsive image
 may require holding SW2 while reconnecting USB, as observed during bring-up.
 
-Normal commands report `fw_version=0.12`. The TI signed updater/rollback protocol
+Normal commands report `fw_version=0.13`. The TI signed updater/rollback protocol
 is not implemented here: `update=none` remains accurate. Factory open DFU accepts
 unsigned application packages, so authenticating update artifacts is a host or
 deployment responsibility.

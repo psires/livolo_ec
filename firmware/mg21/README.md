@@ -3,11 +3,13 @@
 This target runs the existing Livolo UART v3 gateway and packet/peer/phase core
 on an EFR32MG21A020F768IM32. It is a raw IEEE 802.15.4 radio application, not an
 EmberZNet Zigbee coordinator. The Pi remains the owner of network records and
-uses the existing daemon without a protocol change. Current release **0.12**
-includes MCU timed queues, heartbeats, bounded state-query/output transactions,
+uses the existing daemon without a protocol change. Source release **0.13**
+preserves the 0.12 MCU timed queues, heartbeats, bounded state-query/output transactions,
 phase-stamped automatic ACKs and the validated DMA UART receive path. Both named
 boards have bounded hardware qualification; later sections retain dated results
-from older releases. See [third-party notices](../THIRD_PARTY_NOTICES.md) for SDK
+from older releases. The [0.13 trial record](../../docs/FIRMWARE_013_TRIAL.md)
+distinguishes new offline evidence from those hardware results.
+See [third-party notices](../THIRD_PARTY_NOTICES.md) for SDK
 licence exceptions and the exact linked dependency inventory.
 
 Select the board explicitly when changing hardware:
@@ -148,6 +150,12 @@ The linker file is adapted from the SDK's Zlib-licensed device linker script;
 its upstream notice is retained.
 
 ## Installation and recovery
+
+Use the shared [firmware flashing tools](../../docs/FIRMWARE_FLASHING.md) to
+inspect the exact-board GBL before upload. Routine CLI/Web/HA updates share
+catalog validation, live identity checks and the daemon's durable update job.
+The low-level helper commands below remain for first installation/recovery
+with the normal daemon stopped.
 
 The observed ZB-GW04 has **Gecko Bootloader 1.9.2** and the Sonoff **2.4.2**.
 Preserve each board's existing bootloader. This

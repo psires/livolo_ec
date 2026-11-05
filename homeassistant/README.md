@@ -78,7 +78,7 @@ Build an archive from the repository root:
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.2.1.zip` into the HA configuration directory so
+Extract `dist/livolo-ec-ha-0.3.0.zip` into the HA configuration directory so
 `custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
@@ -102,8 +102,8 @@ Maintainers export a reviewed, committed source revision with:
 
 ```sh
 python3 homeassistant/export_channel.py --commit <full-source-commit> \
-  --version 0.2.1 --output dist/ha-channel-0.2.1
-python3 dist/ha-channel-0.2.1/scripts/build_release.py --tag 0.2.1
+  --version 0.3.0 --output dist/ha-channel-0.3.0
+python3 dist/ha-channel-0.3.0/scripts/build_release.py --tag 0.3.0
 ```
 
 The generated repository contains the complete integration, client, original

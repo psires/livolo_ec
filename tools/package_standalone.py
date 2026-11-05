@@ -189,6 +189,7 @@ def package(commit, output):
             ("host/systemd/livolod.service", "systemd/livolod.service"),
             ("host/docker/smoke.py", "checks/smoke.py"),
             ("docs/FIRMWARE_RECOVERY.md", "docs/FIRMWARE_RECOVERY.md"),
+            ("docs/FIRMWARE_FLASHING.md", "docs/FIRMWARE_FLASHING.md"),
             ("host/NATIVE_API.md", "docs/NATIVE_API.md"),
         ):
             destination = staged / target

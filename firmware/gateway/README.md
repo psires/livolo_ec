@@ -87,6 +87,12 @@ session-protected command forms. PING now reports version 3. The old
 
 ## Build and recovery
 
+The shared [firmware flashing tools](../../docs/FIRMWARE_FLASHING.md) provide
+offline signed-package inspection, advisory preflight and the same application
+update backend for CLI/Web/HA. The separate ROM installer supports
+`--check-only` and an expected `--sha256` for one-time full-image validation;
+it does not replace the signed application updater.
+
 Use the pinned Contiki/TI SDK and board adapter from the receiver README:
 
 ```sh

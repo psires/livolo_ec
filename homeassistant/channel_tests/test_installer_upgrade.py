@@ -26,6 +26,8 @@ from livolod.simulator import Simulator
 from livolod.storage import Store
 
 ROOT = Path(__file__).resolve().parents[2]
+BASELINE = os.environ.get("LIVOLO_BASELINE_VERSION", "0.2.1")
+CURRENT = os.environ.get("LIVOLO_CURRENT_VERSION", "0.3.0")
 pytestmark = pytest.mark.usefixtures(
     "socket_enabled", "disable_mock_zeroconf_resolver", "public_github_network"
 )
@@ -90,7 +92,7 @@ async def test_real_installer_preserves_config_entities_and_daemon(hass, tmp_pat
     repository.data.config_flow = True
     releases = await repository.async_get_releases()
     stable = [item for item in releases if not item.draft and not item.prerelease]
-    assert [item.tag_name for item in stable[:2]] == ["0.2.1", "0.2.0"]
+    assert [item.tag_name for item in stable[:2]] == [CURRENT, BASELINE]
     repository.data.last_version = stable[0].tag_name
     repository.content.path.local = repository.localpath
     repository.content.path.remote = "custom_components/livolo_ec"
@@ -134,7 +136,7 @@ async def test_real_installer_preserves_config_entities_and_daemon(hass, tmp_pat
 
         await async_get_custom_components(hass)
         with patch.object(repository, "update_repository", new=AsyncMock()):
-            for version in ("0.2.0", "0.2.1"):
+            for version in (BASELINE, CURRENT):
                 if backend == "hacs":
                     await repository.async_install(version=version)
                 else:
@@ -145,7 +147,7 @@ async def test_real_installer_preserves_config_entities_and_daemon(hass, tmp_pat
                 )
                 assert manifest["version"] == version
                 assert not (Path(repository.localpath) / "custom_components").exists()
-                if version == "0.2.0":
+                if version == BASELINE:
                     assert repository.pending_update
                     importlib.import_module("custom_components.livolo_ec")
                     assert await hass.config_entries.async_setup(entry.entry_id)
