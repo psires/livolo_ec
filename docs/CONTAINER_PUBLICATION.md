@@ -1,16 +1,21 @@
 # Container publication
 
-Status: standalone **0.2.0** and HA app **0.2.0 / 0.2.1** were published for
-`linux/arm64` on 2026-11-05. Anonymous registry verification independently checked
-their index/platform/config digests, exact source labels, SPDX SBOM and SLSA
-provenance. Immutable digests and successful workflow gates are recorded in
-[publication evidence](../host/docker/publication-20261105.json).
+Status: standalone and HA app **0.3.0** are public for `linux/arm64`, with daemon
+**0.13**. Anonymous verification checked image/config digests, source labels,
+SPDX SBOM and SLSA provenance. The exact images passed persistent-data upgrades
+from standalone 0.2.0 and HA app 0.2.1 using isolated containers with no radio.
+See the [0.3.0 publication record](../host/docker/publication-0.3.0-20261105.json).
+The HA app catalog advertises 0.3.0 only after those gates passed.
 
-The standalone first-install/recreation test passed; HA additionally passed the
-actual **0.2.0 → 0.2.1** persistent-data upgrade test. These are isolated Docker
-tests, with no radio access or live testbed software upgrades. The HA specialist
-owns separate Supervisor installation/update qualification. Coordinate channel
-delivery with [HA_PUBLICATION.md](HA_PUBLICATION.md).
+The initial HA upgrade test assumed radio-derived diagnostics were present in
+the offline baseline. The test now reads installed package metadata; the entire
+HA upgrade and publication sequence passed on retry. Published application
+source and release tags were unchanged.
+
+Earlier 0.2.0/0.2.1 image digests and checks remain in the
+[historical publication record](../host/docker/publication-20261105.json).
+Actual Supervisor testing belongs to that earlier qualification; the live HA
+host was unchanged for 0.3.0. See [HA_PUBLICATION.md](HA_PUBLICATION.md).
 
 ## Implemented release controls
 

@@ -1,42 +1,44 @@
-# Run livolod 0.12 in Docker on ARM64
+# Run livolod 0.13 in Docker on ARM64
 
-This image packages daemon **0.12** for **Linux ARM64**, including its web UI and
-MQTT/Home Assistant integration. Use a 64-bit Raspberry Pi OS (`uname -m` should
-print `aarch64`). It requires a radio already running compatible Livolo EC UART
-firmware. The image does not flash firmware, change GPIOs or contain a broker.
+This image packages daemon **0.13** for **Linux ARM64**, including its Web UI,
+optional MQTT and native Home Assistant API. Use a 64-bit Raspberry Pi OS. It
+requires a radio already running compatible Livolo EC UART firmware. Starting
+or upgrading the container does not flash a radio; firmware installation is a
+separate explicit operation. No broker or firmware payload is bundled.
 
-## Public standalone distribution 0.2.0
+## Public standalone distribution 0.3.0
 
-The current published image is **`ghcr.io/psires/livolod:0.2.0`** for Linux
-ARM64. It includes daemon 0.12, the native API, maintenance commands, web UI and
-firmware-update helpers. Pulling it requires no GitHub login:
+The current image is **`ghcr.io/psires/livolod:0.3.0`**. Anonymous pulls require
+no GitHub login:
 
 ```sh
-docker pull ghcr.io/psires/livolod:0.2.0
-docker run --rm ghcr.io/psires/livolod:0.2.0 --version
+docker pull ghcr.io/psires/livolod:0.3.0
+docker run --rm ghcr.io/psires/livolod:0.3.0 --version
 ```
 
-The version command reports daemon **0.12**. Distribution **0.2.0** identifies
-this particular package; older local images also reported 0.12. The published
-OCI index digest is
-`sha256:5448ae213340a610c01225d15cffc51e550966019daedbdc04dcc0c9b8ba2bdd`.
-See [publication evidence](publication-20261105.json) for source, architecture,
-SBOM/provenance and installed-container test results. No qualified radio
-firmware payload is bundled yet.
+The version command reports daemon **0.13**. Distribution **0.3.0** identifies
+the package. Its immutable OCI index digest is
+`sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc`.
+The [publication evidence](publication-0.3.0-20261105.json) records anonymous
+verification, source labels, SBOM/provenance and the isolated upgrade from
+standalone 0.2.0, preserving persistent state.
 
-Follow the deployment steps below, but replace the `image:` line in your copied
-`compose.yaml` with:
+The image includes the unified inspection/preflight CLI, Gecko helper and an
+isolated Nordic runtime. Nordic installation needs the explicit
+[USB profile and publisher setup](NORDIC.md); the default configuration leaves
+it unavailable. The public firmware catalog remains empty.
+
+In your copied `compose.yaml`, use:
 
 ```yaml
-    image: ghcr.io/psires/livolod:0.2.0
+    image: ghcr.io/psires/livolod:0.3.0
 ```
 
 Preserve configuration, network identity and the persistent data directory when
-upgrading an existing installation. Back up the database with the daemon stopped,
-pull the new version and use `docker compose up -d` to replace the container.
-Do not run the native service or another container on the same radio. Future
-release tags are offered explicitly; there is no mutable `latest` tag or automatic
-standalone updater. HA OS users use the separate
+upgrading. Back up the database with the daemon stopped, pull the new image and
+use `docker compose up -d` to replace the container. Do not run another service
+on the same radio. Releases use explicit version tags, with no mutable `latest`
+tag or automatic standalone updater. HA OS users use the separate
 [HA app channel](../../homeassistant/README.md#install-the-daemon-app-on-ha-os).
 
 ## Historical local image

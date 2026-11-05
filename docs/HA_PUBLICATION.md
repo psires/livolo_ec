@@ -1,5 +1,22 @@
 # Home Assistant installation and update publication
 
+Current release: **0.3.0** integration, HA app and standalone distribution,
+with daemon **0.13**. The public HACS/Marketplace 0.2.1 → 0.3.0 upgrade checks
+preserve the existing entry, entity IDs, names, area, token and simulated state.
+The app image separately passed its isolated 0.2.1 → 0.3.0 container upgrade and
+anonymous registry checks before the app catalog was advanced.
+
+- [Integration 0.3.0 and public installer evidence](../homeassistant/verification/integration-channel-0.3.0-20261105.json)
+- [Container publication and upgrade evidence](../host/docker/publication-0.3.0-20261105.json)
+- [Standalone and manual HA release asset checks](verification/software-release-0.3.0-20261105.json)
+
+The live HA host was unchanged. The actual Supervisor qualification below is
+historical 0.2.0 → 0.2.1 evidence, not a claim of a new HA OS 0.3.0 trial.
+Default-catalog acceptance and migration from a local development app remain
+separate work. Software updates do not flash radio firmware.
+
+## Earlier channel qualification
+
 Status on **2026-11-05**: integration releases **0.2.0** and **0.2.1** and the
 matching ARM64 app images are public. Public integration installation and upgrade
 tests passed; actual Supervisor installation and upgrade passed using an isolated
@@ -11,7 +28,7 @@ existing local development app are separate, incomplete work.
 ## Installation links
 
 - [Integration repository](https://github.com/psires/ha-livolo-ec) and
-  [0.2.1 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.2.1).
+  [0.3.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.3.0).
   [Open in HACS or Marketplace](https://my.home-assistant.io/redirect/hacs_repository/?owner=psires&repository=ha-livolo-ec&category=integration)
   as a custom integration repository, then install and restart HA.
 - [Add the HA OS app repository](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fpsires%2Flivolo_ec).

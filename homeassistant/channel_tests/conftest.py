@@ -3,6 +3,7 @@
 import importlib
 import os
 from pathlib import Path
+import socket
 import sys
 from types import ModuleType
 from unittest.mock import patch
@@ -33,25 +34,40 @@ def custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture
-def public_github_network():
-    """Allow public release traffic while preserving HA's isolated test filesystem.
+async def public_github_network(hass, socket_enabled, disable_mock_zeroconf_resolver):
+    """Use the same real DNS answers for HA downloads and the socket allowlist.
 
-    The upstream HA fixtures block DNS globally; permit resolution only while
-    establishing the explicit GitHub and loopback connection allowlist.
+    @param hass Isolated HA instance owning the download resolver.
+    @param socket_enabled Enable sockets before establishing the narrow allowlist.
+    @param disable_mock_zeroconf_resolver Keep resolution on this test's event loop.
     """
-    package = (
-        "pytest_homeassistant_custom_component"
-        if os.environ.get("LIVOLO_INSTALLER", "hacs") == "hacs"
-        else "pytest_homeassistant"
+    from homeassistant.helpers.aiohttp_client import _async_get_or_create_resolver
+
+    resolver = _async_get_or_create_resolver(hass)
+    hosts = ("api.github.com", "github.com", "release-assets.githubusercontent.com")
+    answers = {host: await resolver.resolve(host, 443) for host in hosts}
+    pytest_socket.socket_allow_hosts(
+        ["127.0.0.1", *hosts],
+        allow_unix_socket=True,
+        resolution_cache={
+            host: {item["host"] for item in items} for host, items in answers.items()
+        },
     )
-    plugins = importlib.import_module(package + ".plugins")
-    with patch("socket.getaddrinfo", plugins._real_getaddrinfo):
-        pytest_socket.socket_allow_hosts(
-            [
-                "127.0.0.1",
-                "api.github.com",
-                "github.com",
-                "release-assets.githubusercontent.com",
-            ],
-            allow_unix_socket=True,
-        )
+
+    async def resolved(host, port=0, family=socket.AF_INET):
+        """Reuse actual DNS answers so independently rotating resolvers cannot disagree.
+
+        @param host One of the explicitly allowed GitHub hosts.
+        @param port Requested destination port, retained in each resolved address.
+        @param family Requested address family, or AF_UNSPEC for either family.
+        """
+        if host not in answers:
+            raise OSError("Unexpected host in public release test")
+        return [
+            dict(item, port=port)
+            for item in answers[host]
+            if family in (socket.AF_UNSPEC, item["family"])
+        ]
+
+    with patch.object(resolver, "resolve", side_effect=resolved):
+        yield

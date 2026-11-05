@@ -5,13 +5,13 @@ authenticated local API, creates one HA device per configured physical switch,
 and one switch entity per output. HA Core never opens the radio serial port.
 The independent daemon continues running during HA reloads/restarts.
 
-This preview implements native control and commissioning, broker-free daemon
+The integration provides native control and commissioning, broker-free daemon
 startup, push updates, ingress support, and local HA app packaging. Radio
 firmware updates use a standard HA firmware entity backed by the daemon's durable
 maintenance jobs. Initial conversion from stock adapter firmware remains a
 separate board-specific operation. Network backup/import UI, automatic app
 installation, socket profiles and curtain profiles are not implemented here.
-Do not publish this preview as a fully qualified plug-and-play release.
+Radio and commissioning support remains experimental within the tested board profiles.
 
 The [radio readiness matrix](../analysis/development/ha-radio-support.md) records
 the exact supported/experimental profiles. Commercial Zigbee adapters require
@@ -24,10 +24,9 @@ firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 
 Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
 **Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
-Install **Livolo EC**, then restart HA. Public releases
-[0.2.0](https://github.com/psires/ha-livolo-ec/releases/tag/0.2.0) and
-[0.2.1](https://github.com/psires/ha-livolo-ec/releases/tag/0.2.1) contain the
-assembled client and component. Shared default-catalog inclusion is separate;
+Install **Livolo EC**, then restart HA. The current
+[0.3.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.3.0) contains
+the assembled client and component. Shared default-catalog inclusion is separate;
 this installation uses a custom repository. Marketplace custom repositories
 require the user's GitHub authorization.
 
@@ -47,7 +46,7 @@ source revision to distinguish them.
 
 Add `https://github.com/psires/livolo_ec` under the app store's **Repositories**,
 then install **Livolo EC**. The repository supplies the public **aarch64** wrapper
-image `ghcr.io/psires/livolo-ec-ha-app:0.2.1`; it does not build on the HA host.
+image `ghcr.io/psires/livolo-ec-ha-app:0.3.0`; it does not build on the HA host.
 Configure the options documented below before starting the app. Install the
 native integration separately and use the app's actual internal hostname and
 the same API secret.
@@ -61,8 +60,13 @@ database and reconfigures the existing HA entry. Never start a second daemon on
 the same radio. HA Container users instead use the
 [standalone daemon container](../host/docker/README.md).
 
-Public integration install/update paths were exercised on HA 2026.10.4 and
-2026.11. The public app was installed and updated from 0.2.0 to 0.2.1 through
+Public integration upgrades from **0.2.1 to 0.3.0** passed with HACS on HA
+2026.10.4 and Marketplace on HA 2026.11. The 0.3.0 app passed an isolated container
+upgrade from 0.2.1, preserving configuration and state without radio access.
+See the [integration evidence](verification/integration-channel-0.3.0-20261105.json)
+and [container evidence](../host/docker/publication-0.3.0-20261105.json).
+
+The following Supervisor qualification is historical: The public app was installed and updated from 0.2.0 to 0.2.1 through
 Supervisor on HA OS 18.4 using an isolated app without a radio. Its registry,
 command history, options and secret persisted; the original live installation
 was unchanged. This does not qualify a local-app migration, new physical
@@ -113,9 +117,10 @@ explicit `--preview` export cannot be released. Push the generated repository
 and ordinary matching SemVer tag only after review. Its `livolo_ec.zip` contains
 component files at its root, unlike the manual archive above.
 
-The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.2.1`. The production
-root `repository.yaml` is published after anonymous image verification and the
-actual Supervisor install/update checks passed. For isolated Supervisor qualification,
+The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.3.0`. The production
+catalog advanced after its exact image passed container upgrade and anonymous
+registry checks. The historical Supervisor qualification above remains separate.
+For isolated Supervisor qualification,
 `stage_supervisor_probe.py` prepares a separate app with no USB mapping or host
 ports; it never modifies the existing installation. See the
 [publication record](../docs/HA_PUBLICATION.md) for channel and migration details.

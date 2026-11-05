@@ -1,0 +1,100 @@
+{
+  "verified_at_utc": "2026-11-05T21:33:26.305105+00:00",
+  "repository": "https://github.com/psires/ha-livolo-ec",
+  "channel": "Custom repository for HACS and Marketplace; not default catalog inclusion",
+  "upgrade": {
+    "baseline": "0.2.1",
+    "current": "0.3.0"
+  },
+  "releases": [
+    {
+      "version": "0.2.1",
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.2.1",
+      "source_commit": "c75839d038462042f15731bc28a19cc579f5d630",
+      "assets": {
+        "SHA256SUMS": "cd2ef68615a051ce5307d1c9584ea9c08dcf53d29848717119bfc300d1da1ae3",
+        "livolo_ec.zip": "d6a17c3a5f0f106bde10ea4e1d1745ba00b6b584866539d53bcf7ad8ce769e86",
+        "source.json": "7225822ef01a690699c5138b031eec20b144de5574f2e195d37f71308b83bdd3"
+      }
+    },
+    {
+      "version": "0.3.0",
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.3.0",
+      "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+      "packaging_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+      "preview": false,
+      "assets": {
+        "livolo_ec.zip": "dd1fb372bcff22414deaaf55fd3b8bb09be3dfeb0a2bd83705fd7e26cee2228f",
+        "SHA256SUMS": "c034115d6a3b71b746c75b300561f27ac618f3fab9aa5a3f9b3665483d9c255d",
+        "source.json": "72fb9b361542074312711739f63ff11f9acbfe942a77e174b9b4347cc4b6757b"
+      }
+    }
+  ],
+  "publication_workflow": {
+    "url": "https://github.com/psires/ha-livolo-ec/actions/runs/42112856661",
+    "result": "success",
+    "gates": [
+      "HACS validation",
+      "hassfest",
+      "package validation",
+      "release publication"
+    ]
+  },
+  "public_asset_checks": "Anonymous downloads of ZIP, source.json and SHA256SUMS are byte-identical to the exact final export; checksums and source/packaging commit aa661ef56e11755f00b154289021cc41374797bb verified",
+  "python": "3.14.7",
+  "tests": [
+    {
+      "installer": "HACS",
+      "upstream_commit": "a15e87ec0d1c82e58f1ddbaf17669d3eaa261eb8",
+      "homeassistant": "2026.10.4",
+      "result": "1 passed",
+      "duration_seconds": 1.86
+    },
+    {
+      "installer": "Marketplace",
+      "upstream_core_commit": "74cf5a49c63ed8d4d87717844bf14f79c28c9cea",
+      "homeassistant": "2026.11.0",
+      "result": "1 passed",
+      "duration_seconds": 1.66
+    }
+  ],
+  "tested": [
+    "Anonymous upstream GitHub release listing",
+    "Actual public release URL downloads and upstream ZIP extraction/replacement",
+    "Installed manifest versions and flat component-root layout",
+    "Pending update before upgrade and cleared after upgrade",
+    "Configuration entry identity, URL and token preserved",
+    "Entity IDs, unique IDs, custom name and assigned area preserved",
+    "Simulator switch control and daemon state preserved",
+    "Restart requirement raised; configuration-entry reload succeeds"
+  ],
+  "fixture_correction": {
+    "initial_result": "Both initial runs failed before baseline ZIP download because OS DNS and HA asynchronous DNS returned different valid GitHub addresses; pytest_socket blocked the address absent from its allowlist",
+    "correction": "Resolve api.github.com, github.com and release-assets.githubusercontent.com once through the actual HA resolver, use those exact answers in pytest_socket resolution_cache, and reuse them for the test duration",
+    "network_scope": "Only the three explicit GitHub hosts, loopback and Unix sockets; no broad network allowance or guessed addresses",
+    "unchanged": "Release bytes, tags, public URLs, TLS verification, release lookup, upstream installer and main test body",
+    "files": [
+      "homeassistant/channel_tests/conftest.py",
+      "homeassistant/channel_tests/README.md"
+    ]
+  },
+  "scope_limits": [
+    "Isolated HA instances and simulator; no live HA host or radio access",
+    "Repository metadata refresh stubbed after explicit upstream release retrieval",
+    "No GitHub OAuth/device authorization or catalog UI test",
+    "No scheduled polling or full HA process restart test; entry reload does not activate upgraded Python modules",
+    "Marketplace exercised GitHub custom-repository installer, not default catalog installer",
+    "Firmware payload installation and physical Nordic lifecycle qualification are separate"
+  ],
+  "test_script_sha256": {
+    "homeassistant/channel_tests/conftest.py": "a61a935a1d0095e0b1e1dfc414aed6939d0f113ea579c7e7e4568b27f5517f1e",
+    "homeassistant/channel_tests/run.py": "9dbc254e6ad2a0eac089db35c9199408e8597fb5505003de004f20fc97e96ddf",
+    "homeassistant/channel_tests/test_installer_upgrade.py": "ca7000b51801f3545f6a7a7b51c7a2edd889f1136d9805f925e555debd760dbc"
+  },
+  "local_log_sha256": {
+    "hacs-public-dns-failure.log": "9e944e8b5364e845c5513c25a72e49334b655956c935c40be346b84b594d9796",
+    "hacs-public.log": "5c186e2b43403cc12a718bcb376f24e94f6b03b1ef968ced72c38b8f0a451f1b",
+    "marketplace-public-dns-failure.log": "56bd541678ae8abb01f1daf1a58b1827b3137d4c8bf0ba936b00b4333e2c8448",
+    "marketplace-public.log": "4bebae31bf4cf35523dc7b16cecb2e7c988e5464b638c7cc9f31a38bb5fa2110"
+  }
+}

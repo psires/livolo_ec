@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-11-05T21:31:03.737531+00:00",
+  "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+  "distribution_version": "0.3.0",
+  "daemon_version": "0.13",
+  "firmware_payloads_bundled": false,
+  "public_assets": [
+    {
+      "release_url": "https://github.com/psires/livolo_ec/releases/tag/standalone-0.3.0",
+      "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+      "assets": {
+        "livolo-ec-0.3.0-standalone.tar.gz": "cb90b57ba9a1716e64f1b248a64084676c99261bc19cf2c658fd8a294a7e031d",
+        "livolo_ec_client-0.3.0-py3-none-any.whl": "efe9692e4a329d75749dc94ef68d8bc7eff1373956316c45441a1c098cf03e16",
+        "livolo_ec_client-0.3.0.tar.gz": "60f10964366f6b35351a48d3c0f1da2b4b66c4237037a184bf03c5201771561a",
+        "livolo_ec_daemon-0.13-py3-none-any.whl": "f02a88abce222c71dc1259c912b3f1013379ec891d0262bceda3cccad8d44195",
+        "livolo_ec_daemon-0.13.tar.gz": "b103691969d4bf4c6f92d9d4184ca84091c6f8605cb41f0f91429fcb91ffd7b8",
+        "release.json": "b5907dbaeba1b9764f92d0f7d855ed4134db096f16c6f96b9f0a54738248b481",
+        "SHA256SUMS": "f1114afd365bfbface75ff757e2d4a40539cae1d828d39ea4545e04ec0f97665"
+      }
+    },
+    {
+      "release_url": "https://github.com/psires/livolo_ec/releases/tag/ha-0.3.0",
+      "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+      "assets": {
+        "SHA256SUMS": "27bedf12292674dfb6082c09de342d56691fb8be4cd8e0af7450974c63be7501",
+        "livolo-ec-ha-0.3.0.zip": "6e373de1190bb60e3f481bba2e4c8d13ff0ad751344fbb49f46aa32fd70af94b",
+        "livolo-ec-ha-app-0.3.0-source.tar.gz": "ba7ef8c5f3e2621e44a562d38f5239808393b09ec101f87de7702e96665d3775",
+        "release.json": "637df3b7767bfe5e596a1aaf1317c61c32ee3ba33e8fc542223496c8758ec6cf"
+      }
+    }
+  ],
+  "standalone_jobs": [
+    {
+      "name": "build",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42112625057/job/127543844815"
+    },
+    {
+      "name": "install (ubuntu-24.04-arm, wheel)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42112625057/job/127543965332"
+    },
+    {
+      "name": "install (ubuntu-24.04-arm, sdist)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42112625057/job/127543965352"
+    },
+    {
+      "name": "install (ubuntu-24.04, sdist)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42112625057/job/127543965414"
+    },
+    {
+      "name": "install (ubuntu-24.04, wheel)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42112625057/job/127543965428"
+    },
+    {
+      "name": "publish",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42112625057/job/127544221749"
+    }
+  ],
+  "verification": "Anonymous public downloads; every SHA256SUMS entry verified; source/version metadata checked",
+  "installation_scope": "Isolated wheel and source installs on Linux x86-64 and ARM64, CLI dry-run, simulated daemon, Web/native API, persistence and shutdown",
+  "live_radio_access": false,
+  "nordic_live_trial_record": "nordic-web-0.13-20261105.json"
+}

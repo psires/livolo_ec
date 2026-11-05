@@ -48,10 +48,17 @@ LIVOLO_INSTALLER=marketplace \
 ```
 
 The runner loads HA's HTTP compatibility aliases before pytest plugins.
-The fixtures allow loopback and GitHub release traffic and disable the upstream
-session-scoped DNS mock, whose event loop differs from the test loop. Anonymous
-GitHub API rate limits can prevent a run; no account token is required or used.
+The fixtures allow loopback and the three required GitHub hosts only, and disable
+the upstream session-scoped DNS mock, whose event loop differs from the test
+loop. They resolve those hosts through HA's actual resolver once, then use the
+same addresses for downloads and the socket allowlist. This avoids a test-only
+failure when OS DNS and HA's asynchronous resolver return different valid GitHub
+addresses. Public URLs, TLS validation, release metadata and installer code are
+unchanged. Anonymous GitHub API rate limits can prevent a run; no account token
+is required or used.
 
-Publication checksums and results are recorded in
-[`../verification/integration-channel-20261105.json`](../verification/integration-channel-20261105.json).
+Current publication checksums and results are recorded in
+[`../verification/integration-channel-0.3.0-20261105.json`](../verification/integration-channel-0.3.0-20261105.json).
+The [earlier 0.2.0 → 0.2.1 record](../verification/integration-channel-20261105.json)
+is preserved separately.
 Supervisor app tests have a separate verification record.

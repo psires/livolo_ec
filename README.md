@@ -11,12 +11,12 @@ The [standalone daemon/CLI distribution 0.3.0](host/release/README.md) packages
 daemon 0.13 and client 0.3.0 for native Linux installation without a checkout.
 Its bundle version is separate from the radio compatibility version above.
 
-Published ARM64 containers are `ghcr.io/psires/livolod:0.2.0` and
-`ghcr.io/psires/livolo-ec-ha-app:0.2.1`; see the
+Published ARM64 containers are `ghcr.io/psires/livolod:0.3.0` and
+`ghcr.io/psires/livolo-ec-ha-app:0.3.0`; see the
 [verified image digests and release process](docs/CONTAINER_PUBLICATION.md).
 The [Home Assistant installation guide](homeassistant/README.md) provides the
 app repository and [HACS/Marketplace integration channel](https://github.com/psires/ha-livolo-ec),
-with integration 0.2.1 and automatic update discovery. Installing integration
+with integration 0.3.0 and automatic update discovery. Installing integration
 updates requires an HA restart; radio firmware updates are separate.
 
 The CC2652P gateway supports signed firmware updates over UART after a one-time

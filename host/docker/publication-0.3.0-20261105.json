@@ -1,0 +1,64 @@
+{
+  "verified_at_utc": "2026-11-05T21:32:26.173366+00:00",
+  "registry_auth": "Anonymous scoped pull tokens; no account credentials",
+  "architecture": "linux/arm64",
+  "radio_access": false,
+  "live_testbed_upgrade": false,
+  "images": [
+    {
+      "image": "ghcr.io/psires/livolod:0.3.0",
+      "index_digest": "sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc",
+      "platform_digest": "sha256:da3f6770b4959e35e1346a32553e65d2b4e950e8b295270d06e8d54fd76366e3",
+      "config_digest": "sha256:2764cf92725d369a0104aa4d2d0b06d716968e9e3b7a7e446597b89ccfeacd14",
+      "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+      "recipe_commit": "857deecab6fe47bb8b0aa745368c6c58e8db84ff",
+      "daemon_version": "0.13",
+      "attestation_digests": [
+        "sha256:600af59f6d784deaf1a792a2b121e59bacdf15621a57284babddc92bca2ee50a"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true,
+      "source_tag": "standalone-0.3.0",
+      "previous_image": "ghcr.io/psires/livolod@sha256:5448ae213340a610c01225d15cffc51e550966019daedbdc04dcc0c9b8ba2bdd",
+      "persistence_test": "version upgrade",
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42112758065/job/127544402271",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      }
+    },
+    {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.3.0",
+      "index_digest": "sha256:0c7710060237f32094bee76d53ef685197766af14c5f5da07e42759bbdab7268",
+      "platform_digest": "sha256:0bd3353ec53b045853b8d55fc81df33bbede49694497d4dd824fd155f6968f57",
+      "config_digest": "sha256:ca9f947ff9e4ac63d265c06baf1429be2ff04e938659fe6bdc1ee14c36b0c4a0",
+      "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
+      "recipe_commit": "b1a7e3228f4e3d25f6db4f750332d06e4f7f291f",
+      "daemon_version": "0.13",
+      "attestation_digests": [
+        "sha256:41a2cce46fc203ee9e751a985406f79c094a35f7a125f52b6e79dbd5c12aeba1"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true,
+      "source_tag": "ha-0.3.0",
+      "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:7349943f15dde171d4938bc821f6405146f6306479fddf596a68592d64bd8edb",
+      "persistence_test": "version upgrade",
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42113118329/job/127545685656",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      }
+    }
+  ],
+  "test_correction": "The initial HA baseline check assumed radio diagnostics existed with no radio. Commit b1a7e32 reads installed package metadata instead; the complete HA upgrade and publication gates passed on retry. Runtime source and release tags were unchanged."
+}
