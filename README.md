@@ -7,6 +7,10 @@ is the release source; `python3 tools/project_version.py` checks host and firmwa
 metadata, and `--write` propagates a new release number. UART protocol and data
 schema numbers are separate compatibility identifiers.
 
+The [standalone daemon/CLI distribution 0.2.0](host/release/README.md) packages
+daemon 0.12 and client 0.2.0 for native Linux installation without a checkout.
+Its bundle version is separate from the radio compatibility version above.
+
 The CC2652P gateway supports signed firmware updates over UART after a one-time
 bootloader installation. The daemon reports running and target versions and
 confirms a trial image only after restoring the radio session. Unconfirmed trial

@@ -5,6 +5,7 @@ ARG RELEASE_VERSION=0.12
 WORKDIR /src
 COPY VERSION ./VERSION
 COPY host/pyproject.toml ./host/pyproject.toml
+COPY host/PACKAGE.md ./host/PACKAGE.md
 COPY host/LICENSE ./host/LICENSE
 COPY host/docker/requirements-firmware.txt ./host/docker/requirements-firmware.txt
 COPY host/livolod ./host/livolod

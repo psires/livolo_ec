@@ -1,0 +1,11 @@
+{
+  "network": {"gateway": "10203040", "tag": "42"},
+  "serial_port": "/dev/serial/by-id/REPLACE_WITH_YOUR_RADIO",
+  "serial_baudrate": 460800,
+  "database": "/var/lib/livolod/state.sqlite3",
+  "output_mode": "disabled",
+  "devices": [],
+  "mqtt": {"enabled": false},
+  "web": {"enabled": true, "host": "127.0.0.1", "port": 8080},
+  "api": {"enabled": false}
+}

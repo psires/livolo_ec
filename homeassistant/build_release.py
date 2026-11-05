@@ -67,6 +67,7 @@ def main():
             "LICENSE",
             "VERSION",
             "host/pyproject.toml",
+            "host/PACKAGE.md",
             "host/docker/smoke.py",
             "host/docker/requirements-firmware.txt",
         ):

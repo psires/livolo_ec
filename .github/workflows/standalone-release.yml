@@ -1,0 +1,120 @@
+name: Publish standalone CLI release
+
+on:
+  push:
+    tags: ['standalone-*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing standalone release tag to validate and publish
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standalone-release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - id: source
+        name: Verify standalone release identity
+        run: |
+          python - <<'PY'
+          import json, os, re
+          tag = os.environ['RELEASE_TAG']
+          assert re.fullmatch(r'standalone-[0-9]+\.[0-9]+\.[0-9]+', tag)
+          version = json.load(open('host/release/version.json'))['distribution_version']
+          assert tag == 'standalone-' + version
+          PY
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - run: python -m pip install -r host/release/requirements-build.txt
+      - name: Build wheels, source packages and native service bundle
+        env:
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+        run: |
+          python tools/package_standalone.py --commit "$SOURCE_COMMIT" --output release-assets
+          cd release-assets
+          sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-release-assets
+          path: release-assets/
+          if-no-files-found: error
+
+  install:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+        format: [wheel, sdist]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          name: standalone-release-assets
+          path: release-assets
+      - name: Test isolated installation, CLI, web, native API and shutdown
+        env:
+          PACKAGE_FORMAT: ${{ matrix.format }}
+        run: python tools/check_standalone.py --assets release-assets --format "$PACKAGE_FORMAT"
+
+  publish:
+    needs: [build, install]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: standalone-release-assets
+          path: release-assets
+      - name: Publish complete assets after every installation check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_COMMIT: ${{ needs.build.outputs.commit }}
+        run: |
+          test "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")" = "$SOURCE_COMMIT"
+          (cd release-assets && sha256sum --check SHA256SUMS)
+          if gh release view "$RELEASE_TAG" --json isDraft > existing-release.json; then
+            if test "$(python -c 'import json; print(json.load(open("existing-release.json"))["isDraft"])')" = False; then
+              echo "Release already published; leaving its assets unchanged."
+              exit 0
+            fi
+          else
+            gh release create "$RELEASE_TAG" --verify-tag --draft \
+              --title "Livolo EC standalone CLI ${RELEASE_TAG#standalone-}" \
+              --notes-file host/release/NOTES.md
+          fi
+          gh release upload "$RELEASE_TAG" release-assets/* --clobber
+          gh release edit "$RELEASE_TAG" --draft=false --latest=false
