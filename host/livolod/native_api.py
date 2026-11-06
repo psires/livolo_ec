@@ -186,8 +186,8 @@ def native_snapshot(service):
             data["firmware_update"]["transfer_percent"] = (
                 percent
                 if type(percent) in (int, float)
-                and math.isfinite(percent)
                 and 0 <= percent <= 100
+                and math.isfinite(percent)
                 else None
             )
         if firmware.get("in_progress") or firmware.get("recovery"):

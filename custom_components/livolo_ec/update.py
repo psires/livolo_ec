@@ -101,7 +101,7 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
     def update_percentage(self):
         """Expose measured overall progress only, with no stage-based estimates."""
         value = self.firmware.get("progress_percent")
-        if type(value) in (int, float) and math.isfinite(value) and 0 <= value <= 100:
+        if type(value) in (int, float) and 0 <= value <= 100 and math.isfinite(value):
             return value
         return None
 
@@ -145,8 +145,8 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
         value["transfer_percent"] = (
             transfer
             if type(transfer) in (int, float)
-            and math.isfinite(transfer)
             and 0 <= transfer <= 100
+            and math.isfinite(transfer)
             else None
         )
         if not self.firmware:

@@ -302,6 +302,7 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
                 "50",
                 float("nan"),
                 float("inf"),
+                10**400,
             ):
                 firmware["transfer_percent"] = value
                 async with self.client.get(self.base + "/api/v1/snapshot") as response:

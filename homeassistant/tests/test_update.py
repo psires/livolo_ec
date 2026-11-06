@@ -236,6 +236,7 @@ async def test_external_job_survives_reload_and_radio_unavailability(hass, gatew
         (101, None),
         (float("nan"), None),
         (float("inf"), None),
+        (10**400, None),
         ("50", None),
         (None, None),
     ],
@@ -256,7 +257,7 @@ async def test_transfer_is_separate_from_verified_completion(
             "in_progress": True,
             "status": "pending",
             "stage": "transfer",
-            "progress_percent": None,
+            "progress_percent": 10**400,
         },
         ready=False,
     )
