@@ -1,0 +1,63 @@
+{
+  "verified_at_utc": "2026-11-06T00:47:37.216374+00:00",
+  "registry_auth": "Anonymous scoped pull tokens; no account credentials",
+  "architecture": "linux/arm64",
+  "radio_access": false,
+  "live_testbed_upgrade": false,
+  "images": [
+    {
+      "image": "ghcr.io/psires/livolod:0.4.0",
+      "index_digest": "sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc",
+      "platform_digest": "sha256:633fa2d30ead037f85ad26e8b9c877b3325cc8a81c773b9d773f0c0c7d0f5adc",
+      "config_digest": "sha256:8988acdf58588270f2b26a93f0fe682417c6e259bb1424b88284942700afd8f8",
+      "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+      "recipe_commit": "ee58376daf6778d692b7aff8a37cac251e9ae94a",
+      "daemon_version": "0.13",
+      "attestation_digests": [
+        "sha256:686e717cad37be36505efba6aa7af53f9b76f69a7e38a108858ede6926f52666"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true,
+      "source_tag": "standalone-0.4.0",
+      "previous_image": "ghcr.io/psires/livolod@sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc",
+      "persistence_test": "0.3.0 to 0.4.0 upgrade; HA also checks native-only local catalog across two recreations",
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42138998728/job/127634308660",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      }
+    },
+    {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.4.0",
+      "index_digest": "sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2",
+      "platform_digest": "sha256:4112b93b98c1ba11d8e584807db2cb34d2d83b3eeabbe8398cc34c7f3ba05695",
+      "config_digest": "sha256:d99389b22ab85e366e1981e04e355042d98f018a65202aa6778e2f0a04c85c89",
+      "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+      "recipe_commit": "ee58376daf6778d692b7aff8a37cac251e9ae94a",
+      "daemon_version": "0.13",
+      "attestation_digests": [
+        "sha256:f473184df90c65465e881d0b257d633336fb0bb4220a8f482bbe3b7adc561e8d"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true,
+      "source_tag": "ha-0.4.0",
+      "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:0c7710060237f32094bee76d53ef685197766af14c5f5da07e42759bbdab7268",
+      "persistence_test": "0.3.0 to 0.4.0 upgrade; HA also checks native-only local catalog across two recreations",
+      "workflow_job_url": "https://github.com/psires/livolo_ec/actions/runs/42138998728/job/127634308642",
+      "gates": {
+        "Push candidate with SBOM and provenance": "success",
+        "Pull and inspect exact candidate": "success",
+        "Installed image and persistent replacement checks": "success",
+        "Anonymous pull gate and immutable promotion": "success"
+      }
+    }
+  ]
+}

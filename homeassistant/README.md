@@ -25,7 +25,7 @@ firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
 **Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
 Install **Livolo EC**, then restart HA. The current
-[0.3.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.3.0) contains
+[0.4.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.4.0) contains
 the assembled client and component. Shared default-catalog inclusion is separate;
 this installation uses a custom repository. Marketplace custom repositories
 require the user's GitHub authorization.
@@ -46,7 +46,7 @@ source revision to distinguish them.
 
 Add `https://github.com/psires/livolo_ec` under the app store's **Repositories**,
 then install **Livolo EC**. The repository supplies the public **aarch64** wrapper
-image `ghcr.io/psires/livolo-ec-ha-app:0.3.0`; it does not build on the HA host.
+image `ghcr.io/psires/livolo-ec-ha-app:0.4.0`; it does not build on the HA host.
 Configure the options documented below before starting the app. Install the
 native integration separately and use the app's actual internal hostname and
 the same API secret.
@@ -60,11 +60,13 @@ database and reconfigures the existing HA entry. Never start a second daemon on
 the same radio. HA Container users instead use the
 [standalone daemon container](../host/docker/README.md).
 
-Public integration upgrades from **0.2.1 to 0.3.0** passed with HACS on HA
-2026.10.4 and Marketplace on HA 2026.11. The 0.3.0 app passed an isolated container
-upgrade from 0.2.1, preserving configuration and state without radio access.
-See the [integration evidence](verification/integration-channel-0.3.0-20261105.json)
-and [container evidence](../host/docker/publication-0.3.0-20261105.json).
+Public integration upgrades from **0.3.0 to 0.4.0** passed with HACS on HA
+2026.10.4 and Marketplace on HA 2026.11. The 0.4.0 app passed an isolated container
+upgrade from 0.3.0, preserving configuration and state without radio access.
+Native API access with Web disabled and a local catalog persisted across two
+container recreations also passed. See the
+[integration evidence](verification/integration-channel-0.4.0-20261106.json)
+and [container evidence](../host/docker/publication-0.4.0-20261106.json).
 
 The following Supervisor qualification is historical: The public app was installed and updated from 0.2.0 to 0.2.1 through
 Supervisor on HA OS 18.4 using an isolated app without a radio. Its registry,
@@ -82,7 +84,7 @@ Build an archive from the repository root:
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.3.0.zip` into the HA configuration directory so
+Extract `dist/livolo-ec-ha-0.4.0.zip` into the HA configuration directory so
 `custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
@@ -106,8 +108,8 @@ Maintainers export a reviewed, committed source revision with:
 
 ```sh
 python3 homeassistant/export_channel.py --commit <full-source-commit> \
-  --version 0.3.0 --output dist/ha-channel-0.3.0
-python3 dist/ha-channel-0.3.0/scripts/build_release.py --tag 0.3.0
+  --version 0.4.0 --output dist/ha-channel-0.4.0
+python3 dist/ha-channel-0.4.0/scripts/build_release.py --tag 0.4.0
 ```
 
 The generated repository contains the complete integration, client, original
@@ -117,7 +119,7 @@ explicit `--preview` export cannot be released. Push the generated repository
 and ordinary matching SemVer tag only after review. Its `livolo_ec.zip` contains
 component files at its root, unlike the manual archive above.
 
-The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.3.0`. The production
+The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.4.0`. The production
 catalog advanced after its exact image passed container upgrade and anonymous
 registry checks. The historical Supervisor qualification above remains separate.
 For isolated Supervisor qualification,

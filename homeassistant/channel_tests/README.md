@@ -1,7 +1,7 @@
 # Public integration installation and upgrade checks
 
 These explicit network tests exercise the published `psires/ha-livolo-ec`
-0.2.1 and 0.3.0 releases. They are separate from offline source tests and must
+0.3.0 and 0.4.0 releases. They are separate from offline source tests and must
 run in disposable Python environments. They create a temporary HA configuration
 and a simulator-backed daemon; they never connect to a radio or live HA host.
 
@@ -16,7 +16,7 @@ test GitHub device authorization, catalog/UI onboarding, scheduled polling or
 a full HA process restart. A reload alone does not activate updated Python code;
 users must still restart HA after installing an integration update.
 
-The default version pair is 0.2.1 to 0.3.0. Override it explicitly with
+The default version pair is 0.3.0 to 0.4.0. Override it explicitly with
 `LIVOLO_BASELINE_VERSION` and `LIVOLO_CURRENT_VERSION` when qualifying another
 release pair. The expected current version must be the latest stable release;
 the test fails rather than silently testing different code.
@@ -58,7 +58,7 @@ unchanged. Anonymous GitHub API rate limits can prevent a run; no account token
 is required or used.
 
 Current publication checksums and results are recorded in
-[`../verification/integration-channel-0.3.0-20261105.json`](../verification/integration-channel-0.3.0-20261105.json).
+[`../verification/integration-channel-0.4.0-20261106.json`](../verification/integration-channel-0.4.0-20261106.json).
 The [earlier 0.2.0 → 0.2.1 record](../verification/integration-channel-20261105.json)
 is preserved separately.
 Supervisor app tests have a separate verification record.

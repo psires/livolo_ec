@@ -6,22 +6,22 @@ requires a radio already running compatible Livolo EC UART firmware. Starting
 or upgrading the container does not flash a radio; firmware installation is a
 separate explicit operation. No broker or firmware payload is bundled.
 
-## Public standalone distribution 0.3.0
+## Public standalone distribution 0.4.0
 
-The current image is **`ghcr.io/psires/livolod:0.3.0`**. Anonymous pulls require
+The current image is **`ghcr.io/psires/livolod:0.4.0`**. Anonymous pulls require
 no GitHub login:
 
 ```sh
-docker pull ghcr.io/psires/livolod:0.3.0
-docker run --rm ghcr.io/psires/livolod:0.3.0 --version
+docker pull ghcr.io/psires/livolod:0.4.0
+docker run --rm ghcr.io/psires/livolod:0.4.0 --version
 ```
 
-The version command reports daemon **0.13**. Distribution **0.3.0** identifies
+The version command reports daemon **0.13**. Distribution **0.4.0** identifies
 the package. Its immutable OCI index digest is
-`sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc`.
-The [publication evidence](publication-0.3.0-20261105.json) records anonymous
+`sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc`.
+The [publication evidence](publication-0.4.0-20261106.json) records anonymous
 verification, source labels, SBOM/provenance and the isolated upgrade from
-standalone 0.2.0, preserving persistent state.
+standalone 0.3.0, preserving persistent state.
 
 The image includes the unified inspection/preflight CLI, Gecko helper and an
 isolated Nordic runtime. Nordic installation needs the explicit
@@ -31,7 +31,7 @@ it unavailable. The public firmware catalog remains empty.
 In your copied `compose.yaml`, use:
 
 ```yaml
-    image: ghcr.io/psires/livolod:0.3.0
+    image: ghcr.io/psires/livolod:0.4.0
 ```
 
 Preserve configuration, network identity and the persistent data directory when

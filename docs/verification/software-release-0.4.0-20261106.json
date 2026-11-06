@@ -1,0 +1,83 @@
+{
+  "schema": 1,
+  "verified_at_utc": "2026-11-06T00:47:11.550175+00:00",
+  "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+  "distribution_version": "0.4.0",
+  "daemon_version": "0.13",
+  "firmware_payloads_bundled": false,
+  "public_assets": [
+    {
+      "release_url": "https://github.com/psires/livolo_ec/releases/tag/standalone-0.4.0",
+      "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+      "assets": {
+        "livolo-ec-0.4.0-standalone.tar.gz": "e105d64c50482d9ae6a7747b032434007127aafb80e511ae2797ff0951253b0e",
+        "livolo_ec_client-0.4.0-py3-none-any.whl": "65b89283cf40102a8d7615ddf814f9caf5ed7b12d5c05be932b8e41bbd888ea8",
+        "livolo_ec_client-0.4.0.tar.gz": "11bfe94aa84399c074af059c797788e29fdf309abd6be628cc0f30ba5d8a844e",
+        "livolo_ec_daemon-0.13-py3-none-any.whl": "ef45c47cc29f12307a04060a6d8530dda3f9bd836debe2c3231e5116df6fe003",
+        "livolo_ec_daemon-0.13.tar.gz": "38159c313bf5202927fe1d81b0c35cc9338efce3d7a266c1268d4905f7584ff6",
+        "release.json": "846992d815d77fb831718e04f454a78fb81a2aa7348f15ddbfd7c719ef416191",
+        "SHA256SUMS": "441f52ea6e883e77bdbf0be70cd04ce49923f276bfb8e0b279b87d654e517b3a"
+      }
+    },
+    {
+      "release_url": "https://github.com/psires/livolo_ec/releases/tag/ha-0.4.0",
+      "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+      "assets": {
+        "livolo-ec-ha-0.4.0.zip": "a1694392bd80161676093e1c88a65404395f9295aafdf2bc7aea3233aa5b1faa",
+        "livolo-ec-ha-app-0.4.0-source.tar.gz": "8981fe3710f4efa2dc185e4d7447df90ca0c574e6223681103918e4b159fe0e4",
+        "release.json": "6ec8f7c49f8751e5963909238adf57bbf9734473eb68901fba322f47d3297bce",
+        "SHA256SUMS": "5d4197e40b6d28c0ccf4f9bc0bf6de7dc960233fa288ca9a246d424cc2bee685"
+      }
+    }
+  ],
+  "standalone_jobs": [
+    {
+      "name": "build",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42138939494/job/127634047853"
+    },
+    {
+      "name": "install (ubuntu-24.04, sdist)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42138939494/job/127634151521"
+    },
+    {
+      "name": "install (ubuntu-24.04-arm, sdist)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42138939494/job/127634151559"
+    },
+    {
+      "name": "install (ubuntu-24.04-arm, wheel)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42138939494/job/127634151583"
+    },
+    {
+      "name": "install (ubuntu-24.04, wheel)",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42138939494/job/127634151652"
+    },
+    {
+      "name": "publish",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42138939494/job/127634326207"
+    }
+  ],
+  "verification": "Anonymous public downloads; every SHA256SUMS entry verified; source/version metadata checked",
+  "installation_scope": "Isolated wheel and source installs on Linux x86-64 and ARM64; installed CLI dry-run and catalog promotion, simulated daemon, Web/native API, persistence and shutdown",
+  "offline_source_checks": {
+    "host": 285,
+    "homeassistant": 134,
+    "ha_progress_followup": 25,
+    "native_api_followup": 19,
+    "web": 31,
+    "firmware": 200,
+    "tools": 54,
+    "container_recipe": 8
+  },
+  "live_radio_access": false,
+  "hardware_qualification": "None added by this software release; hardware transfers replaced by test fixtures",
+  "source_workflows": [
+    "https://github.com/psires/livolo_ec/actions/runs/42138674646",
+    "https://github.com/psires/livolo_ec/actions/runs/42138674629"
+  ]
+}

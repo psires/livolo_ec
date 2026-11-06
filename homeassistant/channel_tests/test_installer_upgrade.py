@@ -26,8 +26,8 @@ from livolod.simulator import Simulator
 from livolod.storage import Store
 
 ROOT = Path(__file__).resolve().parents[2]
-BASELINE = os.environ.get("LIVOLO_BASELINE_VERSION", "0.2.1")
-CURRENT = os.environ.get("LIVOLO_CURRENT_VERSION", "0.3.0")
+BASELINE = os.environ.get("LIVOLO_BASELINE_VERSION", "0.3.0")
+CURRENT = os.environ.get("LIVOLO_CURRENT_VERSION", "0.4.0")
 pytestmark = pytest.mark.usefixtures(
     "socket_enabled", "disable_mock_zeroconf_resolver", "public_github_network"
 )
