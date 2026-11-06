@@ -55,6 +55,26 @@
       "source_tag": "ha-0.3.0",
       "source_commit": "aa661ef56e11755f00b154289021cc41374797bb",
       "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:7349943f15dde171d4938bc821f6405146f6306479fddf596a68592d64bd8edb"
+    },
+    {
+      "enabled": true,
+      "kind": "standalone",
+      "image": "ghcr.io/psires/livolod",
+      "version": "0.4.0",
+      "daemon_version": "0.13",
+      "source_tag": "standalone-0.4.0",
+      "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+      "previous_image": "ghcr.io/psires/livolod@sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc"
+    },
+    {
+      "enabled": true,
+      "kind": "ha",
+      "image": "ghcr.io/psires/livolo-ec-ha-app",
+      "version": "0.4.0",
+      "daemon_version": "0.13",
+      "source_tag": "ha-0.4.0",
+      "source_commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
+      "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:0c7710060237f32094bee76d53ef685197766af14c5f5da07e42759bbdab7268"
     }
   ]
 }

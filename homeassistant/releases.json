@@ -15,6 +15,12 @@
     "version": "0.3.0",
     "tag": "ha-0.3.0",
     "commit": "aa661ef56e11755f00b154289021cc41374797bb",
+    "latest": false
+  },
+  {
+    "version": "0.4.0",
+    "tag": "ha-0.4.0",
+    "commit": "ed8fb6158f237482e6a78834644372b24d1e5f0e",
     "latest": true
   }
 ]
