@@ -225,6 +225,49 @@ async def test_external_job_survives_reload_and_radio_unavailability(hass, gatew
     assert hass.states.get(gateway.entity_id).attributes["update_percentage"] is None
 
 
+@pytest.mark.parametrize(
+    "transfer,expected",
+    [
+        (0, 0),
+        (41.5, 41.5),
+        (100, 100),
+        (True, None),
+        (-1, None),
+        (101, None),
+        (float("nan"), None),
+        (float("inf"), None),
+        ("50", None),
+        (None, None),
+    ],
+)
+async def test_transfer_is_separate_from_verified_completion(
+    hass, gateway, transfer, expected
+):
+    """Measured upload progress never supplies overall progress or confirms firmware.
+
+    @param hass Actual HA instance.
+    @param gateway Loaded gateway and firmware stream.
+    @param transfer Candidate transfer measurement from the daemon.
+    @param expected Sanitized transfer attribute, or None.
+    """
+    await gateway.publish(
+        {
+            "transfer_percent": transfer,
+            "in_progress": True,
+            "status": "pending",
+            "stage": "transfer",
+            "progress_percent": None,
+        },
+        ready=False,
+    )
+    state = hass.states.get(gateway.entity_id)
+    assert state.attributes["transfer_percent"] == expected
+    assert state.attributes["update_percentage"] is None
+    assert state.attributes["installed_version"] == "0.12"
+    assert state.attributes["in_progress"]
+    assert state.attributes["status"] == "pending"
+
+
 async def test_install_failure_preserves_recovery_guidance(hass, gateway):
     """Uncertain firmware results raise service errors without inventing a running version.
 

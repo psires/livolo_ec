@@ -1,0 +1,62 @@
+{
+  "date": "2026-11-06",
+  "scope": "Offline working-tree qualification for proposed 0.4.0; not a published release or live radio qualification",
+  "runtime": {
+    "python": "3.14.7",
+    "homeassistant": "2026.10.4",
+    "pytest_homeassistant_custom_component": "0.13.375",
+    "path": "/tmp/livolo-ha04-venv/bin/python",
+    "requirements": "homeassistant/requirements-test.txt"
+  },
+  "validation": {
+    "command": "/tmp/livolo-ha04-venv/bin/python -m pytest -c homeassistant/pytest.ini homeassistant/tests -q --tb=short",
+    "result": "134 passed",
+    "duration_seconds": 7.53,
+    "documentation": "Function documentation checked in 161 Python files",
+    "diff_check": "passed"
+  },
+  "implemented": [
+    "web_enabled defaults true; false omits Web ingress and origin requirements while preserving native API",
+    "firmware_catalog defaults bundled; local maps only to persistent /data/firmware",
+    "Invalid or missing local catalogs do not prevent ordinary service configuration",
+    "Measured transfer_percent is sanitized independently of overall update_percentage",
+    "Existing native experimental switch detection parity verified; full Settings entry point documented"
+  ],
+  "lifecycle_boundary": {
+    "real": [
+      "Home Assistant update.install service, integration entities and registries",
+      "Native HTTP, WebSocket push and client durable result observation",
+      "Service.run, radio restoration sequence and catalog refresh",
+      "Artifact catalog validation, manager admission, SQLite journal and deduplication",
+      "Worker subprocess, worker.main, inherited guard validation and Channel IPC",
+      "Journal persistence before each fake destructive operation receives its ACK"
+    ],
+    "mocked": [
+      "UART connection and device responses through an exact-identity simulator",
+      "Helper availability checks",
+      "firmware_worker.install hardware installer boundary"
+    ],
+    "excluded": [
+      "No live HA host, physical radio, actual bootloader transfer or helper execution",
+      "No publisher firmware qualification or MG21 backend hardware qualification",
+      "No deployment, flash, release tag, commit or push"
+    ]
+  },
+  "cases": [
+    "Web explicitly disabled and MQTT absent throughout native lifecycle",
+    "One actual HA install through confirmed exact-board/version/session/peer restoration",
+    "Transfer 100 percent remains pending with original installed version and unknown overall percentage",
+    "Cancellation of HA observation and entry reload preserve the original daemon job without replay",
+    "Daemon restart reopens the same database and native endpoint without repeating worker execution",
+    "Wrong returned board/version cannot confirm an update",
+    "Failure before mutation, failure after mutation and abrupt worker death preserve appropriate durable outcome/recovery",
+    "Catalog removal during maintenance preserves active candidate and request identity",
+    "Missing/malformed/restored catalog refresh changes eligibility without radio restart",
+    "Device registry, network identity, API token, entity identifiers, custom name and area preserved",
+    "One- and two-gang switch detection, fresh-evidence review and actual native registration remain passing"
+  ],
+  "remaining_release_checks": [
+    "Release coordinator owns fresh hassfest/channel/container validation and publication",
+    "Old temporary hassfest source and launcher had expired; not rerun in this handoff"
+  ]
+}

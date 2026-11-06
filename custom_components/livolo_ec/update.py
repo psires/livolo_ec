@@ -141,6 +141,14 @@ class LivoloFirmwareUpdate(CoordinatorEntity, UpdateEntity):
             if key in self.firmware
             and isinstance(self.firmware[key], (str, bool, type(None)))
         }
+        transfer = self.firmware.get("transfer_percent")
+        value["transfer_percent"] = (
+            transfer
+            if type(transfer) in (int, float)
+            and math.isfinite(transfer)
+            and 0 <= transfer <= 100
+            else None
+        )
         if not self.firmware:
             value["blocked_reason"] = "Daemon does not advertise firmware updates"
         elif self.firmware.get("preflight_supported") is not True and not value.get(

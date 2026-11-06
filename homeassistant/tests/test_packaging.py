@@ -76,7 +76,69 @@ def test_options_keep_secrets_out_of_daemon_json(tmp_path):
     assert config.mqtt == {"enabled": False}
     assert config.database == str(tmp_path / "state.sqlite3")
     assert config.web["ingress"]["enabled"]
+    assert "firmware_bundle_dir" not in raw
     assert "s" * 32 not in str(raw)
+
+
+@pytest.mark.parametrize("catalog", ["bundled", "local"])
+@pytest.mark.parametrize("invalid_manifest", [False, True])
+def test_native_only_options_keep_service_configurable(
+    tmp_path, catalog, invalid_manifest
+):
+    """Web and an absent or invalid local catalog cannot prevent native configuration.
+
+    @param tmp_path Private app data directory.
+    @param catalog Bundled or fixed persistent catalog selection.
+    @param invalid_manifest Whether to create a malformed operator manifest.
+    """
+    if invalid_manifest:
+        (tmp_path / "firmware").mkdir()
+        (tmp_path / "firmware/manifest.json").write_text("invalid")
+    raw = app.configuration(
+        {
+            "gateway": "10203040",
+            "tag": "42",
+            "serial_port": "/dev/serial/by-id/example",
+            "serial_baudrate": 460800,
+            "api_token": "s" * 32,
+            "web_enabled": False,
+            "firmware_catalog": catalog,
+        },
+        tmp_path,
+    )
+    config = parse(raw)
+    assert not config.web["enabled"]
+    assert "ingress" not in config.web
+    assert config.api["enabled"] and config.api["port"] == 8090
+    assert config.api["token_env"] == "LIVOLO_API_TOKEN"
+    assert config.database == str(tmp_path / "state.sqlite3")
+    assert config.gateway == "10203040" and config.tag == "42"
+    assert "s" * 32 not in str(raw)
+    if catalog == "local":
+        assert config.firmware_bundle_dir == str(tmp_path / "firmware")
+    else:
+        assert "firmware_bundle_dir" not in raw
+
+
+@pytest.mark.parametrize(
+    "option,value",
+    [
+        ("web_enabled", "false"),
+        ("web_enabled", 0),
+        ("web_enabled", None),
+        ("firmware_catalog", "/tmp/firmware"),
+        ("firmware_catalog", "https://example.invalid/catalog"),
+        ("firmware_catalog", None),
+    ],
+)
+def test_invalid_optional_options_rejected(option, value):
+    """Options cannot silently enable Web or select arbitrary catalog locations.
+
+    @param option Supervisor option to validate.
+    @param value Invalid submitted setting.
+    """
+    with pytest.raises(ValueError, match=option):
+        app.configuration({"api_token": "s" * 32, option: value})
 
 
 def test_short_api_token_rejected():

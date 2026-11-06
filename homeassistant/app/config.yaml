@@ -27,6 +27,8 @@ options:
   api_token: ""
   ha_origin: http://homeassistant.local:8123
   output_mode: experimental_phase
+  web_enabled: true
+  firmware_catalog: bundled
 schema:
   serial_port: device(subsystem=tty)
   serial_baudrate: list(115200|230400|460800|921600)
@@ -35,3 +37,5 @@ schema:
   api_token: password
   ha_origin: url
   output_mode: list(disabled|experimental_phase)
+  web_enabled: bool
+  firmware_catalog: list(bundled|local)

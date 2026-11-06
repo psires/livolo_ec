@@ -254,6 +254,16 @@ During maintenance, switch controls are unavailable while the API and firmware
 job remain readable. Job phase, request ID, failure and recovery guidance come
 from the daemon. Percentage progress is shown only when a genuine overall
 measurement is supplied; transfer progress alone does not imply completion.
+The separate `transfer_percent` state attribute displays a validated measured
+upload percentage, if supplied. A value of 100 keeps the job pending until
+restoration is verified; it never supplies the overall update percentage.
+
+The HA app can run this entire native workflow with `web_enabled: false`.
+Web remains enabled by default for existing installations. `firmware_catalog:
+local` selects the persistent `/data/firmware` catalog; the default `bundled`
+uses the image's catalog. Invalid local catalogs disable firmware eligibility
+without interrupting ordinary device control or falling back to bundled images.
+See [app options](app/DOCS.md) and [catalog staging](../docs/FIRMWARE_CATALOG.md).
 
 The client submits once and uses the same durable request ID to resolve lost
 responses. A local observation timeout or HA reload does not cancel or restart
@@ -291,7 +301,8 @@ The integration's **Configure** dialog supports:
 - Request a bounded read-only state refresh.
 - Forget a host record after confirmation. This is not a physical factory reset.
 
-For detection, choose **Configure → Detect a switch (experimental)** and put
+For detection, open **Settings → Devices & services → Livolo EC → Configure →
+Detect a switch (experimental)** and put
 only the intended new switch into physical pairing mode, with pairing on the
 original EC gateway disabled. Submit the form without selecting a device to
 refresh the list, then select its observed ID. HA displays the daemon's detected

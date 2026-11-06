@@ -24,7 +24,13 @@ def configuration(options, data_path=Path("/data")):
         or any(c.isspace() for c in token)
     ):
         raise ValueError("Set an API token of at least 32 non-whitespace characters")
-    return {
+    web_enabled = options.get("web_enabled", True)
+    if type(web_enabled) is not bool:
+        raise ValueError("web_enabled must be a boolean")
+    catalog = options.get("firmware_catalog", "bundled")
+    if catalog not in ("bundled", "local"):
+        raise ValueError("firmware_catalog must be bundled or local")
+    raw = {
         "network": {
             "gateway": options["gateway"].lower(),
             "tag": options["tag"].lower(),
@@ -41,7 +47,10 @@ def configuration(options, data_path=Path("/data")):
             "port": 8090,
             "token_env": "LIVOLO_API_TOKEN",
         },
-        "web": {
+        "web": {"enabled": False},
+    }
+    if web_enabled:
+        raw["web"] = {
             "enabled": True,
             "host": "0.0.0.0",
             "port": 8099,
@@ -50,8 +59,10 @@ def configuration(options, data_path=Path("/data")):
                 "trusted_proxies": ["172.30.32.2"],
                 "allowed_origins": [options["ha_origin"]],
             },
-        },
-    }
+        }
+    if catalog == "local":
+        raw["firmware_bundle_dir"] = str(data_path / "firmware")
+    return raw
 
 
 def prepare_data(data_path, raw, uid=10001, gid=10001):
