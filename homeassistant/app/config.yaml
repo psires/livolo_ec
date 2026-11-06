@@ -1,5 +1,5 @@
 name: Livolo EC
-version: "0.3.0"
+version: "0.4.0"
 image: ghcr.io/psires/livolo-ec-ha-app
 slug: livolo_ec
 description: Dedicated Livolo EC radio service with a native Home Assistant API
