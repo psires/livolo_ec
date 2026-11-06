@@ -6,6 +6,7 @@ import asyncio
 from importlib.metadata import version
 import json
 from pathlib import Path
+import socket
 import subprocess
 import threading
 import time
@@ -127,11 +128,12 @@ def firmware_preflight(base, headers, snapshot):
     return True
 
 
-def check(kind, seed):
+def check(kind, seed, local_catalog=False):
     """Check live authentication, registry writes, persistence and wrapper UID.
 
     @param kind Standalone simulated daemon or HA missing-radio wrapper.
     @param seed Whether to create a registry entry before the replacement test.
+    @param local_catalog Whether the HA app must use persistent catalog/no Web options.
     """
     headers = {"Authorization": "Bearer " + TOKEN, "Content-Type": "application/json"}
     base = "http://127.0.0.1:8090"
@@ -200,6 +202,22 @@ def check(kind, seed):
             == 403
         )
         mqtt_online()
+    elif local_catalog:
+        config = json.loads(Path("/data/daemon.json").read_text())
+        assert config["web"]["enabled"] is False
+        assert config["firmware_bundle_dir"] == "/data/firmware"
+        manifest = json.loads(Path("/data/firmware/manifest.json").read_text())
+        assert manifest == {"schema": 1, "host_version": "0.13", "artifacts": []}
+        assert Path("/data/firmware/persistence-check").read_text() == (
+            "isolated-catalog-survives-recreation"
+        )
+        try:
+            connection = socket.create_connection(("127.0.0.1", 8099), timeout=2)
+        except ConnectionRefusedError:
+            pass
+        else:
+            connection.close()
+            raise AssertionError("Disabled Web UI must have no listener")
     else:
         # Direct requests must not bypass Supervisor ingress authentication.
         assert request("http://127.0.0.1:8099/")[0] == 403
@@ -212,6 +230,7 @@ def check(kind, seed):
                 "websocket": True,
                 "daemon_uid": 10001,
                 "firmware_preflight": preflight_supported,
+                "persistent_catalog_without_web": local_catalog,
             }
         )
     )
@@ -244,9 +263,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", choices=["standalone", "ha"])
     parser.add_argument("--seed", action="store_true")
+    parser.add_argument("--local-catalog", action="store_true")
     parser.add_argument("--ingress")
     args = parser.parse_args()
     if args.ingress:
         ingress(args.ingress)
     else:
-        check(args.kind, args.seed)
+        check(args.kind, args.seed, args.local_catalog)

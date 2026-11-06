@@ -113,6 +113,29 @@ def firmware_checks(config_path, root):
     assert inspected.returncode == 1 and report["status"] == "rejected"
     assert report["error"] == "artifact_invalid"
     assert str(root) not in inspected.stdout
+    source = root / "catalog-source"
+    source.mkdir()
+    manifest = {"schema": 1, "host_version": __version__, "artifacts": []}
+    (source / "manifest.json").write_text(json.dumps(manifest))
+    destination = root / "catalog"
+    published = subprocess.run(
+        [
+            "livolod-firmware-manage",
+            "catalog",
+            "--source",
+            str(source),
+            "--destination",
+            str(destination),
+        ],
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert published.returncode == 0, published.stderr
+    assert json.loads(published.stdout)["artifacts"] == 0
+    assert json.loads((destination / "manifest.json").read_text()) == manifest
+    assert not list(root.glob("state.sqlite3*")), "Catalog publication opened the store"
 
 
 def main():

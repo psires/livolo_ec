@@ -33,6 +33,12 @@ def check(image, kind, broker_image, previous=None):
     """
     identity = "livolo-check-" + uuid.uuid4().hex[:10]
     containers = []
+    docker("pull", image)
+    labels = json.loads(docker("image", "inspect", image))[0]["Config"]["Labels"]
+    release = tuple(map(int, labels["org.opencontainers.image.version"].split(".")))
+    phases = [(previous or image, False), (image, False)]
+    if kind == "ha" and release >= (0, 4, 0):
+        phases += [(image, True), (image, True)]
     with tempfile.TemporaryDirectory(prefix=identity) as temporary:
         root = Path(temporary)
         root.chmod(0o755)
@@ -122,7 +128,30 @@ def check(image, kind, broker_image, previous=None):
                 "-c",
                 "import os; os.chown('/data',10001,10001); os.chmod('/data',0o700)",
             )
-            for number, current in enumerate((previous or image, image)):
+            for number, (current, local_catalog) in enumerate(phases):
+                if number == 2:
+                    # Provision inert catalog bytes, then recreate twice on the same data.
+                    docker(
+                        "run",
+                        "--rm",
+                        "--network",
+                        "none",
+                        "--user",
+                        "0",
+                        "--entrypoint",
+                        "python",
+                        "-v",
+                        str(state) + ":/data",
+                        image,
+                        "-c",
+                        "import json; from pathlib import Path; "
+                        "p=Path('/data/options.json'); o=json.loads(p.read_text()); "
+                        "o.update(web_enabled=False,firmware_catalog='local'); "
+                        "p.write_text(json.dumps(o)); "
+                        "d=Path('/data/firmware'); d.mkdir(mode=0o755); "
+                        "(d/'manifest.json').write_text(json.dumps(dict(schema=1,host_version='0.13',artifacts=[]))); "
+                        "(d/'persistence-check').write_text('isolated-catalog-survives-recreation')",
+                    )
                 docker("pull", current)
                 name = identity + "-app-" + str(number)
                 containers.append(name)
@@ -183,8 +212,10 @@ def check(image, kind, broker_image, previous=None):
                 ]
                 if number == 0:
                     probe += ["--seed"]
+                if local_catalog:
+                    probe += ["--local-catalog"]
                 print(docker(*probe))
-                if kind == "ha":
+                if kind == "ha" and not local_catalog:
                     print(
                         docker(
                             "run",

@@ -1,8 +1,8 @@
-# Standalone daemon and CLI distribution 0.3.0
+# Standalone daemon and CLI distribution 0.4.0
 
-Download `livolo-ec-0.3.0-standalone.tar.gz` and `SHA256SUMS` from the
-[standalone 0.3.0 release](https://github.com/psires/livolo_ec/releases/tag/standalone-0.3.0).
-This distribution contains daemon **0.13**, native Python client **0.3.0**, the
+Download `livolo-ec-0.4.0-standalone.tar.gz` and `SHA256SUMS` from the
+[standalone 0.4.0 release](https://github.com/psires/livolo_ec/releases/tag/standalone-0.4.0).
+This distribution contains daemon **0.13**, native Python client **0.4.0**, the
 local web interface, service examples and firmware maintenance commands. The
 bundle number is independent of the daemon/radio compatibility version; `livolod
 --version` correctly prints `0.13`.
@@ -19,9 +19,9 @@ From the download directory, verify the standalone archive (the outer checksum
 file also lists separately downloadable wheels, sdists and metadata):
 
 ```sh
-grep '  livolo-ec-0.3.0-standalone.tar.gz$' SHA256SUMS | sha256sum --check -
-tar -xzf livolo-ec-0.3.0-standalone.tar.gz
-cd livolo-ec-0.3.0-standalone
+grep '  livolo-ec-0.4.0-standalone.tar.gz$' SHA256SUMS | sha256sum --check -
+tar -xzf livolo-ec-0.4.0-standalone.tar.gz
+cd livolo-ec-0.4.0-standalone
 sha256sum --check SHA256SUMS
 ```
 
@@ -37,7 +37,7 @@ starts a service or operates a radio merely by unpacking it.
 python3.13 -m venv .venv
 .venv/bin/python -m pip install --constraint constraints.txt \
   './packages/livolo_ec_daemon-0.13-py3-none-any.whl[mqtt,flash]' \
-  ./packages/livolo_ec_client-0.3.0-py3-none-any.whl
+  ./packages/livolo_ec_client-0.4.0-py3-none-any.whl
 .venv/bin/python -m pip check
 .venv/bin/livolod --version
 .venv/bin/livolod --config config.example.json --check-config
@@ -73,7 +73,7 @@ sudo usermod -aG dialout livolod
 sudo python3.13 -m venv /opt/livolod
 sudo /opt/livolod/bin/python -m pip install --constraint constraints.txt \
   './packages/livolo_ec_daemon-0.13-py3-none-any.whl[mqtt,flash]' \
-  ./packages/livolo_ec_client-0.3.0-py3-none-any.whl
+  ./packages/livolo_ec_client-0.4.0-py3-none-any.whl
 sudo install -d -m 0750 -o root -g livolod /etc/livolod
 sudo install -m 0640 -o root -g livolod config.example.json /etc/livolod/config.json
 sudo install -m 0644 systemd/livolod.service /etc/systemd/system/livolod.service
@@ -91,7 +91,7 @@ The example deliberately has an empty device registry, disables output control
 and MQTT, and binds the web interface to `127.0.0.1:8080`. It requires matching
 UART v3 firmware already on the radio. Register known switches through the UI.
 Enable an experimental output mode only after reading its hardware limits in the
-[daemon guide](https://github.com/psires/livolo_ec/blob/standalone-0.3.0/host/README.md).
+[daemon guide](https://github.com/psires/livolo_ec/blob/standalone-0.4.0/host/README.md).
 Keep loopback access or configure authenticated access as documented there.
 The native API is disabled initially; its bearer-token setup is described in
 the included `docs/NATIVE_API.md`.
@@ -115,11 +115,11 @@ Stop the actual radio owner before upgrading. For the systemd installation:
 ```sh
 sudo systemctl stop livolod
 sudo install -d -m 0700 /var/backups/livolod
-sudo tar -czf /var/backups/livolod/pre-0.3.0.tar.gz -C / etc/livolod var/lib/livolod
+sudo tar -czf /var/backups/livolod/pre-0.4.0.tar.gz -C / etc/livolod var/lib/livolod
 sudo /opt/livolod/bin/python -m pip freeze > previous-python-packages.txt
 sudo /opt/livolod/bin/python -m pip install --force-reinstall --constraint constraints.txt \
   './packages/livolo_ec_daemon-0.13-py3-none-any.whl[mqtt,flash]' \
-  ./packages/livolo_ec_client-0.3.0-py3-none-any.whl
+  ./packages/livolo_ec_client-0.4.0-py3-none-any.whl
 sudo /opt/livolod/bin/python -m pip check
 sudo /opt/livolod/bin/livolod --config /etc/livolod/config.json --check-config
 sudo systemctl start livolod
@@ -156,6 +156,26 @@ journal and radio lock. Do not run the low-level `livolod-firmware` worker
 directly or bypass its ownership locks.
 
 The catalog is empty, so no firmware installation is offered out of the box.
+To publish an administrator-reviewed catalog from a separate staging directory,
+use the installed command without starting the daemon or opening its radio:
+
+```sh
+sudo /opt/livolod/bin/livolod-firmware-manage catalog \
+  --source /path/to/reviewed-catalog \
+  --destination /var/lib/livolod/firmware \
+  --manifest-sha256 REVIEWED_MANIFEST_SHA256
+```
+
+Replace the paths and checksum with the reviewed values. Set
+`firmware_bundle_dir` in the daemon configuration to the destination and ensure
+the service user can read it. The command validates referenced artifacts before
+publishing immutable objects and atomically replacing the manifest. Previous
+manifests remain in `history/`; do not remove objects referenced by a retained
+manifest or active job. Once configured, catalog changes refresh availability
+without a radio reconnect. Invalid or missing files disable firmware eligibility
+while normal switch control remains available. An active job retains its admitted
+target; catalog publication never requests a flash.
+
 Qualified, trusted payloads must match the exact board and host version. TI and
 MG21 update backends exist. Nordic updates require an explicit physical USB
 profile, narrow device-node publisher and isolated Python 3.10/nrfutil 6.1.7
