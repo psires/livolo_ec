@@ -1885,6 +1885,15 @@ class Service:
                 await scheduler.drop_query(job)
 
     async def run(self):
+        """Run catalog observation independently of radio reconnects and maintenance."""
+        catalog = asyncio.create_task(self.firmware_manager.watch_catalog())
+        try:
+            await self._run_radio()
+        finally:
+            catalog.cancel()
+            await asyncio.gather(catalog, return_exceptions=True)
+
+    async def _run_radio(self):
         """Keep the gateway reconciled across failures until shutdown is requested."""
         delay = 1
         while not self.stop.is_set():

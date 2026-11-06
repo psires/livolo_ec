@@ -482,10 +482,28 @@ def main(argv=None):
     flash.add_argument("--check-only", action="store_true")
     flash.add_argument("--probe", action="store_true")
     flash.add_argument("--retry-interrupted", action="store_true")
+    catalog = commands.add_parser(
+        "catalog", help="Validate and publish a local catalog without radio access"
+    )
+    catalog.add_argument("--source", required=True)
+    catalog.add_argument("--destination", required=True)
+    catalog.add_argument("--manifest-sha256")
     args = parser.parse_args(argv)
-    if args.action != "inspect" and not args.config:
+    if args.action not in ("inspect", "catalog") and not args.config:
         parser.error("--config is required for this operation")
     try:
+        if args.action == "catalog":
+            from . import __version__
+            from .firmware_catalog import provision
+
+            print(
+                json.dumps(
+                    provision(
+                        args.source, args.destination, __version__, args.manifest_sha256
+                    )
+                )
+            )
+            return 0
         if args.action == "inspect":
             from .firmware_artifacts import inspect_artifact
 

@@ -4,6 +4,7 @@ import asyncio
 from dataclasses import asdict
 import hmac
 import json
+import math
 import os
 import re
 import time
@@ -28,6 +29,7 @@ FIRMWARE_FIELDS = {
     "in_progress",
     "stage",
     "progress_percent",
+    "transfer_percent",
     "request_id",
     "status",
     "error",
@@ -179,6 +181,15 @@ def native_snapshot(service):
             if key in FIRMWARE_FIELDS
             and isinstance(value, (str, int, float, bool, type(None)))
         }
+        if "transfer_percent" in firmware:
+            percent = firmware["transfer_percent"]
+            data["firmware_update"]["transfer_percent"] = (
+                percent
+                if type(percent) in (int, float)
+                and math.isfinite(percent)
+                and 0 <= percent <= 100
+                else None
+            )
         if firmware.get("in_progress") or firmware.get("recovery"):
             data["controls_enabled"] = False
     return json.loads(json.dumps(data))

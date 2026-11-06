@@ -232,6 +232,87 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(response.status, 200)
             start.assert_called_with(payload)
 
+    async def test_catalog_refresh_pushes_availability_without_web_or_reconnect(self):
+        """Native subscribers see publication and withdrawal from the background watcher."""
+        from test_firmware_catalog import fixture
+        from livolod.firmware_catalog import provision
+
+        root = Path(self.temp.name)
+        source, catalog = root / "source", root / "catalog"
+        fixture(source)
+        self.service.config = replace(
+            self.service.config,
+            firmware_bundle_dir=str(catalog),
+            serial_baudrate=460800,
+            web={"enabled": False},
+        )
+        self.service.ready = True
+        self.service.simulated = False
+        manager = self.service.firmware_manager
+        manager.observe(
+            dict(board="zb-gw04-1v2", fw_version="0.12", proto="3", baud="460800")
+        )
+        session = self.service.session
+        changes = self.store.db.total_changes
+        with (
+            patch("livolod.firmware_manager.CATALOG_REFRESH_SECONDS", 0.02),
+            patch("livolod.firmware_backends.backend_status", return_value=None),
+        ):
+            watcher = asyncio.create_task(manager.watch_catalog())
+            try:
+                async with self.client.ws_connect(self.base + "/api/v1/events") as ws:
+                    await ws.receive_json()
+                    provision(source, catalog, __version__)
+                    event = await self.next_matching(
+                        ws, lambda e: e["data"]["firmware_update"]["update_available"]
+                    )
+                    self.assertTrue(
+                        event["data"]["firmware_update"]["install_supported"]
+                    )
+                    (catalog / "manifest.json").unlink()
+                    event = await self.next_matching(
+                        ws,
+                        lambda e: not e["data"]["firmware_update"]["install_supported"],
+                    )
+                    self.assertEqual(
+                        event["data"]["firmware_update"]["blocked_reason"],
+                        "bundle_missing",
+                    )
+            finally:
+                watcher.cancel()
+                await asyncio.gather(watcher, return_exceptions=True)
+        self.assertEqual(self.service.session, session)
+        self.assertEqual(self.store.db.total_changes, changes)
+        self.assertIsNone(self.store.firmware_job())
+
+    async def test_transfer_progress_is_additive_bounded_and_never_overall(self):
+        """Expose measured transfer detail while rejecting nonfinite or invalid values."""
+        firmware = dict(stage="transfer", in_progress=True, progress_percent=None)
+        with patch.object(
+            self.service, "firmware_update_snapshot", side_effect=lambda: dict(firmware)
+        ):
+            for value in (
+                0,
+                42.5,
+                100,
+                None,
+                -1,
+                101,
+                True,
+                "50",
+                float("nan"),
+                float("inf"),
+            ):
+                firmware["transfer_percent"] = value
+                async with self.client.get(self.base + "/api/v1/snapshot") as response:
+                    data = (await response.json())["data"]["firmware_update"]
+                expected = (
+                    value if type(value) in (int, float) and 0 <= value <= 100 else None
+                )
+                self.assertEqual(data["transfer_percent"], expected)
+                self.assertIsNone(data["progress_percent"])
+                self.assertEqual(data["stage"], "transfer")
+
     async def test_firmware_snapshots_keep_status_during_radio_maintenance(self):
         """Firmware job changes reach subscribers while raw worker data stays private."""
         firmware = {

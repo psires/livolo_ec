@@ -42,6 +42,17 @@ class FirmwareManagerTests(unittest.IsolatedAsyncioTestCase):
             rollback_supported=True,
             public_key="e" * 64,
         )
+        for target, options in (
+            ("livolod.firmware_catalog.inventory", {"return_value": None}),
+            (
+                "livolod.firmware_bundle.load_candidate",
+                {"side_effect": lambda *a, **k: dict(self.manager.candidate)},
+            ),
+            ("livolod.firmware_backends.backend_status", {"return_value": None}),
+        ):
+            patcher = patch(target, **options)
+            patcher.start()
+            self.addCleanup(patcher.stop)
         self.payload = dict(
             request_id="update-1", candidate_id=self.manager.candidate["id"]
         )
@@ -137,6 +148,32 @@ class FirmwareManagerTests(unittest.IsolatedAsyncioTestCase):
         result = self.store.command_result("update-1")
         self.assertEqual(result["status"], "unknown")
         self.assertEqual(result["recovery"], "recovery_required")
+
+    async def test_ti_handoff_uses_journal_key_when_catalog_disappears(self):
+        """An awaited handoff cannot adopt a new catalog key or lose the admitted one."""
+        self.start_job()
+        key = self.manager.job["public_key"]
+
+        async def command(line):
+            """Remove mutable catalog metadata between awaited identity responses.
+
+            @param line Read-only application command sent by preflight.
+            @return Synthetic board or bootloader facts.
+            """
+            self.manager.candidate = None
+            if line == "VERSION":
+                return "OK board=codm-cc2652p fw_version=0.11"
+            return (
+                "OK key=" + key + " trial=0 state=ffffffff current_sha512=" + "d" * 128
+            )
+
+        gateway = type("Gateway", (), {})()
+        gateway.command = command
+        await self.manager.preflight(gateway)
+        self.assertEqual(self.manager.job["public_key"], key)
+        self.manager.job.pop("public_key")
+        with self.assertRaises(LinkError):
+            await self.manager.preflight(gateway)
 
     def test_trial_digest_mismatch_is_never_confirmed(self):
         """Same-version TI images still require the selected digest before confirmation."""

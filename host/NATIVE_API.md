@@ -76,12 +76,18 @@ Newer daemons add `data.firmware_update` to HTTP/WebSocket snapshots. Older
 daemons may omit it; clients must tolerate absent optional fields. The object
 contains `board`, `installed_version`, `latest_version`, `candidate_id`,
 `update_available`, `install_supported`, `blocked_reason`, `in_progress`, `stage`,
-`progress_percent`, `request_id`, `status`, `error`, `recovery`,
+`progress_percent`, optional `transfer_percent`, `request_id`, `status`, `error`, `recovery`,
 `rollback_supported`, and optional `release_notes`/`release_url`. Null latest
 version/candidate means no validated bundled artifact is available. Overall
-progress remains null. The separate browser snapshot may expose measured transfer
-progress, which does not imply installation or trial confirmation. `recovery`
+progress remains null. `transfer_percent` is measured transfer progress (a finite
+number from 0 through 100, otherwise null), exposed identically to native and
+browser clients. It does not imply installation or trial confirmation. `recovery`
 may block controls even when `in_progress` is false.
+
+Catalog availability is refreshed in the background and pushed to subscribers
+without a Web request or radio reconnect. Active job identity remains pinned
+while a new catalog is advertised after the job finishes. See the
+[persistent catalog guide](../docs/FIRMWARE_CATALOG.md).
 
 `GET /api/v1/firmware/preflight` returns a read-only schema-1 report. It accepts
 at most one optional `candidate_id` query value; all other or duplicate query

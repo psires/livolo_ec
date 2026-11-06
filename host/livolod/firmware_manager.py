@@ -18,6 +18,46 @@ from .protocol import key_values
 
 WORKER_TIMEOUT = 180
 RESTORE_TIMEOUT = 45
+CATALOG_REFRESH_SECONDS = 5
+
+
+def scan_catalog(config, board, caps, cached, stamp):
+    """Resolve bounded catalog changes on a worker thread, never on a radio.
+
+    @param config Immutable configuration captured on the owner loop.
+    @param board Observed board identity.
+    @param caps Detached capabilities from that radio session.
+    @param cached Previously validated immutable candidate, or None.
+    @param stamp Previously validated filesystem revision, or None.
+    @return Candidate, blocking reason and validated revision.
+    """
+    from .firmware_bundle import BundleError, select_candidate
+    from .firmware_catalog import inventory
+    from .firmware_backends import backend_status
+
+    if not board:
+        return None, "board_identity_unknown", None
+    try:
+        before = inventory(config.firmware_bundle_dir)[3]
+        candidate = cached if before == stamp else None
+        if candidate is None:
+            candidate = select_candidate(
+                config.firmware_bundle_dir,
+                board=board,
+                host_version=__version__,
+                app_baudrate=config.serial_baudrate,
+            )
+        reason = backend_status(candidate, config.firmware_nordic)
+        if (
+            candidate["backend"] == "ti_uart_signed_v1"
+            and caps.get("update") != "uart_signed_v1"
+        ):
+            reason = "bootloader_install_required"
+        if inventory(config.firmware_bundle_dir)[3] != before:
+            return None, "bundle_invalid", None
+        return candidate, reason, before
+    except (BundleError, OSError, ValueError) as error:
+        return None, getattr(error, "code", "bundle_invalid"), None
 
 
 def radio_guard(database):
@@ -47,6 +87,9 @@ class FirmwareManager:
         self.service = service
         self.requested = asyncio.Event()
         self.candidate = None
+        self._catalog_generation = 0
+        self._catalog_stamp = None
+        self._catalog_refresh_lock = asyncio.Lock()
         self.reason = "board_identity_unknown"
         self.board = None
         self.installed = None
@@ -88,7 +131,10 @@ class FirmwareManager:
         """
         from .firmware_bundle import BundleError, select_candidate
         from .firmware_backends import backend_status
+        from .firmware_catalog import inventory
 
+        self._catalog_generation += 1
+        self._catalog_stamp = None
         self.caps = dict(caps)
         self.version_info = {}
         self.update_info = {}
@@ -100,6 +146,7 @@ class FirmwareManager:
             self.reason = "board_identity_unknown"
             return
         try:
+            inventory(self.service.config.firmware_bundle_dir)
             self.candidate = select_candidate(
                 self.service.config.firmware_bundle_dir,
                 board=self.board,
@@ -116,6 +163,62 @@ class FirmwareManager:
                 self.reason = "bootloader_install_required"
         except BundleError as error:
             self.reason = error.code
+
+    def catalog_context(self):
+        """Identify the live facts/configuration a background catalog result belongs to.
+
+        @return Detached generation/session/configuration tuple, without credentials.
+        """
+        config = self.service.config
+        return (
+            self._catalog_generation,
+            self.service.session,
+            self.board,
+            config.firmware_bundle_dir,
+            config.serial_baudrate,
+            json.dumps(config.firmware_nordic, sort_keys=True),
+        )
+
+    async def refresh_catalog(self):
+        """Refresh candidate eligibility without resetting facts, jobs or the radio.
+
+        @return Whether a result was applied to the same observation context.
+        """
+        async with self._catalog_refresh_lock:
+            context = self.catalog_context()
+            work = asyncio.create_task(
+                asyncio.to_thread(
+                    scan_catalog,
+                    self.service.config,
+                    self.board,
+                    dict(self.caps),
+                    self.candidate,
+                    self._catalog_stamp,
+                )
+            )
+            try:
+                candidate, reason, stamp = await asyncio.shield(work)
+            except asyncio.CancelledError:
+                await work
+                raise
+            if context != self.catalog_context():
+                return False
+            previous = self.snapshot()
+            self.candidate, self.reason, self._catalog_stamp = candidate, reason, stamp
+            if self.snapshot() != previous:
+                self.service.notify_changed()
+            return True
+
+    async def watch_catalog(self):
+        """Poll catalog revisions with one bounded background validation at a time."""
+        while not self.service.stop.is_set():
+            await self.refresh_catalog()
+            try:
+                await asyncio.wait_for(
+                    self.service.stop.wait(), CATALOG_REFRESH_SECONDS
+                )
+            except asyncio.TimeoutError:
+                pass
 
     def preflight_report(self, candidate_id=None, *, candidate=None):
         """Check current catalog bytes and cached owned-session identity without UART I/O.
@@ -162,6 +265,14 @@ class FirmwareManager:
         """Return only public status; package paths, bytes and keys remain internal."""
         job = self.job or {}
         candidate = self.candidate or {}
+        if self.busy:
+            candidate = dict(
+                id=job.get("candidate_id"),
+                version=job.get("version"),
+                rollback_supported=job.get("rollback_supported", False),
+                release_notes=job.get("release_notes"),
+                release_url=job.get("release_url"),
+            )
         try:
             available = bool(
                 candidate
@@ -235,7 +346,7 @@ class FirmwareManager:
             )
         old_candidate, old_reason = self.candidate, self.reason
         self.candidate, self.reason = candidate, None
-        result = self.start(payload)
+        result = self._admit(payload, local_candidate=candidate)
         if result["status"] == "pending":
             self.worker_arguments = list(worker_arguments)
             self.job["operation"] = "local_update"
@@ -326,6 +437,15 @@ class FirmwareManager:
         @param payload Exactly request_id and a hash-bound bundled candidate_id.
         @return Existing command envelope, or durable pending/rejected outcome.
         """
+        return self._admit(payload)
+
+    def _admit(self, payload, local_candidate=None):
+        """Admit freshly validated catalog bytes or a CLI-inspected local artifact.
+
+        @param payload Exact request/candidate identity checked by normal admission.
+        @param local_candidate Private artifact from the explicit local CLI only.
+        @return Durable command result without automatically replaying requests.
+        """
         ident = payload.get("request_id") if isinstance(payload, dict) else None
         try:
             if not isinstance(payload, dict) or set(payload) != {
@@ -366,6 +486,34 @@ class FirmwareManager:
                 or self.service.mqtt_lock.locked()
             ):
                 error = "radio_busy"
+            candidate = None
+            if not error:
+                from .firmware_bundle import BundleError, load_candidate
+                from .firmware_catalog import inventory
+                from .firmware_backends import backend_status
+
+                try:
+                    if local_candidate is None:
+                        inventory(self.service.config.firmware_bundle_dir)
+                        candidate = load_candidate(
+                            self.service.config.firmware_bundle_dir,
+                            payload["candidate_id"],
+                            host_version=__version__,
+                            app_baudrate=self.service.config.serial_baudrate,
+                        )
+                    else:
+                        candidate = local_candidate
+                    if (
+                        candidate["board"] != self.board
+                        or candidate["version"] != state["latest_version"]
+                    ):
+                        error = "candidate_unavailable"
+                    elif local_candidate is None:
+                        error = backend_status(
+                            candidate, self.service.config.firmware_nordic
+                        )
+                except (BundleError, OSError, ValueError) as failure:
+                    error = getattr(failure, "code", "bundle_invalid")
             if error:
                 result = dict(
                     request_id=ident,
@@ -377,7 +525,6 @@ class FirmwareManager:
                 self.service.store.finish(ident, result)
                 self.service.notify_changed()
                 return result
-            candidate = self.candidate
             self.worker_arguments = None
             self.job = dict(
                 recorded,
@@ -389,8 +536,11 @@ class FirmwareManager:
                 installed_version=self.installed,
                 baudrate=self.service.config.serial_baudrate,
                 image_sha512=candidate.get("image_sha512"),
+                public_key=candidate.get("public_key"),
                 backend=candidate["backend"],
                 rollback_supported=candidate["rollback_supported"],
+                release_notes=candidate.get("release_notes"),
+                release_url=candidate.get("release_url"),
                 error=None,
                 recovery=None,
                 started_at=time.time(),
@@ -443,7 +593,8 @@ class FirmwareManager:
         if self.job["backend"] == "ti_uart_signed_v1":
             update = key_values(await gateway.command("UPDATE_STATUS"))
             if (
-                update.get("key") != self.candidate.get("public_key")
+                not self.job.get("public_key")
+                or update.get("key") != self.job["public_key"]
                 or update.get("trial") != "0"
                 or update.get("state") not in ("ffffffff", "fffffff0", "ffffffc8")
             ):
@@ -452,7 +603,6 @@ class FirmwareManager:
             if not re.fullmatch(r"[0-9a-f]{128}", digest):
                 raise LinkError("Original firmware digest unavailable")
             self.job["original_sha512"] = digest
-            self.job["public_key"] = self.candidate["public_key"]
             self.persist()
 
     async def reap(self, process):

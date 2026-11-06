@@ -438,6 +438,11 @@ It may create the deployment's lock files, but does not initialize SQLite.
 Web/HA can obtain the same report from the authenticated preflight endpoints in
 [NATIVE_API.md](NATIVE_API.md).
 
+For persistent operator catalogs, atomic publication and automatic availability
+refresh, see the [catalog guide](../docs/FIRMWARE_CATALOG.md). The
+`livolod-firmware-manage catalog` command requires no radio or database access;
+HA's native firmware workflow works with the Web listener disabled.
+
 In the browser, open **Network → Gateway firmware → Run preflight** for read-only
 diagnostics. **Review update** repeats preflight and requires a matching successful
 report; installation remains a separate explicit action. Older daemons without
