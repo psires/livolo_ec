@@ -477,3 +477,67 @@ test('installed candidate is distinguished from missing or non-newer firmware', 
   ui.run('renderFirmware()');
   assert.match(ui.element('#firmware-reason').textContent, /No verified firmware candidate/);
 });
+
+/** Jobs started through HA expose transfer progress without claiming overall completion. */
+test('external transfer completion remains updating until daemon confirmation', () => {
+  const ui = harness();
+  const job = {
+    ...candidate(),
+    request_id: 'ha-firmware-job',
+    status: 'pending',
+    in_progress: true,
+    progress_percent: null,
+  };
+  for (const percent of [0, 42, 100]) {
+    ui.snapshot({ ...job, stage: 'transfer', transfer_percent: percent });
+    ui.run('renderFirmware()');
+    assert.match(ui.element('#firmware-stage').textContent, new RegExp(`Transfer: ${percent}%`));
+    assert.equal(ui.element('#firmware-progress').value, null);
+    assert.equal(ui.element('#firmware-status').textContent, 'Updating');
+    assert.equal(ui.element('#firmware-review').disabled, true);
+  }
+  for (const percent of [undefined, null, '100', -1, 101]) {
+    ui.snapshot({ ...job, stage: 'transferring', transfer_percent: percent });
+    ui.run('renderFirmware()');
+    assert.doesNotMatch(ui.element('#firmware-stage').textContent, /%/);
+    assert.equal(ui.element('#firmware-progress').value, null);
+  }
+  ui.snapshot({ ...job, stage: 'restoring', transfer_percent: 100 });
+  ui.run('renderFirmware()');
+  assert.match(ui.element('#firmware-stage').textContent, /verifying/);
+  assert.doesNotMatch(ui.element('#firmware-stage').textContent, /100%/);
+  assert.equal(ui.element('#firmware-status').textContent, 'Updating');
+  ui.snapshot({
+    ...job,
+    stage: 'confirmed',
+    status: 'confirmed',
+    in_progress: false,
+    installed_version: '0.13',
+    update_available: false,
+  });
+  ui.run('renderFirmware()');
+  assert.equal(ui.element('#firmware-status').textContent, 'Verified');
+  assert.equal(ui.element('#firmware-progress').hidden, true);
+  assert.equal(ui.calls.length, 0);
+});
+
+/** Shared catalog removal or changed eligibility revokes a previously reviewed installation. */
+test('catalog refresh invalidates review even without a radio reconnect', async () => {
+  for (const changes of [
+    { candidate_id: null, latest_version: null, update_available: false },
+    { install_supported: false, blocked_reason: 'artifact_unqualified' },
+  ]) {
+    const ui = harness();
+    ui.snapshot(candidate());
+    withPreflight(ui);
+    await ui.element('#firmware-review').events.click();
+    assert.equal(ui.element('#firmware-install').disabled, false);
+    ui.snapshot({ ...candidate(), ...changes });
+    ui.run('renderFirmware()');
+    assert.equal(ui.element('#firmware-install').disabled, true);
+    assert.equal(ui.run('firmwareUi.preflight.report'), null);
+    await ui.element('#firmware-form').events.submit({ preventDefault() {} });
+    assert.equal(ui.calls.length, 1);
+    assert.equal(ui.calls[0].options.method, undefined);
+  }
+});
