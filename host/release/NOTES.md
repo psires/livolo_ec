@@ -1,44 +1,43 @@
-Standalone daemon and CLI distribution **0.4.0**, containing daemon **0.13**
-and Python API client **0.4.0**. UART protocol 3 and native API revision 1 remain
-compatible; the software update does not flash radio firmware.
+Standalone daemon and CLI distribution **0.5.0**, containing daemon **0.14.0**
+and Python API client **0.5.0**. Radio firmware compatibility remains **0.13**,
+UART protocol 3 and native API revision 1. This is a software-only release.
 
 ### Changes
 
-- Trusted local firmware catalogs can be validated and promoted without radio
-  access. Catalog changes refresh update eligibility without reconnecting the
-  radio or clearing its observed version and session state.
-- Installation admission revalidates the selected artifact. Existing durable
-  jobs retain their original target when a catalog changes.
-- Native clients receive measured firmware transfer progress separately from
-  overall verification. Transfer completion alone is not success.
-- The unified CLI retains offline dry-run preflight, explicit probing, exact-board
-  checks and durable emergency recovery. Web and HA use the same daemon owner.
+- Pair a new supported switch from Web or HA with one action. A bounded session
+  detects its profile, registers it and reports confirmation; unknown or
+  conflicting profiles remain on the advanced/manual path.
+- Use `livolod-commission` for authenticated terminal commissioning.
+- Report daemon software and radio compatibility versions independently in CLI,
+  API and HA diagnostics. API revision 1 retains its legacy compatibility alias.
+- Explain missing or unusable firmware catalogs without disrupting switch control.
+- Preserve existing local catalogs, network identity and authoritative device
+  registry. Restart does not replay interrupted firmware installations.
 
-### Install
+### Install and upgrade
 
-Download `livolo-ec-0.4.0-standalone.tar.gz` and `SHA256SUMS`, verify the archive,
-and follow its README. No source checkout is required. Use Linux with Python
-3.13 and venv support; dependencies are installed separately from PyPI.
-See the [installation, upgrade and recovery guide](https://github.com/psires/livolo_ec/blob/standalone-0.4.0/host/release/README.md).
+Download `livolo-ec-0.5.0-standalone.tar.gz` and `SHA256SUMS`, verify the archive,
+and follow its README. Linux with Python 3.13 and venv support is required;
+install dependencies separately from PyPI. The bundle includes daemon/client
+wheels and source packages, web assets, configuration/service examples, pairing
+and versioning guides, checksums and licence notices.
 
-The bundle includes daemon/client wheels and source packages, web assets,
-systemd/configuration examples, maintenance commands, checksums and licence
-notices. The Python client is a library, not a remote-control shell.
+See the [installation and recovery guide](https://github.com/psires/livolo_ec/blob/standalone-0.5.0/host/release/README.md).
+Finish active firmware or pairing operations, stop the daemon, and back up its
+configuration, database and trusted catalog (including custom paths). Retain the
+same Docker mounts and local-catalog setting. No database-schema or network-ID
+migration is required. Preserve the previous environment for rollback.
 
 ### Validation and limits
 
 Publication requires isolated wheel and source installs on Linux **x86-64 and
-ARM64**, including installed CLI dry-run checks, simulated radio readiness,
-web/native API, persistence and clean shutdown. These packaging checks use no
-live radios. Nordic hardware qualification is recorded separately in the
-[local trial record](https://github.com/psires/livolo_ec/blob/standalone-0.4.0/docs/FIRMWARE_013_TRIAL.md).
+ARM64**, with installed CLI, simulated radio, Web/API and persistence checks.
+The coordinated ARM64 containers also require upgrade and anonymous-pull checks.
+These software tests do not establish new physical-radio qualification.
 
-The default firmware catalog remains empty. The separately prepared 0.13 radio
-images have offline build/comparison evidence for local installation trials;
-they are not offered as public hardware-qualified updates. No firmware binaries,
-private signing keys, SDKs or legacy Nordic helper are bundled. The exact-board
-experimental limits and recovery prerequisites remain documented in the source.
-
-Back up the stopped daemon's configuration/database before upgrading and preserve
-its network identity and authoritative registry. HA integration releases and
-container tags are separate distributions; prior published assets are unchanged.
+The public firmware catalog remains empty. No firmware payloads, private keys,
+vendor SDKs or bootloaders are included. The four source board profiles retain
+radio compatibility 0.13 and their existing experimental limits; updating this
+software never flashes a radio. Existing trusted local catalogs remain usable.
+HA integration releases and container tags are separate distributions. Published
+versions and prior release assets remain immutable.

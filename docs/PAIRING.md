@@ -1,7 +1,8 @@
 # Pair a new switch
 
-This guide describes the automatic pairing feature in development after the
-0.4.0 release. It is not available in the published 0.4.0 packages.
+Automatic pairing is included in software distribution **0.5.0** with daemon
+**0.14.0** and HA integration **0.5.0**. Earlier 0.4.0 packages retain advanced
+manual commissioning. This feature does not change radio firmware.
 
 ## Add a switch
 

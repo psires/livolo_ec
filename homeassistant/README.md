@@ -25,7 +25,7 @@ firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
 **Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
 Install **Livolo EC**, then restart HA. The current
-[0.4.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.4.0) contains
+[0.5.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.0) contains
 the assembled client and component. Shared default-catalog inclusion is separate;
 this installation uses a custom repository. Marketplace custom repositories
 require the user's GitHub authorization.
@@ -46,7 +46,7 @@ source revision to distinguish them.
 
 Add `https://github.com/psires/livolo_ec` under the app store's **Repositories**,
 then install **Livolo EC**. The repository supplies the public **aarch64** wrapper
-image `ghcr.io/psires/livolo-ec-ha-app:0.4.0`; it does not build on the HA host.
+image `ghcr.io/psires/livolo-ec-ha-app:0.5.0`; it does not build on the HA host.
 Configure the options documented below before starting the app. Install the
 native integration separately and use the app's actual internal hostname and
 the same API secret.
@@ -60,7 +60,15 @@ database and reconfigures the existing HA entry. Never start a second daemon on
 the same radio. HA Container users instead use the
 [standalone daemon container](../host/docker/README.md).
 
-Public integration upgrades from **0.3.0 to 0.4.0** passed with HACS on HA
+Public integration upgrades from **0.4.0 to 0.5.0** passed with HACS on HA
+2026.10.4 and Marketplace on HA 2026.11.0, preserving configuration and entity
+identity through real ZIP replacement and entry reload. These isolated checks
+verify restart-required handling, not a complete HA process restart. Both ARM64
+0.5.0 images passed replacement from the public 0.4.0 images with persistent state.
+See the [0.5.0 release verification](../docs/verification/software-release-0.5.0-20261107.json)
+for exact source, public hashes and test limits.
+
+Historical public integration upgrades from **0.3.0 to 0.4.0** passed with HACS on HA
 2026.10.4 and Marketplace on HA 2026.11. The 0.4.0 app passed an isolated container
 upgrade from 0.3.0, preserving configuration and state without radio access.
 Native API access with Web disabled and a local catalog persisted across two
@@ -84,7 +92,7 @@ Build an archive from the repository root:
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.4.0.zip` into the HA configuration directory so
+Extract `dist/livolo-ec-ha-0.5.0.zip` into the HA configuration directory so
 `custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
@@ -108,8 +116,8 @@ Maintainers export a reviewed, committed source revision with:
 
 ```sh
 python3 homeassistant/export_channel.py --commit <full-source-commit> \
-  --version 0.4.0 --output dist/ha-channel-0.4.0
-python3 dist/ha-channel-0.4.0/scripts/build_release.py --tag 0.4.0
+  --version 0.5.0 --output dist/ha-channel-0.5.0
+python3 dist/ha-channel-0.5.0/scripts/build_release.py --tag 0.5.0
 ```
 
 The generated repository contains the complete integration, client, original
@@ -119,9 +127,10 @@ explicit `--preview` export cannot be released. Push the generated repository
 and ordinary matching SemVer tag only after review. Its `livolo_ec.zip` contains
 component files at its root, unlike the manual archive above.
 
-The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.4.0`. The production
-catalog advanced after its exact image passed container upgrade and anonymous
-registry checks. The historical Supervisor qualification above remains separate.
+The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.5.0`. The production
+catalog is advanced only after that exact image passes container upgrade and
+anonymous registry checks. The historical Supervisor qualification above remains
+separate.
 For isolated Supervisor qualification,
 `stage_supervisor_probe.py` prepares a separate app with no USB mapping or host
 ports; it never modifies the existing installation. See the
@@ -242,7 +251,7 @@ retains the installed version and blocking reason but has an unknown update stat
 and no install capability. Older daemons without firmware-update metadata keep
 their switches working and expose the firmware entity as unavailable.
 
-Development builds after the 0.4.0 release add the following diagnostics.
+Integration 0.5.0 adds the following diagnostics.
 Open the **Livolo EC gateway** device and find **Radio firmware status** under
 **Diagnostic** for an explanation that remains visible when no update is offered.
 It distinguishes a missing or unusable catalog from a catalog with no compatible

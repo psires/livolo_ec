@@ -1,0 +1,231 @@
+{
+  "verified_at_utc": "2026-11-07T14:37:51.645847+00:00",
+  "registry_auth": "Anonymous scoped pull tokens; no account credentials",
+  "architecture": "linux/arm64",
+  "radio_access": false,
+  "live_testbed_upgrade": false,
+  "images": [
+    {
+      "image": "ghcr.io/psires/livolod:0.5.0",
+      "index_digest": "sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f",
+      "platform_digest": "sha256:dded299f6c40ccfdd9aab74e14aa41ff497026069089682018fbbe7f615bcff1",
+      "config_digest": "sha256:ec62b5a7edb90f9bd95db0590547678df59bac4554f6747422d3e53e6df5390c",
+      "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+      "recipe_commit": "24c77839023c6f417ee4649e467467f2ed1595fb",
+      "daemon_version": "0.14.0",
+      "firmware_compat_version": "0.13",
+      "attestation_digests": [
+        "sha256:570001c5e7d3c9419bf951b92d0ea69fd15a2100facd9973154b5d9d5e2073a2"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true
+    },
+    {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.5.0",
+      "index_digest": "sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d92820a4b34e725854a351f6d",
+      "platform_digest": "sha256:357dcc8691493a0fd2debcf18d157509461b504da2fc374ccd42b19e21f469a3",
+      "config_digest": "sha256:f0cca0732895704ee817df35419798ec97a1719bb1f7f607f1fb12e97b939480",
+      "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+      "recipe_commit": "24c77839023c6f417ee4649e467467f2ed1595fb",
+      "daemon_version": "0.14.0",
+      "firmware_compat_version": "0.13",
+      "attestation_digests": [
+        "sha256:e83fe5819f40be03e858f445c98945006121afff4353b9413168ec7bbf6d28da"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true
+    }
+  ],
+  "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+  "publication_workflow": "https://github.com/psires/livolo_ec/actions/runs/42382320757",
+  "jobs": [
+    {
+      "name": "plan",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42382320757/job/128432340803",
+      "steps": [
+        {
+          "name": "Set up job",
+          "result": "success"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "result": "success"
+        },
+        {
+          "name": "Run python3 tools/container_test.py",
+          "result": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "result": "success"
+        },
+        {
+          "name": "Complete job",
+          "result": "success"
+        }
+      ]
+    },
+    {
+      "name": "publish (true, standalone, ghcr.io/psires/livolod, 0.5.0, 0.14.0, 0.13, 2, standalone-0.5.0, bd06...",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42382320757/job/128432365005",
+      "steps": [
+        {
+          "name": "Set up job",
+          "result": "success"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "result": "success"
+        },
+        {
+          "name": "Assemble exact source and external release recipe",
+          "result": "success"
+        },
+        {
+          "name": "Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+          "result": "success"
+        },
+        {
+          "name": "Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+          "result": "success"
+        },
+        {
+          "name": "Record builder and platform",
+          "result": "success"
+        },
+        {
+          "name": "Push candidate with SBOM and provenance",
+          "result": "success"
+        },
+        {
+          "name": "Pull and inspect exact candidate",
+          "result": "success"
+        },
+        {
+          "name": "Installed image and persistent replacement checks",
+          "result": "success"
+        },
+        {
+          "name": "Anonymous pull gate and immutable promotion",
+          "result": "success"
+        },
+        {
+          "name": "Summarize release gates",
+          "result": "success"
+        },
+        {
+          "name": "Preserve release evidence, including failed candidates",
+          "result": "success"
+        },
+        {
+          "name": "Post Push candidate with SBOM and provenance",
+          "result": "success"
+        },
+        {
+          "name": "Post Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+          "result": "success"
+        },
+        {
+          "name": "Post Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+          "result": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "result": "success"
+        },
+        {
+          "name": "Complete job",
+          "result": "success"
+        }
+      ]
+    },
+    {
+      "name": "publish (true, ha, ghcr.io/psires/livolo-ec-ha-app, 0.5.0, 0.14.0, 0.13, 2, ha-0.5.0, bd06c6b02f4...",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42382320757/job/128432365040",
+      "steps": [
+        {
+          "name": "Set up job",
+          "result": "success"
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "result": "success"
+        },
+        {
+          "name": "Assemble exact source and external release recipe",
+          "result": "success"
+        },
+        {
+          "name": "Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+          "result": "success"
+        },
+        {
+          "name": "Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+          "result": "success"
+        },
+        {
+          "name": "Record builder and platform",
+          "result": "success"
+        },
+        {
+          "name": "Push candidate with SBOM and provenance",
+          "result": "success"
+        },
+        {
+          "name": "Pull and inspect exact candidate",
+          "result": "success"
+        },
+        {
+          "name": "Installed image and persistent replacement checks",
+          "result": "success"
+        },
+        {
+          "name": "Anonymous pull gate and immutable promotion",
+          "result": "success"
+        },
+        {
+          "name": "Summarize release gates",
+          "result": "success"
+        },
+        {
+          "name": "Preserve release evidence, including failed candidates",
+          "result": "success"
+        },
+        {
+          "name": "Post Push candidate with SBOM and provenance",
+          "result": "success"
+        },
+        {
+          "name": "Post Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+          "result": "success"
+        },
+        {
+          "name": "Post Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+          "result": "success"
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "result": "success"
+        },
+        {
+          "name": "Complete job",
+          "result": "success"
+        }
+      ]
+    }
+  ],
+  "previous_images": {
+    "standalone": "ghcr.io/psires/livolod@sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc",
+    "ha": "ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2"
+  },
+  "scope": "Isolated ARM64 runtime and public 0.4.0 replacement; no live deployment or physical radio access"
+}

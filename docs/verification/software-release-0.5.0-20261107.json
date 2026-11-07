@@ -1,0 +1,1208 @@
+{
+  "schema": 2,
+  "verified_at_utc": "2026-11-07T14:39:21.433513+00:00",
+  "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+  "publication_recipe_commit": "24c77839023c6f417ee4649e467467f2ed1595fb",
+  "integration_channel_commit": "c94532b664533e62db5e7efff121dae58b070ea3",
+  "distribution_version": "0.5.0",
+  "daemon_version": "0.14.0",
+  "client_version": "0.5.0",
+  "ha_integration_version": "0.5.0",
+  "ha_app_version": "0.5.0",
+  "firmware_compat_version": "0.13",
+  "native_api_revision": 1,
+  "uart_protocol": 3,
+  "scope": "Software-only publication authorized by the user through Tech Lead; not a complete qualified firmware release",
+  "firmware_payloads_bundled": false,
+  "public_assets": [
+    {
+      "release_url": "https://github.com/psires/livolo_ec/releases/tag/standalone-0.5.0",
+      "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+      "assets": {
+        "livolo-ec-0.5.0-standalone.tar.gz": {
+          "sha256": "53284c2d5786e34b320a330028614ae6d1c26130643cde9cd5239ec4bf578805",
+          "size": 478554
+        },
+        "livolo_ec_client-0.5.0-py3-none-any.whl": {
+          "sha256": "59a4aadd89e3423660ca0cb6c4af4c2d7defc1d99eda766bccb58dfaf8efd5f1",
+          "size": 9690
+        },
+        "livolo_ec_client-0.5.0.tar.gz": {
+          "sha256": "355cc7dbb7448ec3a6dad9d0313b81b6cf69f97eaec6e6d6ccc3dc6da3aede51",
+          "size": 10335
+        },
+        "livolo_ec_daemon-0.14.0-py3-none-any.whl": {
+          "sha256": "0e3c92a361a443af0255e5a3256a84025c7bf5d50bcc9d7bc0545ea12c93efb5",
+          "size": 164239
+        },
+        "livolo_ec_daemon-0.14.0.tar.gz": {
+          "sha256": "65f99c5ebfee65b715c1d4b6f4abd009f27ed3c0c5ea2a8380cf58bd2d543342",
+          "size": 260621
+        },
+        "release.json": {
+          "sha256": "3a506c0dd54a27ef9c1b3906e5b317e5b9ca90bbe9e3a89a94a81f12237d5d70",
+          "size": 588
+        },
+        "SHA256SUMS": {
+          "sha256": "1a5066383296aa22166912918b64b0f214ba29716861a1b640f6514fbaa50df5",
+          "size": 585
+        }
+      }
+    },
+    {
+      "release_url": "https://github.com/psires/livolo_ec/releases/tag/ha-0.5.0",
+      "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+      "assets": {
+        "livolo-ec-ha-0.5.0.zip": {
+          "sha256": "8598822912a85de36aded24a45c4ebce5311c73facb3befda2bb1a85241816eb",
+          "size": 78122
+        },
+        "livolo-ec-ha-app-0.5.0-source.tar.gz": {
+          "sha256": "cda8d27c2bef478b97253f029a6ebfd81d6f70cfb64da992f6a205048f6910b8",
+          "size": 155523
+        },
+        "release.json": {
+          "sha256": "ead72326890ae6b49381255f0aed82dfd63f534485b93bc5a269af039dd8aaf3",
+          "size": 458
+        },
+        "SHA256SUMS": {
+          "sha256": "53fc60aec57e6cfa0d36d60b5661da71594be496b2c7be9d8d603eac530d6044",
+          "size": 271
+        }
+      }
+    },
+    {
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.5.0",
+      "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+      "assets": {
+        "livolo_ec.zip": {
+          "sha256": "5bd464d8c9f8c6340382b9ce71fc40b1c4c430b512f2df86d8a2eb880480136f",
+          "size": 77058
+        },
+        "source.json": {
+          "sha256": "a050c5566fddaa3360227fe0f851a597ab5eaa98df648a2e761cf7ef11d63c61",
+          "size": 4345
+        },
+        "SHA256SUMS": {
+          "sha256": "d674aa80f0f37d7e87b3795da3e4303c0c21ce79ed3cbc38c0e81363c01413eb",
+          "size": 158
+        }
+      }
+    }
+  ],
+  "publication_jobs": {
+    "source": [
+      {
+        "name": "offline",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382066395/job/128431590897",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "result": "success"
+          },
+          {
+            "name": "Install test and formatting dependencies",
+            "result": "success"
+          },
+          {
+            "name": "Check documentation and source layout",
+            "result": "success"
+          },
+          {
+            "name": "Test decoder and protocol vectors",
+            "result": "success"
+          },
+          {
+            "name": "Test host service and local integrations",
+            "result": "success"
+          },
+          {
+            "name": "Test gateway UART and peer management",
+            "result": "success"
+          },
+          {
+            "name": "Test update authentication and rollback",
+            "result": "success"
+          },
+          {
+            "name": "Test Silicon Labs UART and Nordic clock handling",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "wireshark",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382066395/job/128431591010",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Install dissector test runtime",
+            "result": "success"
+          },
+          {
+            "name": "Test Lua dissector against capture fixtures",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      }
+    ],
+    "native-ha": [
+      {
+        "name": "hassfest",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382066441/job/128431591053",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run home-assistant/actions/hassfest@master",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "integration",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382066441/job/128431591249",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run python -m pip install -r homeassistant/requirements-test.txt",
+            "result": "success"
+          },
+          {
+            "name": "Run python -m black --check client custom_components homeassistant",
+            "result": "success"
+          },
+          {
+            "name": "Run python -m pytest -c homeassistant/pytest.ini homeassistant/tests -q",
+            "result": "success"
+          },
+          {
+            "name": "Run python homeassistant/build_release.py --app",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      }
+    ],
+    "standalone": [
+      {
+        "name": "build",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382277590/job/128432221441",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Verify standalone release identity",
+            "result": "success"
+          },
+          {
+            "name": "Run python -m pip install -r host/release/requirements-build.txt",
+            "result": "success"
+          },
+          {
+            "name": "Build wheels, source packages and native service bundle",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "install (ubuntu-24.04-arm, sdist)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382277590/job/128432281025",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Test isolated installation, CLI, web, native API and shutdown",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "install (ubuntu-24.04, wheel)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382277590/job/128432281028",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Test isolated installation, CLI, web, native API and shutdown",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "install (ubuntu-24.04-arm, wheel)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382277590/job/128432281031",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Test isolated installation, CLI, web, native API and shutdown",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "install (ubuntu-24.04, sdist)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382277590/job/128432281129",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Test isolated installation, CLI, web, native API and shutdown",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "publish",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382277590/job/128432379378",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Publish complete assets after every installation check",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      }
+    ],
+    "ha-archives": [
+      {
+        "name": "plan",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320704/job/128432340694",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Read explicit release publication manifest",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "release (0.1.1, ha-0.1.1, fde0b494fed3b925e97c482524b874c1d98cd93b, false)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320704/job/128432365075",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Verify the immutable release tag",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Build and inspect clean source assets",
+            "result": "success"
+          },
+          {
+            "name": "Publish complete assets without replacing a published release",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "release (0.3.0, ha-0.3.0, aa661ef56e11755f00b154289021cc41374797bb, false)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320704/job/128432365091",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Verify the immutable release tag",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Build and inspect clean source assets",
+            "result": "success"
+          },
+          {
+            "name": "Publish complete assets without replacing a published release",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "release (0.4.0, ha-0.4.0, ed8fb6158f237482e6a78834644372b24d1e5f0e, false)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320704/job/128432365103",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Verify the immutable release tag",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Build and inspect clean source assets",
+            "result": "success"
+          },
+          {
+            "name": "Publish complete assets without replacing a published release",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "release (0.5.0, ha-0.5.0, bd06c6b02f4598eca266b72293abc11900cae419, true)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320704/job/128432365156",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Verify the immutable release tag",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Build and inspect clean source assets",
+            "result": "success"
+          },
+          {
+            "name": "Publish complete assets without replacing a published release",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "release (0.2.0, ha-0.2.0, 6fe41cbdc909a6497776202b3eeae088655b9908, false)",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320704/job/128432365202",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Verify the immutable release tag",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Build and inspect clean source assets",
+            "result": "success"
+          },
+          {
+            "name": "Publish complete assets without replacing a published release",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      }
+    ],
+    "ha-channel": [
+      {
+        "name": "validate / hacs",
+        "result": "success",
+        "url": "https://github.com/psires/ha-livolo-ec/actions/runs/42382322208/job/128432345748",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Pull ghcr.io/hacs/action:main",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "validate / hassfest",
+        "result": "success",
+        "url": "https://github.com/psires/ha-livolo-ec/actions/runs/42382322208/job/128432345859",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "validate / package",
+        "result": "success",
+        "url": "https://github.com/psires/ha-livolo-ec/actions/runs/42382322208/job/128432345949",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Run python scripts/build_release.py",
+            "result": "success"
+          },
+          {
+            "name": "Run python -m compileall -q custom_components/livolo_ec",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "release",
+        "result": "success",
+        "url": "https://github.com/psires/ha-livolo-ec/actions/runs/42382322208/job/128432528108",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Build exact reviewed package",
+            "result": "success"
+          },
+          {
+            "name": "Publish immutable release",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/setup-python@v5",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      }
+    ],
+    "container": [
+      {
+        "name": "plan",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320757/job/128432340803",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "result": "success"
+          },
+          {
+            "name": "Run python3 tools/container_test.py",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "publish (true, standalone, ghcr.io/psires/livolod, 0.5.0, 0.14.0, 0.13, 2, standalone-0.5.0, bd06...",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320757/job/128432365005",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "result": "success"
+          },
+          {
+            "name": "Assemble exact source and external release recipe",
+            "result": "success"
+          },
+          {
+            "name": "Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+            "result": "success"
+          },
+          {
+            "name": "Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+            "result": "success"
+          },
+          {
+            "name": "Record builder and platform",
+            "result": "success"
+          },
+          {
+            "name": "Push candidate with SBOM and provenance",
+            "result": "success"
+          },
+          {
+            "name": "Pull and inspect exact candidate",
+            "result": "success"
+          },
+          {
+            "name": "Installed image and persistent replacement checks",
+            "result": "success"
+          },
+          {
+            "name": "Anonymous pull gate and immutable promotion",
+            "result": "success"
+          },
+          {
+            "name": "Summarize release gates",
+            "result": "success"
+          },
+          {
+            "name": "Preserve release evidence, including failed candidates",
+            "result": "success"
+          },
+          {
+            "name": "Post Push candidate with SBOM and provenance",
+            "result": "success"
+          },
+          {
+            "name": "Post Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+            "result": "success"
+          },
+          {
+            "name": "Post Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      },
+      {
+        "name": "publish (true, ha, ghcr.io/psires/livolo-ec-ha-app, 0.5.0, 0.14.0, 0.13, 2, ha-0.5.0, bd06c6b02f4...",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42382320757/job/128432365040",
+        "steps": [
+          {
+            "name": "Set up job",
+            "result": "success"
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "result": "success"
+          },
+          {
+            "name": "Assemble exact source and external release recipe",
+            "result": "success"
+          },
+          {
+            "name": "Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+            "result": "success"
+          },
+          {
+            "name": "Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+            "result": "success"
+          },
+          {
+            "name": "Record builder and platform",
+            "result": "success"
+          },
+          {
+            "name": "Push candidate with SBOM and provenance",
+            "result": "success"
+          },
+          {
+            "name": "Pull and inspect exact candidate",
+            "result": "success"
+          },
+          {
+            "name": "Installed image and persistent replacement checks",
+            "result": "success"
+          },
+          {
+            "name": "Anonymous pull gate and immutable promotion",
+            "result": "success"
+          },
+          {
+            "name": "Summarize release gates",
+            "result": "success"
+          },
+          {
+            "name": "Preserve release evidence, including failed candidates",
+            "result": "success"
+          },
+          {
+            "name": "Post Push candidate with SBOM and provenance",
+            "result": "success"
+          },
+          {
+            "name": "Post Run docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
+            "result": "success"
+          },
+          {
+            "name": "Post Run docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
+            "result": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "result": "success"
+          },
+          {
+            "name": "Complete job",
+            "result": "success"
+          }
+        ]
+      }
+    ]
+  },
+  "containers": {
+    "verified_at_utc": "2026-11-07T14:37:51.645847+00:00",
+    "registry_auth": "Anonymous scoped pull tokens; no account credentials",
+    "architecture": "linux/arm64",
+    "radio_access": false,
+    "live_testbed_upgrade": false,
+    "images": [
+      {
+        "image": "ghcr.io/psires/livolod:0.5.0",
+        "index_digest": "sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f",
+        "platform_digest": "sha256:dded299f6c40ccfdd9aab74e14aa41ff497026069089682018fbbe7f615bcff1",
+        "config_digest": "sha256:ec62b5a7edb90f9bd95db0590547678df59bac4554f6747422d3e53e6df5390c",
+        "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+        "recipe_commit": "24c77839023c6f417ee4649e467467f2ed1595fb",
+        "daemon_version": "0.14.0",
+        "firmware_compat_version": "0.13",
+        "attestation_digests": [
+          "sha256:570001c5e7d3c9419bf951b92d0ea69fd15a2100facd9973154b5d9d5e2073a2"
+        ],
+        "predicate_types": [
+          "https://slsa.dev/provenance/v1",
+          "https://spdx.dev/Document"
+        ],
+        "anonymous_registry_verification": true
+      },
+      {
+        "image": "ghcr.io/psires/livolo-ec-ha-app:0.5.0",
+        "index_digest": "sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d92820a4b34e725854a351f6d",
+        "platform_digest": "sha256:357dcc8691493a0fd2debcf18d157509461b504da2fc374ccd42b19e21f469a3",
+        "config_digest": "sha256:f0cca0732895704ee817df35419798ec97a1719bb1f7f607f1fb12e97b939480",
+        "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+        "recipe_commit": "24c77839023c6f417ee4649e467467f2ed1595fb",
+        "daemon_version": "0.14.0",
+        "firmware_compat_version": "0.13",
+        "attestation_digests": [
+          "sha256:e83fe5819f40be03e858f445c98945006121afff4353b9413168ec7bbf6d28da"
+        ],
+        "predicate_types": [
+          "https://slsa.dev/provenance/v1",
+          "https://spdx.dev/Document"
+        ],
+        "anonymous_registry_verification": true
+      }
+    ]
+  },
+  "installer_upgrades": [
+    {
+      "installer": "hacs",
+      "ha_core": "2026.10.4",
+      "from_version": "0.4.0",
+      "to_version": "0.5.0",
+      "tests_passed": 1,
+      "log_sha256": "a68ab72cc93799ed866d88fc758289072ed9132d46b83ad2ce1631302cd22f7b"
+    },
+    {
+      "installer": "marketplace",
+      "ha_core": "2026.11.0",
+      "from_version": "0.4.0",
+      "to_version": "0.5.0",
+      "tests_passed": 1,
+      "log_sha256": "d920062183dfe8076331e4dfec8107565d0424a9135d65f0435cbcceffcb3f67"
+    }
+  ],
+  "installer_scope": "Real public release listing and ZIP replacement; retained config entry, IDs, names/areas, simulated control/state, restart-required and entry reload. Metadata refresh after release listing is stubbed. No OAuth, default-catalog admission, UI, scheduled polling or full-process restart; entry reload does not activate new Python modules.",
+  "local_checks": {
+    "tools_tests": 62,
+    "ha_packaging_tests": 27,
+    "ha_suite_tests": 196,
+    "container_recipe_tests": 10,
+    "exact_bundle_wheel_install": "passed",
+    "documentation_and_version_checks": "passed"
+  },
+  "installation_scope": "CI wheel and sdist installation on Linux x86-64 and ARM64; CLI, Web/API, persistence and shutdown. Both ARM64 containers pass runtime and pinned public 0.4.0 replacement checks.",
+  "live_radio_access": false,
+  "live_deployment": false,
+  "hardware_qualification": "None added; four source board profiles retain prior experimental evidence and limitations",
+  "full_release_blockers": [
+    "Qualified redistributable firmware artifacts for every supported exact board",
+    "Binary licence/notices and signing readiness, including MG21 redistribution question",
+    "Public catalog delivery and per-board installation/recovery evidence"
+  ],
+  "known_documentation_debt": [
+    "Historical HA architecture-plan link targets a local untracked development note; unchanged by this release"
+  ]
+}

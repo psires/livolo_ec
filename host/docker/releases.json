@@ -91,7 +91,7 @@
       "firmware_compat_version": "0.13"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "kind": "standalone",
       "image": "ghcr.io/psires/livolod",
       "version": "0.5.0",
@@ -103,7 +103,7 @@
       "previous_image": "ghcr.io/psires/livolod@sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "kind": "ha",
       "image": "ghcr.io/psires/livolo-ec-ha-app",
       "version": "0.5.0",

@@ -181,7 +181,25 @@ The existing workflows publish components independently. This checklist is a
 manual project-level gate until a combined inventory validator and publication
 gate are implemented; it does not claim that CI currently enforces completeness.
 
-## Onboarding baseline — 2026-11-07
+## Published software-only release 0.5.0 — 2026-11-07
+
+Following the user's authorization to release the latest code, the Tech Lead
+accepted the explicit software-only scope for distribution **0.5.0**, daemon
+**0.14.0**, client/integration/app **0.5.0** and unchanged radio compatibility
+**0.13**. Frozen source: `bd06c6b02f4598eca266b72293abc11900cae419`.
+The [verification record](verification/software-release-0.5.0-20261107.json)
+contains public asset hashes, source/recipe identities, CI gates, ARM64 image
+digests and HACS/Marketplace upgrade evidence. App metadata advanced only after
+both public images passed runtime, persistent replacement and anonymous checks.
+
+This software-only delivery does **not** satisfy the complete-release firmware
+requirement. The public catalog remains empty. Qualified redistributable images
+for every exact board, signing/licence readiness and per-board installation and
+recovery evidence remain open gates. AMD64 containers remain planned. No live
+installation or physical-radio qualification was performed for this release.
+The full-release requirements above remain in force.
+
+## Historical onboarding baseline — 2026-11-07
 
 Repository evidence at `d7c11c6416624fd9baea61cdedd8e4488991d94a` records
 software distribution **0.4.0** and daemon/radio compatibility **0.13**. The
@@ -201,16 +219,17 @@ and [recovery guide](FIRMWARE_RECOVERY.md) before qualification.
 The missing-catalog diagnostic/Repairs fix is now committed at
 `0029910740c0d519ecbc5bd217897eef5800b02d`, verified as the local HEAD during
 handoff. The Tech Lead reports it pushed with green CI; the release engineer has
-not independently rechecked those remote runs. It remains unreleased and must
-be included with its test evidence in the next relevant candidate. This
+not independently rechecked those remote runs at that time. The fix is now
+included in the 0.5.0 source and verification record above. The original
 onboarding review ran the version-consistency check successfully; it did not
 rebuild, publish, deploy or qualify a new release.
 
-## Pending integrated candidate
+## Historical candidate acceptance contract
 
-Publication remains subject to the complete release gates. No next coordinated
-distribution version has been allocated. One-button automatic pairing was
-accepted at `7a15d627132c515a0537b3b92f7520ac152c3b9e`. The separately authorized
+At onboarding, publication remained subject to the complete release gates and
+no next distribution version had been allocated. The later 0.5.0 software-only
+publication and its remaining firmware gates are recorded above. One-button
+automatic pairing was accepted at `7a15d627132c515a0537b3b92f7520ac152c3b9e`. The separately authorized
 daemon versioning work allocates development package `0.14.0` with unchanged
 radio compatibility `0.13`; it does not publish a new distribution.
 Current development validation is offline/simulated only; no live deployment or

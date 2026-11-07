@@ -1,27 +1,27 @@
-# Run livolod 0.13 in Docker on ARM64
+# Run livolod 0.14.0 in Docker on ARM64
 
-This image packages daemon **0.13** for **Linux ARM64**, including its Web UI,
+This image packages daemon **0.14.0** for **Linux ARM64**, including its Web UI,
 optional MQTT and native Home Assistant API. Use a 64-bit Raspberry Pi OS. It
 requires a radio already running compatible Livolo EC UART firmware. Starting
 or upgrading the container does not flash a radio; firmware installation is a
 separate explicit operation. No broker or firmware payload is bundled.
 
-## Public standalone distribution 0.4.0
+## Public standalone distribution 0.5.0
 
-The current image is **`ghcr.io/psires/livolod:0.4.0`**. Anonymous pulls require
+The current image is **`ghcr.io/psires/livolod:0.5.0`**. Anonymous pulls require
 no GitHub login:
 
 ```sh
-docker pull ghcr.io/psires/livolod:0.4.0
-docker run --rm ghcr.io/psires/livolod:0.4.0 --version
+docker pull ghcr.io/psires/livolod:0.5.0
+docker run --rm ghcr.io/psires/livolod:0.5.0 --version
 ```
 
-The version command reports daemon **0.13**. Distribution **0.4.0** identifies
-the package. Its immutable OCI index digest is
-`sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc`.
-The [publication evidence](publication-0.4.0-20261106.json) records anonymous
+The version command reports daemon **0.14.0**. Distribution **0.5.0** identifies
+the package; radio compatibility remains **0.13**. Its immutable OCI index digest is
+`sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f`.
+The [publication evidence](publication-0.5.0-20261107.json) records anonymous
 verification, source labels, SBOM/provenance and the isolated upgrade from
-standalone 0.3.0, preserving persistent state.
+standalone 0.4.0, preserving persistent state.
 
 The image includes the unified inspection/preflight CLI, Gecko helper and an
 isolated Nordic runtime. Nordic installation needs the explicit
@@ -31,7 +31,7 @@ it unavailable. The public firmware catalog remains empty.
 In your copied `compose.yaml`, use:
 
 ```yaml
-    image: ghcr.io/psires/livolod:0.4.0
+    image: ghcr.io/psires/livolod:0.5.0
 ```
 
 Preserve configuration, network identity and the persistent data directory when
