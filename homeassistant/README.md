@@ -311,8 +311,24 @@ Preserve a working image and consistent database backup before trying it on hard
 
 ## Device management and state behavior
 
+On the **Livolo EC gateway** device page, press **Pair new device**, then put
+only the intended new switch into physical pairing mode. The daemon listens
+for up to two minutes, selects a fresh supported announcement, saves its
+profile and pairs it. **Pairing status** follows the session through detection,
+registration and physical confirmation. **Cancel pairing** closes the window;
+it cannot undo messages already sent or remove a registered device.
+
+The switch and its outputs appear automatically under the existing gateway.
+HA sends a notification linking to the device only after fresh physical
+confirmation. Sessions started in the web interface use the same status.
+An interrupted request is never automatically resubmitted, including after
+an HA reload. If its outcome remains uncertain, use **Cancel pairing** before
+starting again. Older daemons keep manual setup available but disable these
+automatic pairing controls. See [pairing and recovery](../docs/PAIRING.md).
+
 The integration's **Configure** dialog supports:
 
+- Pair a new device using the same bounded session and inspect or cancel it.
 - Register a device using its wire ID, name, output count and verified suffix.
 - Detect a switch experimentally from its observed pairing signature, review
   its output count, and register it with a friendly name.
@@ -330,15 +346,16 @@ Submit a name to register that reviewed profile. The daemon rechecks its token
 against fresh evidence from the current radio session. Changed, expired or
 conflicting evidence requires reselection. Unknown devices and older daemons
 without profile metadata retain **Use manual setup instead** and the original
-manual registration menu. No switch is selected or registered automatically.
+manual registration menu. This advanced detection flow requires explicit review;
+the **Pair new device** action above performs automatic selection and registration.
 
 Detection currently recognizes only the tested one- and two-gang pairing
 signatures; see [experimental detection limits](../docs/DEVICE_PROFILES.md).
 It does not qualify sockets, curtains or other switch variants. Once registered,
-wait for radio readiness and reopen **Configure → Open or close pairing** with
+wait for radio readiness and reopen **Configure → Targeted pairing** with
 the selected device ID. Registration alone does not complete physical pairing.
 
-Register before pairing. Manual profile fields remain explicit; suffix alone is
+For advanced targeted pairing, register first. Manual profile fields remain explicit; suffix alone is
 not an inferred gang count. Pairing acceptance opens the window, and the management UI shows
 later confirmation/expiry. No generic automatic admission is enabled.
 

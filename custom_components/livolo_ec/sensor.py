@@ -1,4 +1,4 @@
-"""Explain firmware eligibility independently of HA's disappearing update offer."""
+"""Expose firmware eligibility and native pairing progress on the logical gateway."""
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.const import EntityCategory
@@ -6,6 +6,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
+from .commissioning import PAIRING_STATES
 
 PARALLEL_UPDATES = 0
 
@@ -26,13 +27,18 @@ EXPLANATIONS = {
 
 
 async def async_setup_entry(hass, entry, async_add_entities):
-    """Add an enabled diagnostic to the existing gateway without changing its identity.
+    """Add enabled diagnostics to the existing gateway without changing its identity.
 
     @param hass Actual Home Assistant instance.
     @param entry Network configuration with the shared native coordinator.
     @param async_add_entities Sensor platform registration callback.
     """
-    async_add_entities([LivoloFirmwareStatus(entry.runtime_data)])
+    async_add_entities(
+        [
+            LivoloFirmwareStatus(entry.runtime_data),
+            LivoloPairingStatus(entry.runtime_data),
+        ]
+    )
 
 
 class LivoloFirmwareStatus(CoordinatorEntity, SensorEntity):
@@ -127,3 +133,41 @@ class LivoloFirmwareStatus(CoordinatorEntity, SensorEntity):
             value = self.firmware.get(key)
             attributes[key] = value[:512] if isinstance(value, str) else None
         return attributes
+
+
+class LivoloPairingStatus(CoordinatorEntity, SensorEntity):
+    """Keep native commissioning progress and outcomes visible across UI entry points."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "pairing_status"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_should_poll = False
+    _attr_icon = "mdi:access-point-network"
+    _attr_options = list(PAIRING_STATES)
+
+    def __init__(self, coordinator):
+        """Use a stable status identity on the existing gateway device.
+
+        @param coordinator Shared native push coordinator.
+        """
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.entry.unique_id}:pairing_status"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.entry.unique_id)}
+        )
+
+    @property
+    def available(self):
+        """Show radio interruptions through the live API, but never hide API disconnects."""
+        return self.coordinator.connected
+
+    @property
+    def native_value(self):
+        """Use only authoritative session status or explicit legacy capability absence."""
+        return self.coordinator.commissioning.status
+
+    @property
+    def extra_state_attributes(self):
+        """Describe detection, registration and physical confirmation separately."""
+        return self.coordinator.commissioning.attributes

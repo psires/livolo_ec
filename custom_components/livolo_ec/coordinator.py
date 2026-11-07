@@ -9,6 +9,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from ._client import AuthenticationError, IncompatibleError, LivoloError, network_id
 from .const import CONF_ALLOW_SIMULATED, DOMAIN
 from .firmware_notice import FirmwareOfferNotice
+from .commissioning import LivoloCommissioning
 
 LOGGER = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class LivoloCoordinator(DataUpdateCoordinator):
         self._epoch = None
         self._sequence = -1
         self.firmware_notice = FirmwareOfferNotice(hass, entry)
+        self.commissioning = LivoloCommissioning(self)
 
     def accept(self, envelope):
         """Apply an authoritative snapshot, rejecting identity changes and stale data.
@@ -50,6 +52,7 @@ class LivoloCoordinator(DataUpdateCoordinator):
             return
         self._epoch, self._sequence = epoch, sequence
         self.firmware_notice.observe(data.get("firmware_update"))
+        self.commissioning.observe(data)
         self.async_set_updated_data(data)
 
     def start(self):
@@ -88,3 +91,4 @@ class LivoloCoordinator(DataUpdateCoordinator):
             with suppress(asyncio.CancelledError):
                 await self._task
             self._task = None
+        await self.commissioning.close()

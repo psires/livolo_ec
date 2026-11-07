@@ -19,7 +19,11 @@ def diagnostic(hass):
 
     @param hass Actual HA instance.
     """
-    states = hass.states.async_all("sensor")
+    states = [
+        state
+        for state in hass.states.async_all("sensor")
+        if state.entity_id.endswith("_radio_firmware_status")
+    ]
     assert len(states) == 1
     return states[0]
 

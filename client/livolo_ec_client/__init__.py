@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+import math
 import re
 import time
 from typing import Any
@@ -13,6 +14,15 @@ import uuid
 import aiohttp
 
 API_VERSION = 1
+COMMISSIONING_ACTIVE = ("listening", "registering", "pairing")
+COMMISSIONING_TERMINAL = (
+    "confirmed",
+    "expired",
+    "cancelled",
+    "conflict",
+    "failed",
+    "unknown",
+)
 PREFLIGHT_REQUIRED_CHECKS = frozenset(
     {
         "artifact",
@@ -124,6 +134,86 @@ def snapshot_data(envelope: dict[str, Any]) -> dict[str, Any]:
             raise IncompatibleError("Unsupported or duplicate device profile")
         identities.add(device["id"])
     return data
+
+
+def commissioning_data(value):
+    """Validate optional session metadata without treating registration as paired.
+
+    @param value Session summary from a native snapshot, or None before any session.
+    @return Bounded public summary, or None; invalid summaries raise IncompatibleError.
+    """
+    if value is None:
+        return None
+    if (
+        not isinstance(value, dict)
+        or not isinstance(value.get("session_id"), str)
+        or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", value["session_id"])
+        or value.get("status") not in COMMISSIONING_ACTIVE + COMMISSIONING_TERMINAL
+        or type(value.get("registered")) is not bool
+    ):
+        raise IncompatibleError("Invalid commissioning session")
+    remaining = value.get("seconds_remaining")
+    if (
+        type(remaining) not in (int, float)
+        or not 0 <= remaining <= 120
+        or not math.isfinite(remaining)
+    ):
+        raise IncompatibleError("Invalid commissioning duration")
+    result = {
+        key: value[key]
+        for key in ("session_id", "status", "registered", "seconds_remaining")
+    }
+    for key, maximum in (
+        ("device", 8),
+        ("name", 100),
+        ("suffix", 4),
+        ("profile", 64),
+        ("error", 256),
+    ):
+        item = value.get(key)
+        if item is not None and (not isinstance(item, str) or len(item) > maximum):
+            raise IncompatibleError("Invalid commissioning metadata")
+        result[key] = item
+    outputs = value.get("outputs")
+    if outputs is not None and (type(outputs) is not int or outputs not in (1, 2)):
+        raise IncompatibleError("Unsupported commissioning profile")
+    result["outputs"] = outputs
+    if result["device"] is not None and not re.fullmatch(
+        r"[0-9a-f]{8}", result["device"]
+    ):
+        raise IncompatibleError("Invalid commissioned device identity")
+    if outputs is not None and (
+        result["suffix"] != f"{outputs:04x}"
+        or result["profile"] != f"livolo-ec-suffix-{outputs:04x}"
+    ):
+        raise IncompatibleError("Inconsistent commissioning profile")
+    if result["status"] == "confirmed" and (
+        not result["device"] or not outputs or not result["registered"]
+    ):
+        raise IncompatibleError("Incomplete pairing confirmation")
+    observations = value.get("observations", [])
+    if not isinstance(observations, list) or len(observations) > 8:
+        raise IncompatibleError("Invalid commissioning observations")
+    result["observations"] = []
+    for observation in observations:
+        if (
+            not isinstance(observation, dict)
+            or not isinstance(observation.get("device"), str)
+            or not re.fullmatch(r"[0-9a-f]{8}", observation["device"])
+        ):
+            raise IncompatibleError("Invalid commissioning observation")
+        safe = {"device": observation["device"]}
+        for key in ("suffix", "profile", "reason"):
+            item = observation.get(key)
+            if item is not None and (not isinstance(item, str) or len(item) > 128):
+                raise IncompatibleError("Invalid commissioning observation detail")
+            safe[key] = item
+        count = observation.get("outputs")
+        if count is not None and (type(count) is not int or count not in (1, 2)):
+            raise IncompatibleError("Invalid observed output count")
+        safe["outputs"] = count
+        result["observations"].append(safe)
+    return result
 
 
 def preflight_data(value, candidate_id=None):
@@ -329,6 +419,10 @@ class Client:
         @return Confirmed result, or accepted pairing-window result.
         """
         request = dict(payload)
+        if action == "commission":
+            seconds = request.get("seconds", 120)
+            if type(seconds) is not int or not 10 <= seconds <= 120:
+                raise ValueError("Commissioning duration must be 10 to 120 seconds")
         request.setdefault("request_id", str(uuid.uuid4()))
         request_id = request["request_id"]
         return await self._submit_and_wait(
@@ -336,7 +430,11 @@ class Client:
             {"action": action, "payload": request},
             request_id,
             timeout,
-            ("confirmed", "pairing") if action == "pair" else ("confirmed",),
+            (
+                COMMISSIONING_ACTIVE + ("confirmed",)
+                if action == "commission"
+                else ("confirmed", "pairing") if action == "pair" else ("confirmed",)
+            ),
         )
 
     async def firmware_preflight(self, candidate_id=None):

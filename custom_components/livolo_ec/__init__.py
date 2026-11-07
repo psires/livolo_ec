@@ -5,13 +5,14 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.storage import Store
 
 from ._client import AuthenticationError, Client, LivoloError
 from .const import CONF_TOKEN, CONF_URL, DOMAIN
 from .coordinator import LivoloCoordinator
 from .firmware_notice import issue_id
 
-PLATFORMS = [Platform.SWITCH, Platform.UPDATE, Platform.SENSOR]
+PLATFORMS = [Platform.SWITCH, Platform.UPDATE, Platform.SENSOR, Platform.BUTTON]
 
 
 async def async_setup_entry(hass, entry):
@@ -25,6 +26,7 @@ async def async_setup_entry(hass, entry):
         async_get_clientsession(hass), entry.data[CONF_URL], entry.data[CONF_TOKEN]
     )
     coordinator = LivoloCoordinator(hass, entry, client)
+    await coordinator.commissioning.restore()
     try:
         await client.info()
         coordinator.accept(await client.snapshot())
@@ -90,3 +92,4 @@ async def async_remove_entry(hass, entry):
     @param entry Permanently removed network configuration.
     """
     ir.async_delete_issue(hass, DOMAIN, issue_id(entry))
+    await Store(hass, 1, f"{DOMAIN}.commissioning.{entry.entry_id}").async_remove()

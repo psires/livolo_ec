@@ -55,7 +55,8 @@
           "refresh": "Refresh reported state",
           "forget": "Forget a device",
           "discover": "Detect a switch (experimental)",
-          "firmware_preflight": "Check firmware update (read-only)"
+          "firmware_preflight": "Check firmware update (read-only)",
+          "pair_new": "Pair new device"
         }
       },
       "add": {
@@ -101,7 +102,7 @@
       },
       "detected": {
         "title": "Review detected switch · Experimental",
-        "description": "Device: **{device}**. Detected outputs: **{outputs}**. Wire suffix: **{suffix}**. Check the physical button count and enter a name. This experimental detection recognizes the tested one- and two-gang pairing signatures only. Submit to register this profile. Registration does not complete physical pairing: afterwards, reopen Configure → Open or close pairing for this device once the radio is ready. Evidence must still be fresh when submitted; otherwise select the switch again.",
+        "description": "Device: **{device}**. Detected outputs: **{outputs}**. Wire suffix: **{suffix}**. Check the physical button count and enter a name. This experimental detection recognizes the tested one- and two-gang pairing signatures only. Submit to register this profile. Registration does not complete physical pairing: afterwards, reopen Configure → Targeted pairing for this device once the radio is ready. Evidence must still be fresh when submitted; otherwise select the switch again.",
         "data": {
           "name": "Device name",
           "rescan": "Return to discovery without registering"
@@ -112,6 +113,17 @@
         "description": "Board: **{board}**. Installed: **{installed}**. Candidate: **{target}**.\n\nCompatible: **{compatible}**. Ready to request installation: **{executable}**. Blocking reason: **{reason}**.\n\n{checks}\n\nThis check does not flash, restart or send radio commands. It uses the daemon’s current identity evidence and revalidates the local firmware package. Results are advisory; installation checks again. To install, use the gateway’s Firmware update entity after closing this report. Submit to close, or select Refresh to check again.",
         "data": {
           "refresh": "Refresh the report"
+        }
+      },
+      "pair_new": {
+        "title": "Pair new device",
+        "description": "Submit to open one two-minute pairing session. Then put only the intended new switch into its physical pairing mode. The daemon detects its supported profile, registers it and waits for a fresh pairing confirmation. No wire ID or output count is required. Existing devices are retained. The gateway also has Pair new device and Cancel pairing buttons, with live Pairing status. {detail}"
+      },
+      "pairing_status": {
+        "title": "Pairing session",
+        "description": "Status: **{status}**. {explanation}\n\nSession: {session}. Remaining: {remaining} seconds. Device: **{device}**. Outputs: **{outputs}**. Registered: **{registered}**.\n\nReason: {reason}. Observations: {observations}.\n\nRegistration is not pairing confirmation. Submit to refresh an active session or select Stop to close it. Submit after a terminal result to close this report. Closing this dialog does not stop the daemon session; it expires automatically. The gateway Pairing status updates live.",
+        "data": {
+          "stop": "Stop this pairing session"
         }
       }
     },
@@ -127,7 +139,9 @@
       "detection_changed": "The reviewed profile expired, changed, was registered elsewhere, or the radio is unavailable. Refresh and select the switch again.",
       "detection_failed": "Registration was rejected or could not be confirmed. Check the daemon registry before retrying. Refresh and select again if it was not added; pairing has not been opened.",
       "radio_not_ready": "The radio is not ready. Wait for it to reconnect before detecting a switch.",
-      "preflight_unsupported": "Update the Livolo daemon to a release that supports firmware preflight. Switch control remains available."
+      "preflight_unsupported": "Update the Livolo daemon to a release that supports firmware preflight. Switch control remains available.",
+      "commissioning_unsupported": "Update the Livolo daemon to enable automatic pairing. Advanced manual setup remains available.",
+      "commissioning_failed": "The pairing action or result could not be confirmed. Check Pairing status before starting again; no automatic retry is performed."
     }
   },
   "entity": {
@@ -148,6 +162,32 @@
           "last_update_confirmed": "Last firmware update confirmed",
           "no_update_available": "No newer firmware offered"
         }
+      },
+      "pairing_status": {
+        "name": "Pairing status",
+        "state": {
+          "unsupported": "Automatic pairing unsupported",
+          "idle": "Ready to pair a new device",
+          "listening": "Listening for a new switch",
+          "registering": "Registering detected switch",
+          "pairing": "Waiting for pairing confirmation",
+          "confirmed": "Device paired",
+          "expired": "Pairing window expired",
+          "cancelled": "Pairing cancelled",
+          "conflict": "Conflicting pairing announcements",
+          "failed": "Pairing failed",
+          "unknown": "Pairing outcome unknown",
+          "invalid": "Invalid pairing status",
+          "uncertain": "Start request unresolved"
+        }
+      }
+    },
+    "button": {
+      "pair_new_device": {
+        "name": "Pair new device"
+      },
+      "cancel_pairing": {
+        "name": "Cancel pairing"
       }
     }
   },

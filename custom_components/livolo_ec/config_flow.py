@@ -6,6 +6,7 @@ import voluptuous as vol
 
 from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import selector
 
@@ -214,6 +215,7 @@ class LivoloOptionsFlow(OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options=[
+                "pair_new",
                 "add",
                 "discover",
                 "pair",
@@ -221,6 +223,88 @@ class LivoloOptionsFlow(OptionsFlow):
                 "forget",
                 "firmware_preflight",
             ],
+        )
+
+    async def async_step_pair_new(self, user_input=None):
+        """Start one bounded session or attach to the existing active session.
+
+        @param user_input Explicit submission to start; None only displays instructions.
+        """
+        errors = {}
+        detail = ""
+        coordinator = getattr(self.config_entry, "runtime_data", None)
+        manager = coordinator.commissioning if coordinator else None
+        if not manager:
+            errors["base"] = "cannot_connect"
+        elif not manager.supported:
+            errors["base"] = "commissioning_unsupported"
+        elif manager.active or manager.pending:
+            return await self.async_step_pairing_status()
+        elif user_input is not None:
+            try:
+                await manager.act()
+                return await self.async_step_pairing_status()
+            except HomeAssistantError as error:
+                errors["base"] = "commissioning_failed"
+                detail = str(error)
+        return self.async_show_form(
+            step_id="pair_new",
+            data_schema=vol.Schema({}),
+            errors=errors,
+            description_placeholders={"detail": detail},
+        )
+
+    async def async_step_pairing_status(self, user_input=None):
+        """Display the same session as the gateway controls, with explicit cancellation.
+
+        @param user_input Refresh, close a terminal report, or explicitly stop the session.
+        """
+        coordinator = getattr(self.config_entry, "runtime_data", None)
+        if not coordinator:
+            return await self.async_step_pair_new()
+        manager = coordinator.commissioning
+        errors = {}
+        try:
+            await manager.refresh()
+            if user_input is not None:
+                if user_input.get("stop"):
+                    if manager.can_cancel:
+                        await manager.act(cancel=True)
+                elif not manager.active and not manager.pending:
+                    return self.async_create_entry(
+                        title="", data=dict(self.config_entry.options)
+                    )
+        except (LivoloError, HomeAssistantError):
+            errors["base"] = "commissioning_failed"
+        details = manager.attributes
+        observations = (
+            "; ".join(
+                f"{item['device']}: {item['explanation']}"
+                for item in details.get("observations", [])
+            )
+            or "None"
+        )
+        return self.async_show_form(
+            step_id="pairing_status",
+            data_schema=vol.Schema(
+                {vol.Optional("stop", default=False): bool}
+                if manager.active or manager.pending
+                else {}
+            ),
+            errors=errors,
+            description_placeholders={
+                "status": manager.status,
+                "explanation": details["explanation"],
+                "session": details.get("unresolved_request_id")
+                or details.get("session_id")
+                or "None",
+                "remaining": str(details.get("seconds_remaining", 0)),
+                "device": details.get("device") or "Not detected",
+                "outputs": str(details.get("outputs") or "Not detected"),
+                "registered": "Yes" if details.get("registered") else "No",
+                "reason": details.get("reason") or "None",
+                "observations": observations,
+            },
         )
 
     async def async_step_firmware_preflight(self, user_input=None):
