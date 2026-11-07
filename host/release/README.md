@@ -1,16 +1,11 @@
-# Standalone daemon and CLI distribution 0.4.0
+# Standalone daemon and CLI distribution 0.5.0
 
-Development source now separates daemon package `0.14.0` from radio compatibility
-`0.13`; this is not a newly published 0.4.0 bundle. The instructions below describe
-the immutable published baseline. See the [versioning migration guide](../../docs/VERSIONING.md)
-before testing the next package. New source bundles include `docs/VERSIONING.md`.
-
-Download `livolo-ec-0.4.0-standalone.tar.gz` and `SHA256SUMS` from the
-[standalone 0.4.0 release](https://github.com/psires/livolo_ec/releases/tag/standalone-0.4.0).
-This distribution contains daemon **0.13**, native Python client **0.4.0**, the
+Download `livolo-ec-0.5.0-standalone.tar.gz` and `SHA256SUMS` from the
+[standalone 0.5.0 release](https://github.com/psires/livolo_ec/releases/tag/standalone-0.5.0).
+This distribution contains daemon **0.14.0**, native Python client **0.5.0**, the
 local web interface, service examples and firmware maintenance commands. The
-bundle number is independent of the daemon/radio compatibility version; `livolod
---version` correctly prints `0.13`.
+bundle and daemon package numbers are independent of radio compatibility **0.13**; `livolod
+--version` correctly prints `0.14.0`.
 
 Use Linux with **Python 3.13 and venv support** for this bundle and its pinned
 flasher dependencies. The release workflow tests wheel and source installs on
@@ -24,9 +19,9 @@ From the download directory, verify the standalone archive (the outer checksum
 file also lists separately downloadable wheels, sdists and metadata):
 
 ```sh
-grep '  livolo-ec-0.4.0-standalone.tar.gz$' SHA256SUMS | sha256sum --check -
-tar -xzf livolo-ec-0.4.0-standalone.tar.gz
-cd livolo-ec-0.4.0-standalone
+grep '  livolo-ec-0.5.0-standalone.tar.gz$' SHA256SUMS | sha256sum --check -
+tar -xzf livolo-ec-0.5.0-standalone.tar.gz
+cd livolo-ec-0.5.0-standalone
 sha256sum --check SHA256SUMS
 ```
 
@@ -41,8 +36,8 @@ starts a service or operates a radio merely by unpacking it.
 ```sh
 python3.13 -m venv .venv
 .venv/bin/python -m pip install --constraint constraints.txt \
-  './packages/livolo_ec_daemon-0.13-py3-none-any.whl[mqtt,flash]' \
-  ./packages/livolo_ec_client-0.4.0-py3-none-any.whl
+  './packages/livolo_ec_daemon-0.14.0-py3-none-any.whl[mqtt,flash]' \
+  ./packages/livolo_ec_client-0.5.0-py3-none-any.whl
 .venv/bin/python -m pip check
 .venv/bin/livolod --version
 .venv/bin/livolod --config config.example.json --check-config
@@ -77,8 +72,8 @@ sudo useradd --system --user-group --home-dir /var/lib/livolod --no-create-home 
 sudo usermod -aG dialout livolod
 sudo python3.13 -m venv /opt/livolod
 sudo /opt/livolod/bin/python -m pip install --constraint constraints.txt \
-  './packages/livolo_ec_daemon-0.13-py3-none-any.whl[mqtt,flash]' \
-  ./packages/livolo_ec_client-0.4.0-py3-none-any.whl
+  './packages/livolo_ec_daemon-0.14.0-py3-none-any.whl[mqtt,flash]' \
+  ./packages/livolo_ec_client-0.5.0-py3-none-any.whl
 sudo install -d -m 0750 -o root -g livolod /etc/livolod
 sudo install -m 0640 -o root -g livolod config.example.json /etc/livolod/config.json
 sudo install -m 0644 systemd/livolod.service /etc/systemd/system/livolod.service
@@ -96,7 +91,7 @@ The example deliberately has an empty device registry, disables output control
 and MQTT, and binds the web interface to `127.0.0.1:8080`. It requires matching
 UART v3 firmware already on the radio. Register known switches through the UI.
 Enable an experimental output mode only after reading its hardware limits in the
-[daemon guide](https://github.com/psires/livolo_ec/blob/standalone-0.4.0/host/README.md).
+[daemon guide](https://github.com/psires/livolo_ec/blob/standalone-0.5.0/host/README.md).
 Keep loopback access or configure authenticated access as documented there.
 The native API is disabled initially; its bearer-token setup is described in
 the included `docs/NATIVE_API.md`.
@@ -113,34 +108,42 @@ and reads optional secrets from `/etc/livolod/environment`. Protect that file
 with mode `0600`, owned by root; systemd reads it before dropping privileges.
 Never put tokens into download URLs or source control.
 
-## Pairing in the next release
+## Pair a new switch
 
-The next release adds **Pair new device** in Web and HA. Follow the
+Use **Pair new device** in Web and HA. Follow the
 [pairing guide](../../docs/PAIRING.md) for its one-device session, supported
-profiles and confirmation requirements. This feature is in development and is
-not included in the published 0.4.0 bundle. New bundles include the guide as
-`docs/PAIRING.md` alongside these instructions.
+profiles and confirmation requirements. The bundle includes `docs/PAIRING.md`
+and the [versioning migration guide](../../docs/VERSIONING.md) at
+`docs/VERSIONING.md`. Use `livolod-commission --help` for the authenticated
+terminal commissioning client.
 
 ## Upgrade, backup and removal
 
-Stop the actual radio owner before upgrading. For the systemd installation:
+Finish any active firmware transfer or commissioning session before a planned
+software upgrade, then stop the actual radio owner. Preserve configured database
+and trusted catalog paths, including paths outside `/var/lib/livolod`: the
+example backup below covers only the default directories. With Docker, retain
+the same host-volume mounts and local-catalog setting. No database schema or
+network-identity migration is required. Interrupted jobs keep their recorded
+identity and target; restart may mark their outcome unknown/interrupted, never
+replay them. For the systemd installation:
 
 ```sh
 sudo systemctl stop livolod
 sudo install -d -m 0700 /var/backups/livolod
-sudo tar -czf /var/backups/livolod/pre-0.4.0.tar.gz -C / etc/livolod var/lib/livolod
+sudo tar -czf /var/backups/livolod/pre-0.5.0.tar.gz -C / etc/livolod var/lib/livolod
 sudo /opt/livolod/bin/python -m pip freeze > previous-python-packages.txt
 sudo /opt/livolod/bin/python -m pip install --force-reinstall --constraint constraints.txt \
-  './packages/livolo_ec_daemon-0.13-py3-none-any.whl[mqtt,flash]' \
-  ./packages/livolo_ec_client-0.4.0-py3-none-any.whl
+  './packages/livolo_ec_daemon-0.14.0-py3-none-any.whl[mqtt,flash]' \
+  ./packages/livolo_ec_client-0.5.0-py3-none-any.whl
 sudo /opt/livolod/bin/python -m pip check
 sudo /opt/livolod/bin/livolod --config /etc/livolod/config.json --check-config
 sudo systemctl start livolod
 ```
 
 Use a unique backup filename on subsequent upgrades. Keep the previous wheel or
-environment as well as its dependency inventory. `--force-reinstall` also permits
-reinstalling an earlier development build with the same version. Do not overwrite
+environment as well as its dependency inventory. `--force-reinstall` reinstalls the explicitly selected artifact; published
+versions are immutable. Do not overwrite
 configuration with the example: SQLite owns the device registry after initial
 startup. Inspect service status/logs and verify the correct network and devices.
 

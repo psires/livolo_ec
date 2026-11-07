@@ -34,11 +34,11 @@ Zigbee2MQTT.
 | Home Assistant | Livolo EC daemon app on HA OS, plus the native integration | HA switches, dashboards and automations; optional app Web UI |
 | HA Container with an external daemon | Standalone `livolod` plus the native integration | The same HA experience, connecting to the daemon over your LAN |
 
-The currently published software distribution and HA integration are **0.4.0**.
-The source on `main` also includes improvements for the next release: one-button
-automatic pairing, clearer firmware-catalog status, and separate daemon software
-versioning (`0.14.0`, targeting firmware `0.13`). Those additions are **not in the
-published 0.4.0 downloads**. See [releases](https://github.com/psires/livolo_ec/releases)
+Software distribution and HA integration **0.5.0** include one-button automatic
+pairing, clearer firmware-catalog status, and explicit daemon software versioning.
+The daemon package is **0.14.0**, targeting radio firmware compatibility **0.13**.
+This is a **software-only release**: it includes no firmware payloads and adds no
+physical-radio qualification. See [releases](https://github.com/psires/livolo_ec/releases)
 and [versioning](docs/VERSIONING.md).
 
 ## Before you start
@@ -78,7 +78,7 @@ Linux x86-64 or an installation without Docker, use the
    mkdir livolo-ec
    cd livolo-ec
    curl --fail --location \
-     https://raw.githubusercontent.com/psires/livolo_ec/standalone-0.4.0/host/docker/config.example.json \
+     https://raw.githubusercontent.com/psires/livolo_ec/standalone-0.5.0/host/docker/config.example.json \
      --output config.json
    ```
 
@@ -111,7 +111,7 @@ Linux x86-64 or an installation without Docker, use the
      --mount "type=bind,src=$PWD/data,dst=/var/lib/livolod" \
      --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
      --cap-drop ALL --security-opt no-new-privileges:true \
-     ghcr.io/psires/livolod:0.4.0
+     ghcr.io/psires/livolod:0.5.0
    docker logs --tail=50 livolod
    ```
 
@@ -153,7 +153,8 @@ instead of installing an HA OS app.
    Enter `http://<app-hostname>:8090` and the same API token. Copy the actual
    hostname from the app's information page; `localhost` is not the app.
    Leave the API host-port mapping unpublished on HA OS.
-5. Use the app's **Open Web UI** to add your switches as described below.
+5. On the **Livolo EC gateway** device in HA, press **Pair new device** to add
+   a switch as described below. The app Web UI provides the same action.
    Each registered physical switch appears as an HA device, with one switch
    entity per output. Add those entities to dashboards and automations.
 
@@ -165,19 +166,18 @@ IDs survive. See the [full HA guide](homeassistant/README.md).
 
 ## Adding a switch
 
-With the **published 0.4.0** software, open **Add device** in the Web UI, put the
-intended switch into its documented physical pairing mode, select its detected
-entry and check the suggested output count. Give it a name, choose
-**Save & start pairing**, and follow the displayed pairing instructions. Keep
-pairing disabled on the original gateway when migrating. Wait for a fresh device
-report to confirm pairing; saving a device alone does not establish a connection.
-If automatic profile detection cannot identify it, use the documented manual
-setup rather than guessing its profile.
+Press **Pair new device** in either the Web UI or on the HA gateway device,
+then put one intended new switch into its physical pairing mode. The daemon
+opens a two-minute session, detects a supported profile, registers it and
+reports the pairing outcome. Keep other gateways out of pairing mode. Wait for
+**confirmed**: detection or a saved device entry alone does not establish a
+connection. **Cancel pairing** ends the session early.
 
-In the **development source**, press **Pair new device** in either Web or HA,
-then put one new switch into pairing mode. The daemon detects a supported profile,
-registers it and reports the pairing outcome. The [pairing guide](docs/PAIRING.md)
-describes this next-release workflow and its limits.
+In HA, the child device and output entities appear under the existing network;
+a confirmed pairing produces a notification with a device link. No duplicate
+integration or Discovered card is created. Unknown or conflicting profiles
+remain on the advanced/manual setup path. See the [pairing guide](docs/PAIRING.md)
+for failure handling, terminal commands and experimental support limits.
 
 ## Development and protocol research
 

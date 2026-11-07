@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.0
+
+- Add one-action pairing shared by Web, native HA and the commissioning CLI,
+  with bounded sessions, explicit confirmation and cancellation.
+- Package daemon 0.14.0 separately from radio compatibility 0.13; expose both
+  versions while retaining native API revision 1 and UART protocol 3.
+- Keep switch control available when firmware catalogs are missing or unusable,
+  with clearer diagnostics in integration 0.5.0.
+- Preserve persistent configuration, registry, identity and local catalogs.
+  Interrupted firmware jobs are retained without replaying installation.
+- Software-only release: no radio payloads or new hardware qualification.
+  ARM64 remains the supported container architecture.
+
 ## 0.4.0
 
 - Allow native HA control and firmware updates with the Web listener disabled;

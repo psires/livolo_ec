@@ -1,9 +1,9 @@
 # Software versions and radio compatibility
 
-This separation is in development after the published 0.4.0 distribution.
+Software distribution **0.5.0** separates daemon software from radio compatibility.
 It does not change the installed radio or automatically start a firmware update.
 
-| Version | Meaning in the development tree |
+| Version | Meaning in software distribution 0.5.0 |
 | --- | --- |
 | Daemon software `0.14.0` | Version of the installable `livolo-ec-daemon` package |
 | Firmware compatibility `0.13` | Exact firmware target used by catalog admission and update validation |
