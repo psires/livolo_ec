@@ -1,5 +1,10 @@
 # Open-source release assessment and plan
 
+For current release ownership, required deliverables and acceptance gates, see
+[Release process](RELEASE_PROCESS.md), effective 2026-11-07. The dated assessment
+below is historical context; its software-only staging does not satisfy the
+owner's current complete-project-release requirement.
+
 Assessment date: 2026-11-01. Status: proposed release design; nothing has been
 published, deployed or flashed by this assessment.
 
