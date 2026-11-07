@@ -1,43 +1,43 @@
-Standalone daemon and CLI distribution **0.5.0**, containing daemon **0.14.0**
-and Python API client **0.5.0**. Radio firmware compatibility remains **0.13**,
-UART protocol 3 and native API revision 1. This is a software-only release.
+Livolo EC software distribution **0.5.1**, containing daemon **0.14.1** and
+client/integration/app **0.5.1**. Radio compatibility remains **0.13**, native API
+revision **1** and UART protocol **3**. This is an explicitly requested
+software-only maintenance release while dedicated-radio qualification continues.
 
 ### Changes
 
-- Pair a new supported switch from Web or HA with one action. A bounded session
-  detects its profile, registers it and reports confirmation; unknown or
-  conflicting profiles remain on the advanced/manual path.
-- Use `livolod-commission` for authenticated terminal commissioning.
-- Report daemon software and radio compatibility versions independently in CLI,
-  API and HA diagnostics. API revision 1 retains its legacy compatibility alias.
-- Explain missing or unusable firmware catalogs without disrupting switch control.
-- Preserve existing local catalogs, network identity and authoritative device
-  registry. Restart does not replay interrupted firmware installations.
+- Recognize the additional observed two-gang pairing payload `000203042e00CC00`
+  under suffix `0002`. Match only the exact reviewed layout; freshness, conflict,
+  explicit-session and locally addressed confirmation checks remain enforced.
+- Preserve bounded rejection evidence in diagnostics and clarify HA pairing
+  session results. Existing failures cannot gain evidence retroactively.
+- Include the diagnostic and profile fixes previously deployed as private
+  overlays. The owner reported successful pairing after that fix; this is not a
+  new independent output-control or firmware-qualification result.
 
-### Install and upgrade
+### Upgrade and rollback
 
-Download `livolo-ec-0.5.0-standalone.tar.gz` and `SHA256SUMS`, verify the archive,
-and follow its README. Linux with Python 3.13 and venv support is required;
-install dependencies separately from PyPI. The bundle includes daemon/client
-wheels and source packages, web assets, configuration/service examples, pairing
-and versioning guides, checksums and licence notices.
+Preserve configuration, the authoritative database, network/device identities,
+trusted local catalogs and Docker mounts. Finish active pairing/firmware jobs
+before an operator installs the update. No database-schema or identity migration
+is required. Keep a consistent backup and the previous environment for rollback.
+Existing local compatibility-0.13 catalogs remain usable; the distributed catalog
+is empty. Updating software does not trigger firmware installation.
 
-See the [installation and recovery guide](https://github.com/psires/livolo_ec/blob/standalone-0.5.0/host/release/README.md).
-Finish active firmware or pairing operations, stop the daemon, and back up its
-configuration, database and trusted catalog (including custom paths). Retain the
-same Docker mounts and local-catalog setting. No database-schema or network-ID
-migration is required. Preserve the previous environment for rollback.
+The official image incorporates both temporary daemon overlays; do not reapply
+those old overlay files over 0.14.1. Installing or recreating the app replaces its
+writable container code while preserving mounted data. A rollback to unmodified
+0.5.0 loses the additional profile and diagnostic fixes. HA integration files
+require a Core restart to load updated Python code; entry reload alone is not
+an upgrade. Publication itself performs no live update, restart or pairing.
 
-### Validation and limits
+### Scope and compatibility
 
-Publication requires isolated wheel and source installs on Linux **x86-64 and
-ARM64**, with installed CLI, simulated radio, Web/API and persistence checks.
-The coordinated ARM64 containers also require upgrade and anonymous-pull checks.
-These software tests do not establish new physical-radio qualification.
+No firmware payload, vendor SDK, bootstrap, signing key or USB-identity change
+is included. Firmware 0.14 and distribution 0.6.0 remain separate unpublished
+qualification work. This software-only release does not satisfy the outstanding
+all-board firmware release requirement. Both container products support ARM64;
+AMD64 container support is not claimed. Published artifacts remain immutable.
 
-The public firmware catalog remains empty. No firmware payloads, private keys,
-vendor SDKs or bootloaders are included. The four source board profiles retain
-radio compatibility 0.13 and their existing experimental limits; updating this
-software never flashes a radio. Existing trusted local catalogs remain usable.
-HA integration releases and container tags are separate distributions. Published
-versions and prior release assets remain immutable.
+Download `livolo-ec-0.5.1-standalone.tar.gz` and `SHA256SUMS`, verify the archive,
+and follow the [installation guide](https://github.com/psires/livolo_ec/blob/standalone-0.5.1/host/release/README.md).
+Wheel and source installations are checked on Linux x86-64 and ARM64.

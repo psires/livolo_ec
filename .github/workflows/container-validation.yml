@@ -2,7 +2,7 @@ name: Validate ARM64 containers without publication
 
 on:
   push:
-    branches: [main]
+    branches: [main, codex/release-0.5.1]
     paths:
       - 'host/**'
       - 'tools/**'
@@ -30,9 +30,9 @@ jobs:
       matrix:
         include:
           - kind: standalone
-            previous: ghcr.io/psires/livolod@sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc
+            previous: ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f
           - kind: ha
-            previous: ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2
+            previous: ghcr.io/psires/livolo-ec-ha-app@sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d92820a4b34e725854a351f6d
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -97,7 +97,7 @@ jobs:
           PY
           docker run --rm --network none --entrypoint python "livolo-validation:$KIND" -m pip check
           docker run --rm --network none --user 10001:10001 --entrypoint python -e LIVOLO_NORDIC_SMOKE=1 -v "$PWD/host/docker/smoke.py:/checks/smoke.py:ro" "livolo-validation:$KIND" /checks/smoke.py
-      - name: Verify upgrade, persistence and restoration from public 0.4.0
+      - name: Verify upgrade, persistence and restoration from public 0.5.0
         env:
           KIND: ${{ matrix.kind }}
           PREVIOUS: ${{ matrix.previous }}

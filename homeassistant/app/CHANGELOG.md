@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.5.1
+
+- Recognize the additional observed two-gang pairing payload while retaining
+  exact matching, freshness, conflict and confirmation checks.
+- Retain bounded pairing rejection evidence and clarify HA session results.
+- Package daemon 0.14.1; radio compatibility remains 0.13 (API 1/UART 3).
+- Incorporate the private diagnostic/profile fixes into the official image.
+- Software-only: no radio firmware, bootloader or trust-key changes.
+
 ## 0.5.0
 
 - Add one-action pairing shared by Web, native HA and the commissioning CLI,
