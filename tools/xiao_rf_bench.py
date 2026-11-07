@@ -252,22 +252,43 @@ def command(link, text, links, timeout=2, clock=time.monotonic, sleep=time.sleep
         link.awaited = None
 
 
-def status(reply, active):
+def status(reply, active, *, channel=None, mode=None):
     """Require diagnostic RF settings and bounded monotonic counter values.
 
     @param reply Successful RFSTATUS response.
     @param active Required RF window state.
+    @param channel Required channel, or either idle channel / active synthetic 26.
+    @param mode Required mode, or either idle mode / active synthetic mode.
     @return Parsed status evidence.
     """
     data = fields(reply.removeprefix("OK "))
     for key, expected in (
         ("active", str(active)),
-        ("channel", "26"),
         ("auto_ack", "0"),
         ("retries", "0"),
     ):
         if data.get(key) != expected:
             raise ValueError(f"Unexpected RF setting: {key}")
+    if channel is None and active:
+        channel = 26
+    if mode is None and active:
+        mode = "synthetic"
+    if data.get("channel") not in ("11", "26") or (
+        channel is not None and data["channel"] != str(channel)
+    ):
+        raise ValueError("Unexpected RF channel")
+    if "mode" not in data:
+        if data["channel"] != "26" or mode not in (None, "synthetic"):
+            raise ValueError("Missing RF mode")
+    elif data["mode"] not in ("synthetic", "passive") or (
+        mode is not None and data["mode"] != mode
+    ):
+        raise ValueError("Unexpected RF mode")
+    if (
+        "mode" in data
+        and data["mode"] != {"11": "passive", "26": "synthetic"}[data["channel"]]
+    ):
+        raise ValueError("Inconsistent RF channel/mode")
     integer(data.get("power_dbm"), -128, 0)
     for key in ("tx_started", "tx_done", "tx_failed", "rx", "dropped", "queued"):
         integer(data.get(key), 0, 0xFFFFFFFF)

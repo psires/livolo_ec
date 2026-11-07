@@ -66,6 +66,8 @@ class Port:
         self.output = bytearray()
         self.commands = []
         self.active = 0
+        self.channel = 26
+        self.mode = "synthetic"
         self.tx = self.rx = self.dropped = 0
         self.write_limit = 5
         self.zero_writes = 2
@@ -127,13 +129,15 @@ class Port:
             )
         elif command == "RFSTATUS":
             reply = (
-                f"OK active={self.active} channel=26 power_dbm=0 auto_ack=0 retries=0 "
+                f"OK active={self.active} channel={self.channel} mode={self.mode} power_dbm=0 auto_ack=0 retries=0 "
                 f"tx_started={self.tx} tx_done={self.tx} tx_failed=0 rx={self.rx} "
                 f"dropped={self.dropped} queued=0 busy=0 ticks_hz=1000000 timestamp=callback"
                 " fault=0 bad_crc=unavailable"
             )
         elif command == "RFSTART":
             self.active = 1
+            self.channel = 26
+            self.mode = "synthetic"
             self.tx = self.rx = 0
             reply = "OK active=1 channel=26"
         elif command == "RFSTOP":
@@ -355,6 +359,45 @@ class RunnerTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.run_bench("unknown")
         self.assertTrue(all(not port.commands for port in self.ports))
+
+    def test_synthetic_run_after_passive_stop_needs_no_reset(self):
+        """A previous idle channel-11 session cannot prevent explicit synthetic selection."""
+        for port in self.ports:
+            port.channel = 11
+            port.mode = "passive"
+        self.run_bench()
+        self.assertTrue(bench.passed(self.evidence))
+        self.assertTrue(
+            all(port.channel == 26 and port.mode == "synthetic" for port in self.ports)
+        )
+        reply = "OK active=1 channel=11 mode=passive power_dbm=0 auto_ack=0 retries=0 tx_started=0 tx_done=0 tx_failed=0 rx=0 dropped=0 queued=0 busy=0 fault=0 ticks_hz=1000000 timestamp=callback bad_crc=unavailable"
+        with self.assertRaises(ValueError):
+            bench.status(reply, 1)
+        for wrong in (
+            reply.replace("active=1", "active=0").replace(
+                "mode=passive", "mode=synthetic"
+            ),
+            reply.replace("active=1", "active=0").replace("channel=11", "channel=26"),
+        ):
+            with self.assertRaises(ValueError):
+                bench.status(wrong, 0)
+
+    def test_legacy_synthetic_status_without_mode_remains_compatible(self):
+        """The original channel-26 firmware still passes its unchanged baseline."""
+        for port in self.ports:
+            original = port.emit
+
+            def legacy(line, emit=original):
+                """Strip only the new status metadata to emulate historical firmware.
+
+                @param line Original fixture record.
+                @param emit Bound original endpoint writer.
+                """
+                emit(line.replace(" mode=synthetic", ""))
+
+            port.emit = legacy
+        self.run_bench()
+        self.assertTrue(bench.passed(self.evidence))
 
     def test_both_directions_fragmented_backpressure_and_independent_crc(self):
         """Forty one-shot frames match on the other endpoint and both radios stop."""

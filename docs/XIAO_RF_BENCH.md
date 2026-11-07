@@ -21,6 +21,11 @@ from the private inventory. No endpoint is selected automatically. Before openin
 either port, the tool checks path resolution, distinct endpoints, VID/PID and
 serial against enumerated USB metadata. VERSION and CAPS then verify the live
 board before either RF window starts.
+Idle preflight accepts the last selected channel 11 or 26. After a previous
+passive session stops, explicit RFSTART selects channel 26 without a reset.
+Active synthetic checks require channel 26 and `mode=synthetic` when that field
+is present. Older channel-26 `synthetic_v1` firmware without a mode field remains
+compatible; absence of the field never authorizes passive channel-11 reception.
 
 | Board | USB VID:PID | Baud | DTR | RTS |
 | --- | --- | --- | --- | --- |
@@ -31,10 +36,14 @@ The MG24 SAMD11 bridge requires DTR for forwarding. The C6 may emit ROM boot
 chatter; only a complete matching numbered response satisfies a command.
 These settings are specific to the observed bench devices and do not alter any
 daemon serial policy. Ports are opened exclusively, with control-line state set
-before opening; no reset, bootloader, flush or buffer-reset operation is issued.
+before opening; the harness issues no explicit reset, bootloader, flush or
+buffer-reset call. This does not exclude OS/USB effects or pyserial's internal
+input-buffer clearing during open.
 
-Run only after the sole device operator has released other owners of these two
-new endpoints. Use Python 3.9 or newer and pyserial 3.5, as in the host environment:
+Run only after the sole device operator has established exclusive ownership and
+that both radios are already idle, before opening either of the two new endpoints.
+Post-open preflight is not a substitute for that condition. Use Python 3.9 or
+newer and pyserial 3.5, as in the host environment:
 
 ```sh
 python3 tools/xiao_rf_bench.py \
@@ -54,8 +63,10 @@ The default mode is `baseline`; it never starts a follow-up experiment itself.
 
 ## Frozen baseline
 
-1. Read PING, VERSION, CAPS and RFSTATUS from both exact endpoints. Refuse an
-   already active window without sending START, STOP or TX to either radio.
+1. Read PING, VERSION, CAPS and RFSTATUS from both exact endpoints. Refuse a
+   window observed active after opening without sending START, STOP or TX to
+   either radio. Serial close/reopen can span a USB reset on the tested C6 fixture;
+   post-open status cannot guarantee preservation of a pre-open window.
 2. Start both windows with the same fresh nonzero 32-bit nonce. Verify fixed
    channel 26, SDK-configured power at most 0 dBm, automatic ACK off, retries off,
    callback timestamps at 1 MHz and no latched fault.
