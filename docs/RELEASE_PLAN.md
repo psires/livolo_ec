@@ -439,6 +439,10 @@ or adapter must not inherit support from a shared VID/PID or MCU family alone.
 
 ### Sharing chip support across dongles
 
+The newly supplied XIAO MG24 and XIAO ESP32-C6 have a separate
+[implementation and qualification plan](XIAO_BOARD_SUPPORT_PLAN.md). They remain
+proposed targets until their exact-board acceptance gates are met.
+
 Use the additional modules to separate three concerns: shared Livolo protocol,
 peer and scheduling behavior; MCU-family radio/timer/transport adapters; and
 small explicit board profiles for pins, oscillators, RF front ends, USB bridges,
