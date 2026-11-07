@@ -6,6 +6,10 @@
 #include "api/application_properties.h"
 #include "transport.h"
 #include "../version.h"
+#ifdef EC_RF_DIAGNOSTICS
+#include "rf.h"
+extern const struct ec_rf_ops ec_mg24_rf_ops;
+#endif
 
 #define RX_SIZE 2048u
 static volatile uint8_t rx[RX_SIZE];
@@ -66,7 +70,7 @@ static void serial_init(void)
 	NVIC_EnableIRQ(USART0_RX_IRQn);
 }
 
-/** @brief Run transport-only diagnostics without enabling clocks for the radio.
+/** @brief Run diagnostics with RF off until an explicit bounded RFSTART request.
  * @return Never returns.
  */
 int main(void)
@@ -76,11 +80,27 @@ int main(void)
 	size_t pending = 0, sent = 0;
 
 	CHIP_Init();
+#ifdef EC_RF_DIAGNOSTICS
+	/* Board DTS uses a 39 MHz crystal with CTUNE 95; no radio starts here. */
+	CMU_HFXOInit_TypeDef hfxo = CMU_HFXOINIT_DEFAULT;
+
+	hfxo.ctuneXiAna = hfxo.ctuneXoAna = 95;
+	CMU_HFXOInit(&hfxo);
+	CMU_ClockSelectSet(cmuClock_SYSCLK, cmuSelect_HFXO);
+#endif
 	SystemCoreClockUpdate();
 	serial_init();
 	ec_experimental_init(&parser, "seeed-xiao-mg24", "xiao-bringup-1",
 			     115200);
+#ifdef EC_RF_DIAGNOSTICS
+	ec_rf_setup(&ec_mg24_rf_ops);
+	parser.radio_command = ec_rf_command;
+	parser.build = "xiao-rf-1";
+#endif
 	for (;;) {
+#ifdef EC_RF_DIAGNOSTICS
+		ec_rf_poll();
+#endif
 		if (lost) {
 			__disable_irq();
 			tail = head;
@@ -94,6 +114,7 @@ int main(void)
 				USART0->TXDATA = response[sent++];
 			continue;
 		}
+		pending = sent = 0;
 		if (tail != head) {
 			uint8_t byte = rx[tail];
 
@@ -102,5 +123,11 @@ int main(void)
 						       sizeof(response));
 			sent = 0;
 		}
+#ifdef EC_RF_DIAGNOSTICS
+		if (!pending) {
+			pending = ec_rf_event(response, sizeof(response));
+			sent = 0;
+		}
+#endif
 	}
 }

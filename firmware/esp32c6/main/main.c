@@ -4,8 +4,12 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#ifdef EC_RF_DIAGNOSTICS
+#include "rf.h"
+extern const struct ec_rf_ops ec_c6_rf_ops;
+#endif
 
-/** @brief Run only bounded USB diagnostics; never initialize a radio stack. */
+/** @brief Run USB diagnostics; only explicit RFSTART can enable the raw radio. */
 void app_main(void)
 {
 	usb_serial_jtag_driver_config_t config = {
@@ -23,7 +27,16 @@ void app_main(void)
 		return;
 	ec_experimental_init(&parser, "seeed-xiao-esp32c6", "xiao-bringup-1",
 			     115200);
+#ifdef EC_RF_DIAGNOSTICS
+	ec_rf_setup(&ec_c6_rf_ops);
+	parser.radio_command = ec_rf_command;
+	parser.build = "xiao-rf-1";
+#endif
 	for (;;) {
+#ifdef EC_RF_DIAGNOSTICS
+		/* Single task owns core state; expiry progresses even with blocked USB. */
+		ec_rf_poll();
+#endif
 		if (sent < pending) {
 			int written = usb_serial_jtag_write_bytes(
 				response + sent, pending - sent, 0);
@@ -33,6 +46,7 @@ void app_main(void)
 			vTaskDelay(1);
 			continue;
 		}
+		pending = sent = 0;
 		if (consumed >= count) {
 			count = usb_serial_jtag_read_bytes(input, sizeof(input),
 							   pdMS_TO_TICKS(10));
@@ -48,5 +62,11 @@ void app_main(void)
 				sizeof(response));
 			sent = 0;
 		}
+#ifdef EC_RF_DIAGNOSTICS
+		if (!pending) {
+			pending = ec_rf_event(response, sizeof(response));
+			sent = 0;
+		}
+#endif
 	}
 }

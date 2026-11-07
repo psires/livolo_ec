@@ -1,8 +1,9 @@
-# Experimental transport-only target. Separate pinned Gecko SDK 4.4.6 checkout.
+# Experimental transport and opt-in RF diagnostics. Separate pinned Gecko SDK 4.4.6.
 GSDK ?= ../../vendor/gecko_sdk
 PREFIX ?= arm-none-eabi-
 CC = $(PREFIX)gcc
 BUILD ?= build
+RF_DIAGNOSTICS ?= 1
 DEVICE = $(GSDK)/platform/Device/SiliconLabs/EFR32MG24
 EMLIB = $(GSDK)/platform/emlib
 INCLUDES = ../experimental $(DEVICE)/Include $(GSDK)/platform/CMSIS/Core/Include \
@@ -16,18 +17,33 @@ SOURCES = main.c ../experimental/transport.c \
  $(DEVICE)/Source/startup_efr32mg24.c $(DEVICE)/Source/system_efr32mg24.c \
  $(addprefix $(EMLIB)/src/,em_cmu.c em_emu.c em_gpio.c em_usart.c em_core.c em_system.c)
 OBJECTS = $(addprefix $(BUILD)/,$(notdir $(SOURCES:.c=.o)))
+ifeq ($(RF_DIAGNOSTICS),1)
+RAIL = $(GSDK)/platform/radio/rail_lib
+PA = $(RAIL)/plugin/pa-conversions
+RADIO_LIB = $(RAIL)/autogen/librail_release/librail_efr32xg24_gcc_release.a
+INCLUDES += $(RAIL)/common $(RAIL)/protocol/ieee802154 \
+ $(RAIL)/chip/efr32/efr32xg2x $(PA) $(PA)/efr32xg24/config
+CFLAGS += -DEC_RF_DIAGNOSTICS=1
+SOURCES += radio.c ../experimental/rf.c \
+ $(PA)/pa_conversions_efr32.c $(PA)/pa_curves_efr32.c
+RADIO_LINK = -Wl,--whole-archive $(RADIO_LIB) -Wl,--no-whole-archive
+endif
 vpath %.c $(sort $(dir $(SOURCES)))
 
 .PHONY: all clean
 all: $(BUILD)/ec-xiao-mg24.bin
 $(BUILD):
 	mkdir -p $@
+$(BUILD)/.config-$(RF_DIAGNOSTICS): | $(BUILD)
+	rm -f $(BUILD)/.config-*
+	touch $@
+$(OBJECTS): $(BUILD)/.config-$(RF_DIAGNOSTICS)
 $(BUILD)/%.o: %.c Makefile | $(BUILD)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
-$(BUILD)/ec-xiao-mg24.elf: $(OBJECTS) application.ld
+$(BUILD)/ec-xiao-mg24.elf: $(OBJECTS) application.ld $(RADIO_LIB)
 	$(CC) $(CFLAGS) -nostartfiles --specs=nano.specs --specs=nosys.specs \
 	 -T application.ld -Wl,--gc-sections,-z,max-page-size=0x1000,-Map=$(BUILD)/ec-xiao-mg24.map \
-	 $(OBJECTS) -lm -o $@
+	 $(OBJECTS) $(RADIO_LINK) -lm -o $@
 	$(PREFIX)size $@
 $(BUILD)/ec-xiao-mg24.bin: $(BUILD)/ec-xiao-mg24.elf
 	$(PREFIX)objcopy -O binary --gap-fill=0xff $< $@

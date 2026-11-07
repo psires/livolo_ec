@@ -75,15 +75,22 @@ static size_t reply(struct ec_experimental *state, char *out, size_t capacity)
 			"command_slots=0 request_cache=0 lease_max=0 "
 			"session_bytes=0 channel=11 baud=%u board=%s "
 			"fw_version=" EC_VERSION " update=none experimental=1 "
-			"gateway=0 radio_tx=0 build=%s",
-			state->baud, state->board, state->build);
+			"gateway=0 radio_tx=%s%s build=%s",
+			state->baud, state->board,
+			state->radio_command ? "synthetic_only" : "0",
+			state->radio_command ? " rf_diag=synthetic_v1" : "",
+			state->build);
 		if (length < 0 || (size_t)length >= sizeof(body))
 			return 0;
 	} else if (!strcmp(cursor, "STATUS")) {
 		snprintf(body, sizeof(body),
-			 "OK configured=0 armed=0 peers=0 radio_tx=0 "
+			 "OK configured=0 armed=0 peers=0 radio_tx=%s "
 			 "experimental=1 malformed=%lu",
+			 state->radio_command ? "synthetic_only" : "0",
 			 (unsigned long)state->malformed);
+	} else if (state->radio_command && !strncmp(cursor, "RF", 2)) {
+		if (!state->radio_command(cursor, body, sizeof(body)))
+			return 0;
 	} else {
 		strcpy(body, "ERR UNSUPPORTED experimental=1");
 	}

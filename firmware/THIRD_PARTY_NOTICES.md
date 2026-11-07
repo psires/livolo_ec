@@ -1,7 +1,8 @@
 # Firmware third-party inputs and notices
 
-This inventory covers release **0.12**, its TI bootloader **0.2**, and the passive
-receiver/sniffer targets. Project-owned code uses the repository's
+This inventory covers release **0.12**, its TI bootloader **0.2**, the passive
+receiver/sniffer targets, and the separately identified experimental XIAO inputs.
+Project-owned code uses the repository's
 [BSD-2-Clause licence](../LICENSE). That licence does not replace the terms of
 the dependencies below. Preserve existing copyright and licence headers.
 
@@ -62,6 +63,46 @@ not conclude that those terms prevent distribution; it also does not claim that
 the RAIL archive's Zlib exception applies to unrelated bootloader headers.
 The board's existing Gecko bootloader is preserved, not built or distributed
 with the application.
+
+## Experimental XIAO MG24 and ESP32-C6 RF diagnostics
+
+These targets remain experimental and outside the supported firmware release
+set and updater catalog. The following records their reviewed RF dependencies;
+it does not approve a binary download or transfer qualification from another
+board. The earlier transport-only images did not initialize the radio.
+
+| Input | Pinned source and scope | Licence evidence |
+| --- | --- | --- |
+| MG24 Gecko SDK | The same `59d2160fe448b13730a91c0f019a8b4c53c43eb2` revision above; EFR32MG24 startup/system code, emlib, CMSIS, application-property headers and RAIL/PA inputs | Preserve the applicable per-file notices, including the bootloader-interface MSLA terms; the MG21 inventory is not a substitute for the MG24 build's dependency list. |
+| MG24 RAIL archive | `platform/radio/rail_lib/autogen/librail_release/librail_efr32xg24_gcc_release.a`; the fetched archive matches its pinned Git LFS content hash and appears in the MG24 link map | This archive path falls within the pinned Gecko `License.txt` Zlib exception. The inspected RAIL headers and PA conversion/curve sources also carry Zlib notices. That exception does not relicense the entire SDK or the stock bootloader. |
+| ESP-IDF | [v5.5.1, `fcae32885b0296b32044cb99ecbdc50d98dddb83`](https://github.com/espressif/esp-idf/tree/fcae32885b0296b32044cb99ecbdc50d98dddb83); IEEE 802.15.4, USB, GPIO, timer and their selected dependencies | The inspected IEEE 802.15.4 public API and implementation carry Apache-2.0 notices. Other components and submodules retain their own terms; an SDK-wide Apache label is insufficient. |
+| ESP PHY binary inputs | [Submodule `45ce2703403784b4c3983a52e453988d61eb0e9d`](https://github.com/espressif/esp-phy-lib/tree/45ce2703403784b4c3983a52e453988d61eb0e9d), supplying `esp32c6/libphy.a` and `esp32c6/libbtbb.a` | Its inspected `README.rst` explicitly applies Apache-2.0 to the binary libraries, with Copyright 2015-2021 Espressif Systems. Retain that attribution and `LICENSE`. |
+| ESP coexistence binary input | [Submodule `2d68674e3d522fb025e4666217f9cc1ca2af9399`](https://github.com/espressif/esp-coex-lib/tree/2d68674e3d522fb025e4666217f9cc1ca2af9399), supplying `esp32c6/libcoexist.a` | Its inspected `README.md` explicitly applies Apache-2.0 to the binary libraries, with Copyright 2015-2023 Espressif Systems. Retain that attribution and `LICENSE`. |
+
+The reviewed archive SHA-256 values are:
+
+| Input | SHA-256 |
+| --- | --- |
+| MG24 `librail_efr32xg24_gcc_release.a` | `29f09f2ee00396372ea15944966df0fe59d30f23a48582095edced6763bcb67f` |
+| C6 `libphy.a` | `69d43dbc33da2b72abd7c251c0b61e7f1ace000884a448e0b8790704cad368b7` |
+| C6 `libbtbb.a` | `9e1e15c9f0bdbb6fcfca245afec7eb082ff243dcdac212b2921ad9b62f6db198` |
+| C6 `libcoexist.a` | `79fae7fbe27f4a8d9aeabe25ae9cf18759cab2fa20ce5a596ebddd764f0e28a2` |
+
+The C6 link map contains retained sections from all three listed Espressif
+archives; disabling Wi-Fi and Bluetooth operation does not remove these shared
+radio inputs. The reviewed map has no selected members from the separately
+collected `librfate.a`, `librftest.a` or `libbttestmode.a` test archives. The two
+binary submodules had no top-level NOTICE file at their recorded revisions.
+
+Private review evidence is retained under `.local/xiao-rf-20261107/`, including
+`rf-review-inputs.json`, the selected licences/headers, generated C6 configuration,
+ELFs and link maps. All 29 entries in that initial manifest were independently
+size/hash checked; the two binary-submodule READMEs were inspected separately.
+This selected-input review is not a complete compiled-header or runtime notice
+inventory. The C6 toolchain/runtime must be inventoried independently of the
+GNU Arm runtime described below. Before a binary release, collect the complete
+applicable notices and bind them to its exact images. Neither source publication
+nor a passing radio test establishes that binary-distribution package.
 
 ## Nordic nRF52840 PCA10059 gateway
 

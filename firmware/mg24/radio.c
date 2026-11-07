@@ -1,0 +1,192 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
+#include "rf.h"
+#include "em_gpio.h"
+#include "rail.h"
+#include "rail_ieee802154.h"
+#include "pa_conversions_efr32.h"
+#include <stdatomic.h>
+#include <string.h>
+
+static RAIL_Handle_t radio;
+static atomic_uint calibration;
+static uint8_t tx_fifo[256] __attribute__((aligned(4)));
+static uint8_t rx_fifo[2048] __attribute__((aligned(4)));
+
+/** @brief Retain RX packets for bounded main-loop copying and publish TX status.
+ * @param handle RAIL instance that owns received packet handles.
+ * @param events Hardware event mask; no serial output occurs here.
+ */
+static void event(RAIL_Handle_t handle, RAIL_Events_t events)
+{
+	if (events & RAIL_EVENT_RX_PACKET_RECEIVED)
+		if (RAIL_HoldRxPacket(handle) == RAIL_RX_PACKET_HANDLE_INVALID)
+			ec_rf_drop();
+	if (events & (RAIL_EVENT_RX_FIFO_OVERFLOW | RAIL_EVENT_RX_FRAME_ERROR))
+		ec_rf_drop();
+	if (events & RAIL_EVENT_CAL_NEEDED)
+		atomic_store(&calibration, 1);
+	if (events & RAIL_EVENTS_TX_COMPLETION)
+		ec_rf_tx_complete((events & RAIL_EVENT_TX_PACKET_SENT) != 0);
+}
+
+/** @brief Return callback/poll microseconds from the running RAIL timer.
+ * @return Zero before initialization, otherwise wrapping uint32 microseconds.
+ */
+static uint32_t now_us(void)
+{
+	return radio ? RAIL_GetTime() : 0;
+}
+
+/** @brief Synchronously abort current radio operations before buffer reuse.
+ * @return Zero only if RAIL is idle after cancellation.
+ */
+static int stop(void)
+{
+	if (radio)
+		RAIL_Idle(radio, RAIL_IDLE_ABORT, true);
+	return radio && RAIL_GetRadioState(radio) != RAIL_RF_STATE_IDLE ? -1
+									: 0;
+}
+
+/** @brief Configure raw IEEE PHY, retained FCS and no hardware ACKs.
+ * @return Zero only after verified configuration and channel-26 RX entry.
+ */
+static int start(void)
+{
+	static RAIL_Config_t config = { .eventsCallback = event };
+	RAIL_IEEE802154_Config_t ieee = {
+		.ackConfig = { .enable = false,
+			       .rxTransitions = { RAIL_RF_STATE_RX,
+						  RAIL_RF_STATE_RX },
+			       .txTransitions = { RAIL_RF_STATE_RX,
+						  RAIL_RF_STATE_RX } },
+		.timings = { .idleToRx = 100,
+			     .idleToTx = 100,
+			     .rxToTx = 192,
+			     .txToRx = 192 },
+		.framesMask = RAIL_IEEE802154_ACCEPT_STANDARD_FRAMES,
+		.promiscuousMode = true,
+	};
+	RAIL_TxPowerConfig_t power = { .mode = RAIL_TX_POWER_MODE_2P4GIG_HP,
+				       .voltage = 3300,
+				       .rampTime = 10 };
+	RAIL_StateTransitions_t transitions = { RAIL_RF_STATE_RX,
+						RAIL_RF_STATE_RX };
+	uint16_t rx_size = sizeof(rx_fifo);
+
+	if (radio)
+		return RAIL_StartRx(radio, 26, NULL) == RAIL_STATUS_NO_ERROR
+			       ? 0
+			       : -1;
+	/* XIAO antenna switch: PB4 selects onboard antenna; PB5 enables switch. */
+	GPIO_PinModeSet(gpioPortB, 4, gpioModePushPull, 0);
+	GPIO_PinModeSet(gpioPortB, 5, gpioModePushPull, 1);
+	radio = RAIL_Init(&config, NULL);
+	if (!radio)
+		return -1;
+	if (RAIL_IEEE802154_Config2p4GHzRadio(radio) ||
+	    RAIL_IEEE802154_Init(radio, &ieee) ||
+	    RAIL_ConfigRxOptions(radio, RAIL_RX_OPTION_STORE_CRC,
+				 RAIL_RX_OPTION_STORE_CRC) ||
+	    RAIL_SetRxFifo(radio, rx_fifo, &rx_size) ||
+	    RAIL_SetTxFifo(radio, tx_fifo, 0, sizeof(tx_fifo)) !=
+		    sizeof(tx_fifo) ||
+	    RAIL_InitTxPowerCurvesAlt(&RAIL_TxPowerCurvesVbat) ||
+	    RAIL_ConfigTxPower(radio, &power) || RAIL_SetTxPowerDbm(radio, 0) ||
+	    RAIL_SetRxTransitions(radio, &transitions) ||
+	    RAIL_SetTxTransitions(radio, &transitions) ||
+	    RAIL_ConfigCal(radio, RAIL_CAL_ALL) ||
+	    RAIL_ConfigEvents(radio, RAIL_EVENTS_ALL,
+			      RAIL_EVENT_RX_PACKET_RECEIVED |
+				      RAIL_EVENT_RX_FIFO_OVERFLOW |
+				      RAIL_EVENT_RX_FRAME_ERROR |
+				      RAIL_EVENTS_TX_COMPLETION |
+				      RAIL_EVENT_CAL_NEEDED))
+		return -1;
+	return RAIL_StartRx(radio, 26, NULL) == RAIL_STATUS_NO_ERROR ? 0 : -1;
+}
+
+/** @brief Copy one synthetic packet into RAIL-owned FIFO and submit once.
+ * @param mac MAC bytes, excluding the hardware-generated IEEE FCS.
+ * @param length MAC byte count, at most 125.
+ * @param cca Nonzero selects RAIL's single-CCA configuration, with no retries.
+ * @return Zero on submission; nonzero after aborting and restoring RX.
+ */
+static int send(const uint8_t *mac, size_t length, unsigned cca)
+{
+	uint8_t packet[126];
+	RAIL_CsmaConfig_t csma = RAIL_CSMA_CONFIG_SINGLE_CCA;
+	RAIL_Status_t status;
+
+	if (!radio || !length || length > 125)
+		return -1;
+	packet[0] = length + 2;
+	memcpy(packet + 1, mac, length);
+	RAIL_Idle(radio, RAIL_IDLE_ABORT, true);
+	if (RAIL_WriteTxFifo(radio, packet, length + 1, true) != length + 1) {
+		RAIL_StartRx(radio, 26, NULL);
+		return -1;
+	}
+	status = cca ? RAIL_StartCcaCsmaTx(radio, 26, RAIL_TX_OPTIONS_DEFAULT,
+					   &csma, NULL)
+		     : RAIL_StartTx(radio, 26, RAIL_TX_OPTIONS_DEFAULT, NULL);
+	if (status != RAIL_STATUS_NO_ERROR) {
+		RAIL_Idle(radio, RAIL_IDLE_ABORT, true);
+		RAIL_StartRx(radio, 26, NULL);
+		return -1;
+	}
+	return 0;
+}
+
+/** @brief Drain at most four held frames per pass, releasing every packet handle. */
+static void poll(void)
+{
+	if (!radio)
+		return;
+	for (unsigned i = 0; i < 4; i++) {
+		RAIL_RxPacketInfo_t info;
+		RAIL_RxPacketDetails_t details;
+		RAIL_RxPacketHandle_t packet;
+		uint8_t bytes[128];
+		uint32_t ticks = RAIL_GetTime();
+
+		packet = RAIL_GetRxPacketInfo(
+			radio, RAIL_RX_PACKET_HANDLE_OLDEST_COMPLETE, &info);
+		if (packet == RAIL_RX_PACKET_HANDLE_INVALID)
+			break;
+		if (info.packetStatus == RAIL_RX_PACKET_READY_SUCCESS &&
+		    info.packetBytes >= 4 &&
+		    info.packetBytes <= sizeof(bytes) &&
+		    RAIL_GetRxPacketDetailsAlt(radio, packet, &details) ==
+			    RAIL_STATUS_NO_ERROR) {
+			RAIL_CopyRxPacket(bytes, &info);
+			RAIL_ReleaseRxPacket(radio, packet);
+			if (!(bytes[0] & 0x80) &&
+			    bytes[0] + 1 == info.packetBytes)
+				ec_rf_receive(bytes + 1, bytes[0] - 2, 1,
+					      details.rssi, details.lqi, ticks);
+			else
+				ec_rf_drop();
+		} else {
+			RAIL_ReleaseRxPacket(radio, packet);
+			ec_rf_drop();
+		}
+	}
+	if (atomic_exchange(&calibration, 0))
+		if (RAIL_Calibrate(radio, NULL, RAIL_CAL_ALL_PENDING))
+			ec_rf_drop();
+}
+
+/** @brief Return the configured power, conservatively rounding positive values up.
+ * @return Configured dBm, or zero before initialization.
+ */
+static int power_dbm(void)
+{
+	int power = radio ? RAIL_GetTxPowerDbm(radio) : 0;
+
+	return power > 0 ? (power + 9) / 10 : power / 10;
+}
+
+const struct ec_rf_ops ec_mg24_rf_ops = {
+	now_us, start, stop, send, poll, power_dbm,
+};

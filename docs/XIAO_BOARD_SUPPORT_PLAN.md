@@ -1,9 +1,11 @@
 # XIAO MG24 and ESP32-C6 support plan
 
-Planning baseline: 2026-11-07. Both boards are newly supplied by the owner and
-will be connected to the development Raspberry Pi. Neither board is currently
-a supported Livolo target. This document assigns future work; it is not a
-hardware qualification result or an instruction to flash attached devices.
+Planning baseline: 2026-11-07; RF progress updated 2026-11-08. Both boards are
+connected to the development Raspberry Pi and have completed initial diagnostic
+transport, bounded recovery and synthetic radio cross-capture. Neither board is
+currently a supported Livolo gateway. This document
+tracks the remaining work; hardware findings belong to the linked verification
+records, not to the planned acceptance criteria below.
 
 ## Product scope and sequence
 
@@ -74,7 +76,8 @@ not prove acceptance of Livolo frames or the timing of our application ACKs.
 In particular, test the existing `01 88` frame prefix, absence of unintended
 IEEE ACKs and hidden retries, and exact FCS/length handling. Auto-pending controls
 must not be mistaken for disabling auto-ACK.
-The reviewed v5.5.1 header is feasibility evidence, not a selected SDK version.
+The experimental C6 adapter now uses pinned ESP-IDF v5.5.1. SDK API availability
+alone does not establish these hardware properties.
 [Espressif IEEE 802.15.4 API](https://github.com/espressif/esp-idf/blob/v5.5.1/components/ieee802154/include/esp_ieee802154.h)
 
 ## Assigned work packages
@@ -115,16 +118,14 @@ assigned before the feasibility results.
   bootloader entry before any reuse for MG24. A matching container format does
   not authorize cross-chip flashing. Design an explicit ESP32-C6 image/partition
   validator and recovery adapter instead of disguising it as an existing board.
-- Separate required release membership from updater/backend implementation
-  capability. Currently `tools/firmware_release.py` derives required membership
-  from `firmware_bundle.BOARDS`; experimental adapters must not accidentally
-  require a six-board release. Keep historical four-board bundles verifiable.
-  Freeze/version the required set in independently reviewed release policy;
-  a candidate specification cannot choose its own smaller required set. Test
-  omitted required boards, duplicate/unknown boards and an experimental backend
-  that must not change required membership.
-  Replace implicit non-TI/non-Nordic routing to MG21 in `firmware_artifacts.py`
-  with explicit format dispatch. Review the existing 1 MiB file and 16 MiB
+- Keep required release membership separate from updater/backend implementation
+  capability. Schema-1 membership is now frozen independently of
+  `firmware_bundle.BOARDS`, and artifact validation uses explicit board/layout
+  dispatch. Preserve those safeguards: experimental adapters must not require
+  a six-board release or fall through to an MG21 parser. Keep historical
+  four-board bundles verifiable; a candidate specification cannot choose its
+  own smaller required set. Retain omitted/unknown-board and backend-extension
+  regressions. Review the existing 1 MiB file and 16 MiB
   bundle bounds against measured new images without removing defensive limits.
 - Dry-run/preflight must not reset, enter a loader, flash or change configuration.
   Retain artifact, expected-board, helper, live-identity, board, protocol, baudrate
@@ -208,7 +209,7 @@ hash. Use the existing [release process](RELEASE_PROCESS.md),
 [bundle contract](FIRMWARE_RELEASE_BUNDLE.md) and
 [qualification plan](FIRMWARE_QUALIFICATION_PLAN.md).
 
-## Initial bring-up and next handoff
+## Bring-up results and next handoff
 
 Both boards are connected to the development Pi. The initial transport-only
 applications answer diagnostic commands and reject network/control commands;
@@ -224,10 +225,31 @@ are retained. The loader and device information were unchanged. See the
 [MG24](../firmware/mg24/README.md) and
 [ESP32-C6](../firmware/esp32c6/README.md) build/recovery notes.
 
-The MG24 physical Standard/Sense variant and PCB revision still need visual
-confirmation. Next, implement the raw-radio adapters and agree an isolated
-receive/transmit experiment with independent capture before enabling gateway
-control. Watchdog, sustained serial/radio load, timing, pairing and updater
-qualification remain open gates. Existing radios, services and HA are outside
-this bring-up's modification scope. No experimental image is included in a
+The raw-radio adapters now pass a bounded channel-26 cross-capture baseline:
+each board transmitted 20 synthetic frames and the other received all 20, with
+ten 39-byte and ten 41-byte frames in each direction. MG24 captures also passed
+20 independent software FCS checks; C6 reception relies on the SDK's valid-CRC
+metadata. The passing run had no missing or duplicate expected frames, failed
+transmits, queue drops or latched faults, and both radios finished inactive.
+See the [RF verification record](verification/xiao-rf-20261108.json) for exact
+artifacts, failed preflight attempts, preservation checks and evidence limits.
+
+A separate follow-up after the MG24 USB cable replacement passed with four
+frames per direction: one of each length with CCA enabled, and one of each
+length with the ACK-request flag set. All eight frames were independently
+received, with no observed classic IEEE ACKs. This does not qualify busy-channel
+CCA, addressed-unicast ACK behavior or ACK timing.
+
+The C6 initially became unresponsive over USB before RF activation. The same
+image worked after application reinstallation, but the cause remains unresolved;
+this result does not establish sustained transport reliability. The MG24
+physical Standard/Sense variant and PCB revision still need visual confirmation.
+The owner confirmed that the nearby, isolated test switches are `46715621` (two gang)
+and `66780945` (one gang), both removed from the HA-managed network. Synthetic
+channel-26 results do not establish reception from those channel-11 switches;
+that needs a separate passive-only experiment. See the
+[RF bench procedure](XIAO_RF_BENCH.md) for exact bounds and evidence semantics.
+Gateway control stays disabled. Watchdog, sustained serial/radio load, timing,
+pairing and updater qualification remain open gates. Existing radios, services
+and HA are outside this bring-up's modification scope. No experimental image is included in a
 release or an automatic-update catalog.

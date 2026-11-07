@@ -1,0 +1,7 @@
+# The RX/TX callbacks release SDK-owned buffers while running in interrupt context.
+# Keep both layers of that public API in RAM, alongside our IRAM_ATTR callbacks.
+[mapping:ec_rf_receive_release]
+archive: libieee802154.a
+entries:
+    esp_ieee802154: esp_ieee802154_receive_handle_done (noflash)
+    esp_ieee802154_dev: ieee802154_receive_handle_done (noflash)

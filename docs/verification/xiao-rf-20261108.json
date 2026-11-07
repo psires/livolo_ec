@@ -1,0 +1,760 @@
+{
+  "schema": 1,
+  "handoff_date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "status": "Bounded baseline and separate post-cable CCA/ACK-request follow-up passed; preservation and final RF-off transport checks passed; experimental only",
+  "scope": "Experimental synthetic raw IEEE 802.15.4 RX/TX on two new XIAOs; not Livolo gateway support",
+  "firmware_version": "0.14",
+  "build_id": "xiao-rf-1",
+  "release_or_catalog_modified": false,
+  "boards": {
+    "mg24": {
+      "application": {
+        "bytes": 80976,
+        "sha256": "f2e04e505f053c2e7e6369427b0c671d2165ed87c93e3b8f9ff11cd1caf8b3cd"
+      },
+      "sdk": "Gecko SDK 4.4.6, 59d2160fe448b13730a91c0f019a8b4c53c43eb2",
+      "fcs": "Original FCS retained and independently verified",
+      "gateway_ready": false
+    },
+    "c6": {
+      "application": {
+        "bytes": 194544,
+        "sha256": "f2e11f934b622da356ac24ffe9ed058b4389e3f69973a967967179513a35764b"
+      },
+      "sdk": "ESP-IDF v5.5.1, fcae32885b0296b32044cb99ecbdc50d98dddb83",
+      "fcs": "Hardware CRC acceptance; FCS replaced by SDK metadata",
+      "gateway_ready": false
+    }
+  },
+  "baseline": {
+    "receipt_completed_at_utc": "2026-11-07T23:06:34.752321+00:00",
+    "timestamp_source": "Private receipt file modification time",
+    "receipt_sha256": "7f834c489d3abf40ec31a345f7b6506ed773f68d83b2cc9cba316cffc030c972",
+    "passed": true,
+    "channel": 26,
+    "configured_power_dbm": 0,
+    "power_is_radiated_measurement": false,
+    "minimum_request_spacing_ms": 200,
+    "frames_per_direction": 20,
+    "lengths_excluding_fcs": [
+      39,
+      41
+    ],
+    "frames_per_length_per_direction": 10,
+    "cca": false,
+    "ack_request": false,
+    "automatic_ack": false,
+    "retries": 0,
+    "directions": {
+      "mg24": {
+        "expected": 20,
+        "independently_received": 20,
+        "missing_sequences": [],
+        "missing_fraction": 0.0,
+        "duplicate_sequences": {},
+        "out_of_order": 0,
+        "unrelated_frames": 14,
+        "invalid_software_crc": 0,
+        "independently_crc_checked": 0,
+        "hardware_crc_only": 20,
+        "tx_outcomes": {
+          "0": [
+            "done"
+          ],
+          "1": [
+            "done"
+          ],
+          "2": [
+            "done"
+          ],
+          "3": [
+            "done"
+          ],
+          "4": [
+            "done"
+          ],
+          "5": [
+            "done"
+          ],
+          "6": [
+            "done"
+          ],
+          "7": [
+            "done"
+          ],
+          "8": [
+            "done"
+          ],
+          "9": [
+            "done"
+          ],
+          "10": [
+            "done"
+          ],
+          "11": [
+            "done"
+          ],
+          "12": [
+            "done"
+          ],
+          "13": [
+            "done"
+          ],
+          "14": [
+            "done"
+          ],
+          "15": [
+            "done"
+          ],
+          "16": [
+            "done"
+          ],
+          "17": [
+            "done"
+          ],
+          "18": [
+            "done"
+          ],
+          "19": [
+            "done"
+          ]
+        },
+        "tx_completion_complete": true,
+        "capture_complete": true,
+        "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+      },
+      "c6": {
+        "expected": 20,
+        "independently_received": 20,
+        "missing_sequences": [],
+        "missing_fraction": 0.0,
+        "duplicate_sequences": {},
+        "out_of_order": 0,
+        "unrelated_frames": 14,
+        "invalid_software_crc": 0,
+        "independently_crc_checked": 20,
+        "hardware_crc_only": 0,
+        "tx_outcomes": {
+          "32": [
+            "done"
+          ],
+          "33": [
+            "done"
+          ],
+          "34": [
+            "done"
+          ],
+          "35": [
+            "done"
+          ],
+          "36": [
+            "done"
+          ],
+          "37": [
+            "done"
+          ],
+          "38": [
+            "done"
+          ],
+          "39": [
+            "done"
+          ],
+          "40": [
+            "done"
+          ],
+          "41": [
+            "done"
+          ],
+          "42": [
+            "done"
+          ],
+          "43": [
+            "done"
+          ],
+          "44": [
+            "done"
+          ],
+          "45": [
+            "done"
+          ],
+          "46": [
+            "done"
+          ],
+          "47": [
+            "done"
+          ],
+          "48": [
+            "done"
+          ],
+          "49": [
+            "done"
+          ],
+          "50": [
+            "done"
+          ],
+          "51": [
+            "done"
+          ]
+        },
+        "tx_completion_complete": true,
+        "capture_complete": true,
+        "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+      }
+    },
+    "final": {
+      "mg24": {
+        "active": "0",
+        "channel": "26",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "20",
+        "tx_done": "20",
+        "tx_failed": "0",
+        "rx": "34",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      },
+      "c6": {
+        "active": "0",
+        "channel": "26",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "20",
+        "tx_done": "20",
+        "tx_failed": "0",
+        "rx": "34",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      }
+    },
+    "cleanup_errors": [],
+    "direction_keys": {
+      "mg24": "MG24 transmitter to C6 receiver",
+      "c6": "C6 transmitter to MG24 receiver"
+    },
+    "harness_sha256": "829a2abc092738371df8d12beb9bacd0dac76e9c1208c737b8b1622af95fb241"
+  },
+  "early_preflight_failures": [
+    {
+      "receipt_sha256": "0dca876bedc63c697e155eae52e1e22dd715a94180c20d112591dcd1a03acd84",
+      "completed_at_utc": "2026-11-07T22:55:24.788286+00:00",
+      "error": "Linux EIO during preflight; C6 USB re-enumeration observed",
+      "rf_windows_started": 0,
+      "tx_requests": 0,
+      "timestamp_source": "Private receipt file modification time"
+    },
+    {
+      "receipt_sha256": "5fa32e63aaf9bc10faabc1c3ff5aad376584455a6581ec4ac2072257982d6c0a",
+      "completed_at_utc": "2026-11-07T22:56:05.004842+00:00",
+      "error": "C6 initial PING timed out; no request replayed",
+      "rf_windows_started": 0,
+      "tx_requests": 0,
+      "timestamp_source": "Private receipt file modification time"
+    }
+  ],
+  "c6_startup_investigation": {
+    "status": "Unresolved; recovered after exact-image reinstall",
+    "observed": "Initial successful diagnostic probe followed by unresponsive USB and periodic backtrace-enable hints",
+    "interpretation": "Hints alone do not establish panic or reboot; nonfatal task watchdog output is possible",
+    "installed_failing_image_readback_matched": true,
+    "temporary_configurations": [
+      "USB console plus frame pointers and 3-second panic delay",
+      "USB console and 3-second panic delay",
+      "Frame pointers and 3-second panic delay, console disabled"
+    ],
+    "temporary_results": "All three answered repeated RF-off status queries; no causal configuration fix established",
+    "final_configuration": "Original console-disabled, no-frame-pointer baseline, unchanged source and 4096-byte main stack",
+    "recovery_observation": "Exact baseline reinstall followed by 22-second read-only sequence passed before successful RF test",
+    "no_workaround_claimed": true
+  },
+  "source_provenance": {
+    "built_source_archive_sha256": "e0d596b41370ee97a123edf545975c23a3865a01a92d6f98caf68d509aeb44d8",
+    "built_project_files": {
+      "firmware/esp32c6/CMakeLists.txt": "38c7e14147b7d5d887fad857c1ddc607852f9612333b3c98f936b2ec14e2353a",
+      "firmware/esp32c6/README.md": "be5dbaed4dba9f64a15cece4b58d324dd2486fb4eb3028be1fc7e1beac0dd79b",
+      "firmware/esp32c6/main/CMakeLists.txt": "2f3c0483dd089cad9c35531b5e44ed3cf439c5228ff1ac2ec15caf1cf66a935a",
+      "firmware/esp32c6/main/main.c": "7c45d20c8cfe5b46fea91d8ef2a0092f3ff3fb24a5261ba456cede3dae4b5aa8",
+      "firmware/esp32c6/main/radio.c": "2fed39094b6a6b4232dad0093f361d649204f70e2e6ab5a0e3381018b61acaee",
+      "firmware/esp32c6/main/radio.lf": "e87fed8dd50fdbbdb48ff442d9c24897154badc37e9c2a303a1d226ddb4d638c",
+      "firmware/esp32c6/partitions.csv": "0a96161cd311be7af9f7a5317ee0d3ccb2d0c3d8ac491932d3de61ee416f8ab9",
+      "firmware/esp32c6/sdkconfig.defaults": "03d91b2235228e1c7ec93078e73868f7a202cdf6f48268bda725ea4ff7d5d6f0",
+      "firmware/esp32c6/tests/Makefile": "c3497919d1710d7d313497738639e24173fe1def52b3ae57c9be1feb0a054c58",
+      "firmware/esp32c6/tests/stubs/driver/usb_serial_jtag.h": "439dd6c44566eb952b65da7ef379ae49a0784274503e23b2e9a9140e1ed1fe19",
+      "firmware/esp32c6/tests/stubs/esp_log.h": "77d809f0e2af513964473b78d967e4f9c17856a047a0a1704c31a5ccbbb9e5b6",
+      "firmware/esp32c6/tests/stubs/freertos/FreeRTOS.h": "052b546104655087c2f44ddacab9949a445785036d20d6c3a2fda0fe3121309e",
+      "firmware/esp32c6/tests/stubs/freertos/task.h": "fc5fdf5deafc1c1e9cf280960964093476495202d6c4b3e6aafd9a096f5167cd",
+      "firmware/esp32c6/tests/test_rf_usb.c": "ef08cb55db89ae467b3a4d68169763c9cf01ad52547152b4c91ee2f15b45eae4",
+      "firmware/esp32c6/tests/test_usb_transport.c": "927f6eed099b4ed1fede3243fa6e10ee970537490c15d9fb10f82d5d6a2bcf32",
+      "firmware/experimental/Makefile": "f9f9deff1b58d5d68cff033e5b833a2e1039feff255337caedf01b7a928f9224",
+      "firmware/experimental/README.md": "4a423f10b6ee6e20e142a12e90f4fca5d0c02ac9f9801bf62ea14d2420c487c1",
+      "firmware/experimental/rf.c": "c452da451c803bef245dcfe278aea06756ed1ae550f1c164826202ec0bae0300",
+      "firmware/experimental/rf.h": "9a1c07695193db39f0615c752b3bc6f815b8efa7caaa0f4c8ed547edb6622a95",
+      "firmware/experimental/test_rf.c": "8e5ec114af7c413d10b4419acc1ea38f75fae428977e599208b70d9b6dae2488",
+      "firmware/experimental/test_transport.c": "915856ef8a54536729d5bc5acb796823d478175544dbb6ca71eaae4f454085f2",
+      "firmware/experimental/transport.c": "e5b9ca7768a9cb9ee1a69e261c5f5fb272a1de7da248696f65e41638917bd52b",
+      "firmware/experimental/transport.h": "35a4db7c54d698a6e63ad10a6ac6a16b77ba603253b59e0238ede40e5e664a10",
+      "firmware/mg24/Makefile": "ff46f38425d9db0e40e1b1d8a39e1f6ba501c13bd1e2bee21f5e9515944bd706",
+      "firmware/mg24/README.md": "b968cf8ad83c32cee29e73cd92a0c1a25297f5e50329f5798b31e652003e4b9d",
+      "firmware/mg24/application.ld": "8e0dce961dad775bc1d5eb9028ec739489be6713cae79a4c1f6bb182460c842e",
+      "firmware/mg24/main.c": "8bf099abe17d9ce901a1f5c570b3390f7be9a4797acdf49a72fb57bbb257f51d",
+      "firmware/mg24/radio.c": "dff3715a56f9617e603743b0316d9261290c3cd6423750dd26ffd89fb9c92d93",
+      "firmware/version.h": "d049c9ea0cb69c14c87352bc0f13c62712f7c5f9e87c61749a8703baec43a05e"
+    },
+    "later_changes": "Only explanatory README/transport header comment/Makefile comment changes differ from built inputs; runtime C sources and linker mapping match",
+    "selected_sdk_manifest_sha256": "d7014d51f8e7be6f52eeddf039a20563ed3de43636b02d62ae22b79c6bdfa721"
+  },
+  "offline_verification": {
+    "native_transport_and_rf_core": "PASS with AddressSanitizer/UndefinedBehaviorSanitizer and warnings as errors; includes 60-second lease expiry and timer wrap",
+    "actual_c6_usb_loop_and_rf_loop": "PASS including partial writes, unsolicited events and transmit timeout during stalled output",
+    "host_readiness_gate": "PASS across 16 board/mode/registry/RF-capability combinations",
+    "baseline_harness": "16 offline tests passed",
+    "optional_followup_harness": "22 offline tests passed"
+  },
+  "preservation": {
+    "mg24": {
+      "app_equal": true,
+      "before_app_unchanged": true,
+      "after_touched_pages_unchanged": true,
+      "high_page_unchanged": true,
+      "touched_start": "0x8006000",
+      "touched_end_exclusive": "0x801a000",
+      "full_sha256": "dd39d6ebcaecfeea9a723f1823d0f833fe26ec1d11ac569d6a23c11989bbd97b",
+      "before_full_sha256": "d767c4f7273b16832f57f07c00d56c5d1761330284899383c33c9633c87f678a",
+      "final_after_followup": {
+        "size_equal": true,
+        "app_equal": true,
+        "before_app_unchanged": true,
+        "after_touched_pages_unchanged": true,
+        "before_full_sha256": "d767c4f7273b16832f57f07c00d56c5d1761330284899383c33c9633c87f678a",
+        "final_full_sha256": "dd39d6ebcaecfeea9a723f1823d0f833fe26ec1d11ac569d6a23c11989bbd97b",
+        "application_sha256": "f2e04e505f053c2e7e6369427b0c671d2165ed87c93e3b8f9ff11cd1caf8b3cd",
+        "application_bytes": 80976,
+        "touched_start_offset": "0x6000",
+        "touched_end_offset_exclusive": "0x1a000",
+        "high_page_unchanged": true,
+        "matches_pre_cable_post_baseline_readback": true
+      }
+    },
+    "c6": {
+      "initial_post_rf_full_readback": "Approved application matches; bytes before 0x10000 and from 0x44000 onward unchanged",
+      "temporary_diagnostic_union_end_exclusive": "0x44000",
+      "final_application_touched_end_exclusive": "0x40000",
+      "restored_diagnostic_only_pages": [
+        "0x40000",
+        "0x41000",
+        "0x42000",
+        "0x43000"
+      ],
+      "restoration": "Original pre-RF snapshot bytes written; tool hash verification passed",
+      "final_full_readback": "PASS: exact approved application, restored diagnostic-only tail, all bytes outside current application pages unchanged",
+      "before_full_sha256": "5ea7a6398b1faf10c2385246a7227e8c346f1491d8a87887f0313d97c6aea99d",
+      "first_post_rf_before_tail_restoration_full_sha256": "bed7f3f5c098f7a5de91c9230c89f838b6ef3683aa65cc7f5a000bbf021e9837",
+      "restored_debug_tail_sha256": "33076775f2381df74a75640aabe8245fde8c0845db47d120ece6f23e3c9ad580",
+      "final_after_followup": {
+        "size_equal": true,
+        "app_equal": true,
+        "before_app_unchanged": true,
+        "after_touched_pages_unchanged": true,
+        "before_full_sha256": "5ea7a6398b1faf10c2385246a7227e8c346f1491d8a87887f0313d97c6aea99d",
+        "final_full_sha256": "13570e694e5bf08593c3a187a9bc59134cb930183c0a0b828583d1c509d635c8",
+        "application_sha256": "f2e11f934b622da356ac24ffe9ed058b4389e3f69973a967967179513a35764b",
+        "application_bytes": 194544,
+        "touched_start_offset": "0x10000",
+        "touched_end_offset_exclusive": "0x40000",
+        "debug_only_tail_restored": true
+      }
+    },
+    "stock_backups_retained": true,
+    "bootloaders_and_security_not_programmed": true,
+    "existing_radios_and_services": {
+      "checked_at_utc": "2026-11-07T23:14:14.739748+00:00",
+      "container_image": "ghcr.io/psires/livolod@sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc",
+      "container_started_at": "2026-11-05T21:57:28.57840143Z",
+      "restart_count": 0,
+      "running": true,
+      "configuration_matches_backup": true,
+      "catalog_matches_backup": true,
+      "catalog_files": 16,
+      "database_integrity": "ok",
+      "gateway_ready": true,
+      "mqtt_connected": true,
+      "registered_devices": 0,
+      "gateway_firmware": "0.13",
+      "host_version": "0.13",
+      "nginx_active": true,
+      "ha_accessed_or_modified": false,
+      "existing_radio_serial_ports_opened_by_tests": false
+    },
+    "ha_accessed_or_modified": false,
+    "final_checked_at_utc": "2026-11-07T23:15:09.719886+00:00",
+    "final_comparison_receipt_sha256": "e21b0ea5a206dd1ab143157f482c48fceeabb4a3628bfe0a75946f3b0d736353"
+  },
+  "transport_configuration_boundary": {
+    "baseline": "Before owner-reported MG24 long-USB-cable replacement",
+    "pause": "All live operations paused for owner cable replacement, then resumed only after confirmation",
+    "c6_issue_attributed_to_mg24_cable": false,
+    "followup": "After replacement; exact known USB VID/PID/serial identity and RF-off preflight passed; MG24 USB topology changed, so do not treat both runs as identical transport conditions"
+  },
+  "followup": {
+    "status": "PASS after owner-confirmed MG24 cable replacement",
+    "maximum_frames_per_direction": 4,
+    "channel": 26,
+    "spacing_ms": 200,
+    "retries": 0,
+    "reviewed_harness_sha256": "11eadb92b3afec772e3338ea95289ecddd3023e6037e5077b4811c19cfcbfd57",
+    "source_review": "RE and root accepted; 22 offline tests passed",
+    "receipt_sha256": "611c9b50d088575cc9c71a3d2823aa6cfe83f6cab98695c37373df3ab7367ba3",
+    "passed": true,
+    "mode": "cca-ack",
+    "nonce": "1b0216da",
+    "direction_keys": {
+      "mg24": "MG24 transmitter to C6 receiver",
+      "c6": "C6 transmitter to MG24 receiver"
+    },
+    "preflight": {
+      "mg24": {
+        "active": "0",
+        "channel": "26",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "0",
+        "tx_done": "0",
+        "tx_failed": "0",
+        "rx": "0",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      },
+      "c6": {
+        "active": "0",
+        "channel": "26",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "0",
+        "tx_done": "0",
+        "tx_failed": "0",
+        "rx": "0",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      }
+    },
+    "final": {
+      "mg24": {
+        "active": "0",
+        "channel": "26",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "4",
+        "tx_done": "4",
+        "tx_failed": "0",
+        "rx": "15",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      },
+      "c6": {
+        "active": "0",
+        "channel": "26",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "4",
+        "tx_done": "4",
+        "tx_failed": "0",
+        "rx": "10",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      }
+    },
+    "directions": {
+      "mg24": {
+        "expected": 4,
+        "independently_received": 4,
+        "missing_sequences": [],
+        "missing_fraction": 0.0,
+        "duplicate_sequences": {},
+        "out_of_order": 0,
+        "unrelated_frames": 6,
+        "invalid_software_crc": 0,
+        "independently_crc_checked": 0,
+        "hardware_crc_only": 4,
+        "tx_outcomes": {
+          "0": [
+            "done"
+          ],
+          "1": [
+            "done"
+          ],
+          "2": [
+            "done"
+          ],
+          "3": [
+            "done"
+          ]
+        },
+        "tx_completion_complete": true,
+        "capture_complete": true,
+        "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+      },
+      "c6": {
+        "expected": 4,
+        "independently_received": 4,
+        "missing_sequences": [],
+        "missing_fraction": 0.0,
+        "duplicate_sequences": {},
+        "out_of_order": 0,
+        "unrelated_frames": 11,
+        "invalid_software_crc": 0,
+        "independently_crc_checked": 4,
+        "hardware_crc_only": 0,
+        "tx_outcomes": {
+          "32": [
+            "done"
+          ],
+          "33": [
+            "done"
+          ],
+          "34": [
+            "done"
+          ],
+          "35": [
+            "done"
+          ]
+        },
+        "tx_completion_complete": true,
+        "capture_complete": true,
+        "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+      }
+    },
+    "case_outcomes": {
+      "mg24": {
+        "cca": {
+          "expected": 2,
+          "independently_received": 2,
+          "missing_sequences": [],
+          "missing_fraction": 0.0,
+          "duplicate_sequences": {},
+          "out_of_order": 0,
+          "unrelated_frames": 8,
+          "invalid_software_crc": 0,
+          "independently_crc_checked": 0,
+          "hardware_crc_only": 2,
+          "tx_outcomes": {
+            "0": [
+              "done"
+            ],
+            "1": [
+              "done"
+            ]
+          },
+          "tx_completion_complete": true,
+          "capture_complete": true,
+          "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+        },
+        "ackreq": {
+          "expected": 2,
+          "independently_received": 2,
+          "missing_sequences": [],
+          "missing_fraction": 0.0,
+          "duplicate_sequences": {},
+          "out_of_order": 0,
+          "unrelated_frames": 8,
+          "invalid_software_crc": 0,
+          "independently_crc_checked": 0,
+          "hardware_crc_only": 2,
+          "tx_outcomes": {
+            "2": [
+              "done"
+            ],
+            "3": [
+              "done"
+            ]
+          },
+          "tx_completion_complete": true,
+          "capture_complete": true,
+          "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+        }
+      },
+      "c6": {
+        "cca": {
+          "expected": 2,
+          "independently_received": 2,
+          "missing_sequences": [],
+          "missing_fraction": 0.0,
+          "duplicate_sequences": {},
+          "out_of_order": 0,
+          "unrelated_frames": 13,
+          "invalid_software_crc": 0,
+          "independently_crc_checked": 2,
+          "hardware_crc_only": 0,
+          "tx_outcomes": {
+            "32": [
+              "done"
+            ],
+            "33": [
+              "done"
+            ]
+          },
+          "tx_completion_complete": true,
+          "capture_complete": true,
+          "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+        },
+        "ackreq": {
+          "expected": 2,
+          "independently_received": 2,
+          "missing_sequences": [],
+          "missing_fraction": 0.0,
+          "duplicate_sequences": {},
+          "out_of_order": 0,
+          "unrelated_frames": 13,
+          "invalid_software_crc": 0,
+          "independently_crc_checked": 2,
+          "hardware_crc_only": 0,
+          "tx_outcomes": {
+            "34": [
+              "done"
+            ],
+            "35": [
+              "done"
+            ]
+          },
+          "tx_completion_complete": true,
+          "capture_complete": true,
+          "loss_attribution": "unresolved: radio, receiver queue and USB delivery are separate"
+        }
+      }
+    },
+    "ack_observations": {
+      "mg24": {
+        "observed": 0,
+        "sequence_counts": {},
+        "matching_sequence_observed": 0,
+        "unmatched_sequence_observed": 0,
+        "matching_requested_sequences": [],
+        "attribution": "unproven: sequence coincidence alone is not a causal ACK or timing measurement",
+        "scope": "classic three-byte IEEE ACK only; absence means not observed"
+      },
+      "c6": {
+        "observed": 0,
+        "sequence_counts": {},
+        "matching_sequence_observed": 0,
+        "unmatched_sequence_observed": 0,
+        "matching_requested_sequences": [],
+        "attribution": "unproven: sequence coincidence alone is not a causal ACK or timing measurement",
+        "scope": "classic three-byte IEEE ACK only; absence means not observed"
+      }
+    },
+    "ack_check": {
+      "status": "no_classic_ack_observed",
+      "explanation": "No classic ACK captured; hidden ACKs and addressed-unicast behavior remain unqualified"
+    },
+    "cleanup_errors": [],
+    "receipt_completed_at_utc": "2026-11-07T23:13:12.416353+00:00",
+    "timestamp_source": "Private receipt file modification time"
+  },
+  "limitations": [
+    "No production pairing/control/peer/phase/scheduler or update support",
+    "No long-duration or full-load stability qualification; C6 startup episode unresolved",
+    "RX timestamps are callback/poll delivery times, not RF SFD timestamps",
+    "C6 RX metadata supplies hardware CRC validity; original FCS is unavailable",
+    "No busy-channel CCA or ACK timing qualification",
+    "No passive channel-11 switch capture in this stage",
+    "No power-loss or stalled-host physical lease qualification"
+  ],
+  "next_stage": "Separately scoped passive channel-11 observation of the confirmed two-gang and one-gang test switches; no control commands in this stage",
+  "verified_at_utc": "2026-11-07T23:15:35.322706+00:00",
+  "final_transport": {
+    "checked_at_utc": "2026-11-07T23:15:35.322706+00:00",
+    "receipt_sha256": "a6837a4fb9cb7258739b41d1e3b8553e6fba2fe04ac51225a0ac72794d4980d8",
+    "commands": "PING VERSION CAPS RFSTATUS only",
+    "boards": {
+      "mg24": {
+        "rf_status": {
+          "active": "0",
+          "channel": "26",
+          "power_dbm": "0",
+          "auto_ack": "0",
+          "retries": "0",
+          "tx_started": "4",
+          "tx_done": "4",
+          "tx_failed": "0",
+          "rx": "15",
+          "dropped": "0",
+          "queued": "0",
+          "busy": "0",
+          "fault": "0",
+          "ticks_hz": "1000000",
+          "timestamp": "callback",
+          "bad_crc": "unavailable"
+        },
+        "version": "OK fw_version=0.14 board=seeed-xiao-mg24 proto=3 update=none experimental=1 build=xiao-rf-1"
+      },
+      "c6": {
+        "rf_status": {
+          "active": "0",
+          "channel": "26",
+          "power_dbm": "0",
+          "auto_ack": "0",
+          "retries": "0",
+          "tx_started": "0",
+          "tx_done": "0",
+          "tx_failed": "0",
+          "rx": "0",
+          "dropped": "0",
+          "queued": "0",
+          "busy": "0",
+          "fault": "0",
+          "ticks_hz": "1000000",
+          "timestamp": "callback",
+          "bad_crc": "unavailable"
+        },
+        "version": "OK fw_version=0.14 board=seeed-xiao-esp32c6 proto=3 update=none experimental=1 build=xiao-rf-1"
+      }
+    },
+    "c6_counters_reset_reason": "Final esptool full-flash readback used ROM recovery and reset; RF remained off afterward"
+  },
+  "summary": {
+    "synthetic_frames_sent_total": 48,
+    "independent_payload_matches_total": 48,
+    "mg24_received_original_fcs_checks": 24,
+    "test_frame_duplicates": 0,
+    "transmit_failures": 0,
+    "classic_acks_observed_in_followup": 0,
+    "gateway_support_qualified": false,
+    "long_term_stability_qualified": false
+  }
+}

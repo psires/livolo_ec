@@ -15,6 +15,9 @@ struct ec_experimental {
 	const char *board;
 	const char *build;
 	unsigned baud;
+	/* Optional RF-only diagnostic handler: command -> bounded response body. */
+	size_t (*radio_command)(const char *command, char *out,
+				size_t capacity);
 };
 
 /** @brief Initialize a permanently disarmed diagnostic parser.
@@ -26,7 +29,7 @@ struct ec_experimental {
 void ec_experimental_init(struct ec_experimental *state, const char *board,
 			  const char *build, unsigned baud);
 
-/** @brief Consume one byte without executing any network or radio operation.
+/** @brief Consume one byte; an optional hook admits bounded synthetic RF commands.
  * @param state Initialized parser; no persistent state is changed.
  * @param byte Next received byte.
  * @param out Reply storage, used only when a complete valid request arrives.
