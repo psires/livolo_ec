@@ -1,0 +1,307 @@
+{
+  "schema": 1,
+  "task_date": "2026-11-07",
+  "verified_at_utc": "2026-11-07T22:18:20.231636+00:00",
+  "status": "experimental_transport_only",
+  "scope": "New XIAO boards only; no production RF, HA or existing radio/service operations",
+  "firmware_version": "0.14",
+  "source_archive_sha256": "8b286f461a8f971c237a96a209f7fc1d457bf39bc2a7cddfadcd4c2e1204e7fb",
+  "source_files_sha256": {
+    "firmware/experimental/Makefile": "4016ff79338453a42c816e4fcfa82accf2a30d130612d0ce31d5db686b9afbdb",
+    "firmware/experimental/README.md": "4a423f10b6ee6e20e142a12e90f4fca5d0c02ac9f9801bf62ea14d2420c487c1",
+    "firmware/experimental/test_transport.c": "915856ef8a54536729d5bc5acb796823d478175544dbb6ca71eaae4f454085f2",
+    "firmware/experimental/transport.c": "386cef14466ac3214a8a1e35acb4e91d5f0b1649a26d6c7e12ef50834eb6369b",
+    "firmware/experimental/transport.h": "a837f9ed92e3ec25ba20fa8de8bd2508dcecc47d3effecad6ee38b2c4be2e81b",
+    "firmware/mg24/Makefile": "ed7788a9d717e0149d3a622997ec39db9b73e929e51388ee1c7b10c45fe68edf",
+    "firmware/mg24/README.md": "b968cf8ad83c32cee29e73cd92a0c1a25297f5e50329f5798b31e652003e4b9d",
+    "firmware/mg24/application.ld": "8e0dce961dad775bc1d5eb9028ec739489be6713cae79a4c1f6bb182460c842e",
+    "firmware/mg24/main.c": "902b46098b6c331c2a1751bec0e93ac48b96d38d8b99d6d4eeac6c299f1781be",
+    "firmware/esp32c6/CMakeLists.txt": "38c7e14147b7d5d887fad857c1ddc607852f9612333b3c98f936b2ec14e2353a",
+    "firmware/esp32c6/README.md": "be5dbaed4dba9f64a15cece4b58d324dd2486fb4eb3028be1fc7e1beac0dd79b",
+    "firmware/esp32c6/main/CMakeLists.txt": "4ae56692821356f118d8c07f17c6e90cec776b9b4d6c6d5a3f3e4bae98508aad",
+    "firmware/esp32c6/main/main.c": "0e58eeca4ef726f94375600c455637f45a5c01076cb80a194470726f81267583",
+    "firmware/esp32c6/partitions.csv": "0a96161cd311be7af9f7a5317ee0d3ccb2d0c3d8ac491932d3de61ee416f8ab9",
+    "firmware/esp32c6/sdkconfig.defaults": "66bfe01b1a000ec78f7c77a5b081c04671a57103bdf4a5a2f59112058491d98b",
+    "firmware/esp32c6/tests/Makefile": "4eab14cdc03508b1383d56271ea30fa24980249b8ab5de19d7b4063453d37663",
+    "firmware/esp32c6/tests/stubs/driver/usb_serial_jtag.h": "439dd6c44566eb952b65da7ef379ae49a0784274503e23b2e9a9140e1ed1fe19",
+    "firmware/esp32c6/tests/stubs/esp_log.h": "77d809f0e2af513964473b78d967e4f9c17856a047a0a1704c31a5ccbbb9e5b6",
+    "firmware/esp32c6/tests/stubs/freertos/FreeRTOS.h": "052b546104655087c2f44ddacab9949a445785036d20d6c3a2fda0fe3121309e",
+    "firmware/esp32c6/tests/stubs/freertos/task.h": "fc5fdf5deafc1c1e9cf280960964093476495202d6c4b3e6aafd9a096f5167cd",
+    "firmware/esp32c6/tests/test_usb_transport.c": "927f6eed099b4ed1fede3243fa6e10ee970537490c15d9fb10f82d5d6a2bcf32",
+    "firmware/version.h": "d049c9ea0cb69c14c87352bc0f13c62712f7c5f9e87c61749a8703baec43a05e"
+  },
+  "shared_parser": {
+    "framing": "UART v3 numbered diagnostic requests/replies",
+    "supported_commands": [
+      "PING",
+      "VERSION",
+      "CAPS",
+      "STATUS"
+    ],
+    "all_other_commands": "ERR UNSUPPORTED",
+    "request_cache": false,
+    "radio_initialized": false,
+    "gateway_ready": false,
+    "capabilities": {
+      "peers": 0,
+      "ack_mask": "00",
+      "max_raw": 0,
+      "lease_max": 0,
+      "session_bytes": 0,
+      "update": "none",
+      "experimental": 1,
+      "gateway": 0,
+      "radio_tx": 0
+    }
+  },
+  "tools": {
+    "pyocd": "0.46.1",
+    "mg24_device_pack": "SiliconLabs.GeckoPlatform_EFR32MG24_DFP.2025.12.1",
+    "esptool": "5.6.0",
+    "gecko_sdk_commit": "59d2160fe448b13730a91c0f019a8b4c53c43eb2",
+    "esp_idf_tag": "v5.5.1",
+    "esp_idf_commit": "fcae32885b0296b32044cb99ecbdc50d98dddb83",
+    "arm_gcc": "14.2.1 20241119 (15:14.2.rel1-1)",
+    "riscv_toolchain": "esp-14.2.0_20241119",
+    "cmake": "3.30.5",
+    "ninja": "1.11.1.3",
+    "clang_format": "18.1.8"
+  },
+  "boards": {
+    "seeed-xiao-mg24": {
+      "usb": {
+        "vid": "2886",
+        "pid": "0062",
+        "interface": 2,
+        "product": "Seeed Studio XIAO MG24 (Sense) CMSIS-DAP",
+        "bench_label": "xiao-mg24-bench-a",
+        "exact_serial_and_physical_endpoint_matched": true
+      },
+      "physical_variant_revision": "unconfirmed; USB name alone does not prove Sense",
+      "build_target": "EFR32MG24B220F1536IM48",
+      "deviceinfo_part": "0x011804c4",
+      "deviceinfo_msize": "0x01000600",
+      "main_flash_bytes": 1572864,
+      "sram_bytes": 262144,
+      "transport": {
+        "baud": 115200,
+        "dtr": true,
+        "rts": false,
+        "dtr_false_observation": "No UART replies; setting DTR true immediately restored forwarding"
+      },
+      "application_address": "0x08006000",
+      "programmed_pages": [
+        "0x08006000",
+        "0x08008000"
+      ],
+      "artifact_sha256": "0d090d86e0ca9c28ae35a15dd3961749d31da55640e596f87ee2a07d53fd85b5",
+      "artifact_size": 9184,
+      "stock_flash_sha256": "fb2257850533725289aee03dc73379eafa98e4ae9778d04c1504d877ccf0f3c2",
+      "stock_deviceinfo_sha256": "1026ee5b824650c5dfcf5981a25cddfe74f1707fe22cad4b2131996a4b1a29e8",
+      "flash_backup": "full main flash plus device info, local and remote copies",
+      "live_diagnostics": [
+        {
+          "request": "1 PING",
+          "responses": [
+            "RSP 1 OK EC-GATEWAY 3"
+          ]
+        },
+        {
+          "request": "2 VERSION",
+          "responses": [
+            "RSP 2 OK fw_version=0.14 board=seeed-xiao-mg24 proto=3 update=none experimental=1 build=xiao-bringup-1"
+          ]
+        },
+        {
+          "request": "3 CAPS",
+          "responses": [
+            "RSP 3 OK proto=3 peers=0 ack_mask=00 max_raw=0 max_line=319 command_slots=0 request_cache=0 lease_max=0 session_bytes=0 channel=11 baud=115200 board=seeed-xiao-mg24 fw_version=0.14 update=none experimental=1 gateway=0 radio_tx=0 build=xiao-bringup-1"
+          ]
+        },
+        {
+          "request": "4 STATUS",
+          "responses": [
+            "RSP 4 OK configured=0 armed=0 peers=0 radio_tx=0 experimental=1 malformed=0"
+          ]
+        },
+        {
+          "request": "5 NETWORK 12345678 b1 123456789abcdef0",
+          "responses": [
+            "RSP 5 ERR UNSUPPORTED experimental=1"
+          ]
+        },
+        {
+          "request": "6 ARM 123456789abcdef0 30",
+          "responses": [
+            "RSP 6 ERR UNSUPPORTED experimental=1"
+          ]
+        },
+        {
+          "request": "7 SEND 123456789abcdef0 0188",
+          "responses": [
+            "RSP 7 ERR UNSUPPORTED experimental=1"
+          ]
+        },
+        {
+          "request": "8 BOOTLOADER",
+          "responses": [
+            "RSP 8 ERR UNSUPPORTED experimental=1"
+          ]
+        }
+      ],
+      "recovery": {
+        "independent_path": "SAMD11 CMSIS-DAP SWD",
+        "auto_unlock": false,
+        "stock_touched_pages_restored_verified": true,
+        "diagnostics_reinstalled": true,
+        "reentry_then_resume_diagnostics": true,
+        "main_readback_required_halted_cpu": true,
+        "ap_discovery_warnings": "AP2 ROM-table FAULT and occasional AP3 WAIT; successful reads independently checked",
+        "factory_full_chip_restore_claimed": false
+      },
+      "comparison": {
+        "main_flash_length": 1572864,
+        "app_equal": true,
+        "loader_unchanged": true,
+        "after_touched_pages_unchanged": false,
+        "deviceinfo_unchanged": true,
+        "stock_touched_pages_restore_verified": true,
+        "outside_changed_bytes": 53,
+        "outside_changed_first": "0x81743d0",
+        "outside_changed_last": "0x817440a",
+        "changed_page": "0x08174000",
+        "changed_page_stable": true,
+        "attribution": "Unknown; append-like changes observed after stock application restore/run; no direct writes to this page were requested"
+      }
+    },
+    "seeed-xiao-esp32c6": {
+      "usb": {
+        "vid": "303a",
+        "pid": "1001",
+        "interface": 0,
+        "bench_label": "xiao-c6-bench-a",
+        "exact_serial_and_physical_endpoint_matched": true
+      },
+      "chip_rom_identity": "ESP32-C6FH4 (QFN32), revision v0.2",
+      "physical_pcb_revision": "unconfirmed",
+      "flash_bytes": 4194304,
+      "xtal_mhz": 40,
+      "secure_boot": false,
+      "flash_encryption": false,
+      "transport": {
+        "baud": 115200,
+        "baud_is_usb_nominal": true,
+        "dtr": false,
+        "rts": false,
+        "stock_rom_boot_noise": "Ignored until full matching RSP line"
+      },
+      "application_address": "0x00010000",
+      "touched_sectors_end_exclusive": "0x0002d000",
+      "artifact_sha256": "dbd2c4876ba44404f1b46b76e5934106ed21c0a4cb1b70f0f5e2a009602e357c",
+      "artifact_size": 117120,
+      "image_app_version": "0.14",
+      "stock_flash_sha256": "1e096923a16396a7418184950d89578155d653fcab9a3afd7d0b5f2338c011c4",
+      "live_diagnostics": [
+        {
+          "request": "1 PING",
+          "responses": [
+            "SPIWP:0xee",
+            "mode:DIO, clock div:2",
+            "load:0x40875720,len:0x1260",
+            "load:0x4086c110,len:0xdc4",
+            "load:0x4086e610,len:0x3018",
+            "entry 0x4086c110",
+            "RSP 1 OK EC-GATEWAY 3"
+          ]
+        },
+        {
+          "request": "2 VERSION",
+          "responses": [
+            "RSP 2 OK fw_version=0.14 board=seeed-xiao-esp32c6 proto=3 update=none experimental=1 build=xiao-bringup-1"
+          ]
+        },
+        {
+          "request": "3 CAPS",
+          "responses": [
+            "RSP 3 OK proto=3 peers=0 ack_mask=00 max_raw=0 max_line=319 command_slots=0 request_cache=0 lease_max=0 session_bytes=0 channel=11 baud=115200 board=seeed-xiao-esp32c6 fw_version=0.14 update=none experimental=1 gateway=0 radio_tx=0 build=xiao-bringup-1"
+          ]
+        },
+        {
+          "request": "4 STATUS",
+          "responses": [
+            "RSP 4 OK configured=0 armed=0 peers=0 radio_tx=0 experimental=1 malformed=0"
+          ]
+        },
+        {
+          "request": "5 NETWORK 12345678 b1 123456789abcdef0",
+          "responses": [
+            "RSP 5 ERR UNSUPPORTED experimental=1"
+          ]
+        },
+        {
+          "request": "6 ARM 123456789abcdef0 30",
+          "responses": [
+            "RSP 6 ERR UNSUPPORTED experimental=1"
+          ]
+        },
+        {
+          "request": "7 SEND 123456789abcdef0 0188",
+          "responses": [
+            "RSP 7 ERR UNSUPPORTED experimental=1"
+          ]
+        },
+        {
+          "request": "8 BOOTLOADER",
+          "responses": [
+            "RSP 8 ERR UNSUPPORTED experimental=1"
+          ]
+        }
+      ],
+      "recovery": {
+        "independent_path": "USB Serial/JTAG ROM download, exact endpoint, usb-reset/hard-reset",
+        "original_touched_sectors_restored_verified": true,
+        "restore_cycle_image_note": "Stock-sector restore exercised with earlier diagnostic build; frozen build re-entry/full-readback checked separately",
+        "diagnostics_reinstalled": true,
+        "physical_boot_reset_fallback": "not exercised",
+        "efuses_or_security_changed": false,
+        "frozen_artifact_rom_reentry_and_diagnostic_resume": true
+      },
+      "comparison": {
+        "app_equal": true,
+        "before_app_unchanged": true,
+        "after_touched_sectors_unchanged": true,
+        "touched_start": 65536,
+        "touched_end": 184320,
+        "app_size": 117120,
+        "app_sha256": "dbd2c4876ba44404f1b46b76e5934106ed21c0a4cb1b70f0f5e2a009602e357c",
+        "full_readback_sha256": "5ea7a6398b1faf10c2385246a7227e8c346f1491d8a87887f0313d97c6aea99d"
+      }
+    }
+  },
+  "tests": {
+    "native_parser_asan_ubsan": "passed",
+    "actual_c6_app_loop_stub_asan_ubsan": "passed",
+    "real_daemon_restore_zero_capability_gate": "passed by Unix/root",
+    "physical_long_load_or_watchdog": "not tested",
+    "raw_radio_or_timing": "not implemented or tested",
+    "pairing_control": "not implemented or tested",
+    "automatic_updates": "not implemented or qualified",
+    "power_loss_interruption": "not tested"
+  },
+  "preserved_existing_setup": {
+    "standalone_container_started_at": "2026-11-05T21:57:28.57840143Z",
+    "standalone_container_running": true,
+    "standalone_container_image": "ghcr.io/psires/livolod@sha256:9adecc0c96ea776759d82f7cb7f76f30a4d58c5a4eb4ac7616dd734f1ee14dbc",
+    "existing_radio_ports_opened": false,
+    "existing_radio_firmware_modified": false,
+    "ha_accessed": false,
+    "sniffers_used": false
+  },
+  "private_evidence": {
+    "workspace": ".local/xiao-bringup-20261107",
+    "pi": "Private XIAO bring-up directory on the development Pi; exact path retained in local evidence",
+    "raw_stock_backups_committed": false
+  },
+  "qualification": "Neither board is a supported/qualified Livolo gateway or catalog updater target",
+  "receipt_state": "frozen"
+}

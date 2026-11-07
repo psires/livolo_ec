@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.16)
+set(COMPONENTS main)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/../version.h")
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../version.h" EC_VERSION_HEADER)
+string(REGEX MATCH "#define EC_VERSION_MAJOR ([0-9]+)" _ "${EC_VERSION_HEADER}")
+set(EC_VERSION_MAJOR "${CMAKE_MATCH_1}")
+string(REGEX MATCH "#define EC_VERSION_MINOR ([0-9]+)" _ "${EC_VERSION_HEADER}")
+set(PROJECT_VER "${EC_VERSION_MAJOR}.${CMAKE_MATCH_1}")
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+project(ec_xiao_c6_experimental)

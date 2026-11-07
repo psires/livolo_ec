@@ -208,11 +208,26 @@ hash. Use the existing [release process](RELEASE_PROCESS.md),
 [bundle contract](FIRMWARE_RELEASE_BUNDLE.md) and
 [qualification plan](FIRMWARE_QUALIFICATION_PLAN.md).
 
-## Immediate next handoff
+## Initial bring-up and next handoff
 
-The owner is wiring both boards to the development Pi. Once connected, agree
-the inventory operation and identify the new devices without claiming existing
-radio ports or disturbing running bench services. Confirm the MG24 variant and
-recovery access, then have ZigBee and Unix propose the exact first firmware
-experiment and recovery procedure. This planning task performs no device probe,
-flash, live HA change or release publication.
+Both boards are connected to the development Pi. The initial transport-only
+applications answer diagnostic commands and reject network/control commands;
+neither initializes the radio. The MG24 uses its onboard CMSIS-DAP recovery
+path and requires DTR for its serial bridge. The ESP32-C6 uses ROM recovery
+and native USB Serial/JTAG. Both passed restoration and verification of the
+original application sectors touched by bring-up, followed by diagnostic
+reinstallation. This is a bounded recovery result, not interrupted-update or
+full factory-restoration qualification. A separate MG24 high-flash page changed
+outside the programmed application pages; the cause is unproven and both dumps
+are retained. The loader and device information were unchanged. See the
+[bring-up record](verification/xiao-bringup-20261107.json) and the
+[MG24](../firmware/mg24/README.md) and
+[ESP32-C6](../firmware/esp32c6/README.md) build/recovery notes.
+
+The MG24 physical Standard/Sense variant and PCB revision still need visual
+confirmation. Next, implement the raw-radio adapters and agree an isolated
+receive/transmit experiment with independent capture before enabling gateway
+control. Watchdog, sustained serial/radio load, timing, pairing and updater
+qualification remain open gates. Existing radios, services and HA are outside
+this bring-up's modification scope. No experimental image is included in a
+release or an automatic-update catalog.
