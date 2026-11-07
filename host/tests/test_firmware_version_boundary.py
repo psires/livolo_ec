@@ -3,6 +3,7 @@
 import unittest
 from unittest.mock import patch
 
+from livolod import __version__, FIRMWARE_COMPAT_VERSION
 from livolod.firmware_manager import FirmwareManager
 from livolod.uart import LinkError
 import test_version
@@ -13,13 +14,16 @@ class FirmwareVersionBoundaryTests(unittest.IsolatedAsyncioTestCase):
         self,
     ):
         """A newer daemon cannot confirm a wrong target, board or same-version digest."""
+        current = FIRMWARE_COMPAT_VERSION
+        other = "0.1" if current != "0.1" else "0.2"
+        self.assertNotEqual(current, other)
         for running, selected, board, digest, allowed in (
-            ("0.13", "0.13", "codm-cc2652p", "c" * 128, True),
-            ("0.13", "0.13", "codm-cc2652p", "d" * 128, False),
-            ("0.13", "0.13", "sonoff-zbdongle-e", "c" * 128, False),
-            ("0.14", "0.13", "codm-cc2652p", "c" * 128, False),
-            ("0.14", "0.14", "codm-cc2652p", "c" * 128, False),
-            ("0.14.0", "0.13", "codm-cc2652p", "c" * 128, False),
+            (current, current, "codm-cc2652p", "c" * 128, True),
+            (current, current, "codm-cc2652p", "d" * 128, False),
+            (current, current, "sonoff-zbdongle-e", "c" * 128, False),
+            (other, current, "codm-cc2652p", "c" * 128, False),
+            (other, other, "codm-cc2652p", "c" * 128, False),
+            (__version__, current, "codm-cc2652p", "c" * 128, False),
         ):
             with (
                 self.subTest(
@@ -81,7 +85,7 @@ class FirmwareVersionBoundaryTests(unittest.IsolatedAsyncioTestCase):
                     self.assertNotIn("UPDATE_CONFIRM", history)
                     self.assertNotEqual(manager.job["status"], "confirmed")
                 self.assertEqual(service.diagnostics["daemon_version"], "9.8.7")
-                self.assertEqual(service.diagnostics["host_version"], "0.13")
+                self.assertEqual(service.diagnostics["host_version"], current)
                 self.assertFalse(manager.requested.is_set())
                 self.assertFalse(
                     any(line.startswith("UPDATE_BEGIN") for line in history)

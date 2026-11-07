@@ -22,6 +22,9 @@ from livolod.storage import Store
 from test_firmware_bundle import gbl, mg21_image, ti_package
 from test_firmware_catalog import fixture
 
+# Always a valid firmware version distinct from the release's compatibility target.
+OTHER_FIRMWARE_VERSION = "0.1" if FIRMWARE_COMPAT_VERSION != "0.1" else "0.2"
+
 
 class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
@@ -51,6 +54,7 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
         )
         self.observe(self.service)
         self.assertNotEqual(__version__, FIRMWARE_COMPAT_VERSION)
+        self.assertNotEqual(OTHER_FIRMWARE_VERSION, FIRMWARE_COMPAT_VERSION)
 
     async def asyncTearDown(self):
         """Release only isolated state; tests never open a radio."""
@@ -85,7 +89,7 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
             for key in ("version", "candidate_id", "board", "request_id"):
                 self.assertEqual(restored.job[key], selected[key])
             self.assertEqual(restored.start(payload)["status"], "unknown")
-            restored.restored(dict(self.caps, fw_version="0.14"))
+            restored.restored(dict(self.caps, fw_version=OTHER_FIRMWARE_VERSION))
             self.assertEqual(restored.job["status"], "unknown")
             restored.restored(dict(self.caps, fw_version=FIRMWARE_COMPAT_VERSION))
             self.assertEqual(restored.job["status"], "confirmed")
@@ -100,11 +104,11 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((self.catalog / "manifest.json").read_bytes(), original)
 
     async def test_wrong_radio_target_and_schema_extensions_never_become_eligible(self):
-        """Software minor 14 cannot admit firmware 0.14 or alter schema-1 interpretation."""
+        """Software identity cannot admit another radio target or alter schema-1 interpretation."""
         path = self.catalog / "manifest.json"
         original = json.loads(path.read_text())
         for manifest in (
-            dict(original, host_version="0.14"),
+            dict(original, host_version=OTHER_FIRMWARE_VERSION),
             dict(original, host_version=__version__),
             dict(original, daemon_version=__version__),
         ):
@@ -119,7 +123,7 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
     async def test_worker_revalidates_compatibility_for_catalog_and_local_artifacts(
         self,
     ):
-        """Actual worker entry admits 0.13 and refuses 0.14 before any backend mutation."""
+        """Actual worker entry admits only the current target before any backend mutation."""
         with tempfile.TemporaryFile() as guard:
             fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
             common = [
@@ -152,7 +156,10 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 install.call_args.args[0]["version"], FIRMWARE_COMPAT_VERSION
             )
-            for version, expected in ((FIRMWARE_COMPAT_VERSION, 0), ("0.14", 1)):
+            for version, expected in (
+                (FIRMWARE_COMPAT_VERSION, 0),
+                (OTHER_FIRMWARE_VERSION, 1),
+            ):
                 artifact = self.root / (version + ".gbl")
                 artifact.write_bytes(gbl(mg21_image("zb-gw04-1v2", version)))
                 local = inspect_artifact(
@@ -234,7 +241,7 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_legacy_signed_cli_uses_firmware_target_not_package_number(self):
         """Signed maintenance accepts exactly the compatibility target before transport."""
-        for version in (FIRMWARE_COMPAT_VERSION, "0.14"):
+        for version in (FIRMWARE_COMPAT_VERSION, OTHER_FIRMWARE_VERSION):
             data, key = ti_package(version)
             path = self.root / (version + ".ecupd")
             path.write_bytes(data)
@@ -279,7 +286,7 @@ class FirmwareVersioningTests(unittest.IsolatedAsyncioTestCase):
         self,
     ):
         """The artifact --version flag remains firmware-specific after adding software info."""
-        for version in (FIRMWARE_COMPAT_VERSION, "0.14"):
+        for version in (FIRMWARE_COMPAT_VERSION, OTHER_FIRMWARE_VERSION):
             data = gbl(mg21_image("zb-gw04-1v2", version))
             path = self.root / (version + ".gbl")
             path.write_bytes(data)

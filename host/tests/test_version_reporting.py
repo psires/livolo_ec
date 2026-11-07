@@ -83,7 +83,7 @@ class VersionCLITests(unittest.TestCase):
                     "0.13",
                 ]
             )
-        self.assertEqual(inspect.call_args.kwargs["version"], FIRMWARE_COMPAT_VERSION)
+        self.assertEqual(inspect.call_args.kwargs["version"], "0.13")
 
     def test_compatibility_decision_modules_never_import_software_version(self):
         """Prevent an accidental reintroduction of package identity into firmware policy."""

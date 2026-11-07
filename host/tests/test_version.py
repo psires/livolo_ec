@@ -151,9 +151,10 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_wrong_release_or_failed_durable_confirmation_is_not_ready(self):
         """Verify wrong release or failed durable confirmation is not ready."""
+        major, minor = parse_version(FIRMWARE_COMPAT_VERSION)
         for firmware, bad in [
-            ("0.1", False),
-            ("0.14", False),
+            (f"{major}.{(minor - 1) % 65536}", False),
+            (f"{major}.{(minor + 1) % 65536}", False),
             (FIRMWARE_COMPAT_VERSION, True),
         ]:
             service, store, history = await self.exercise(firmware, bad)
