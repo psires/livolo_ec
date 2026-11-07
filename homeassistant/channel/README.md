@@ -23,6 +23,8 @@ The minimum qualified HA version is 2026.10.4. The tested one- and two-gang
 switches are supported; profile detection is experimental. Sockets, curtains
 and other variants remain unqualified.
 
+<!-- pairing-guide -->
+
 New releases appear as an integration update item. Install an update and restart
 HA to apply it. App updates and radio firmware updates are separate items;
 unattended software updates are optional. Preserve the existing HA integration

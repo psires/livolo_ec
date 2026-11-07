@@ -46,14 +46,24 @@ def test_release_bundles_client_and_license(tmp_path):
             == (ROOT / "client/livolo_ec_client/__init__.py").read_bytes()
         )
     context = tmp_path / "ha-addons/livolo_ec"
+    with zipfile.ZipFile(archive) as bundle:
+        for name in ("button.py", "commissioning.py"):
+            assert (
+                bundle.read(prefix + name)
+                == (ROOT / "custom_components/livolo_ec" / name).read_bytes()
+            )
     assert (context / "LICENSE").read_bytes() == license_text
     assert (context / "host/LICENSE").read_bytes() == license_text
     assert (ROOT / "client/LICENSE").read_bytes() == license_text
     for relative in (
         "host/docker/requirements-firmware.txt",
         "host/livolod/firmware/manifest.json",
+        "host/livolod/commissioning.py",
     ):
         assert (context / relative).read_bytes() == (ROOT / relative).read_bytes()
+    assert (context / "DOCS.md").read_bytes() == (
+        ROOT / "homeassistant/app/DOCS.md"
+    ).read_bytes()
 
 
 def test_options_keep_secrets_out_of_daemon_json(tmp_path):

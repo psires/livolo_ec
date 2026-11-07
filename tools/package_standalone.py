@@ -88,6 +88,21 @@ def inspect_wheel(path, name, expected, license_text):
                 raise ValueError("This standalone release does not distribute firmware")
 
 
+def stage_pairing_guide(source, staged, tag):
+    """Include the pairing guide when it exists in the selected source revision.
+
+    @param source Exported release source directory, never the working checkout.
+    @param staged Standalone bundle root receiving the docs directory.
+    @param tag Immutable standalone release tag for linked profile documentation.
+    """
+    relative = "docs/PAIRING.md"
+    origin = source / relative
+    if origin.is_file():
+        destination = staged / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(document_links(origin.read_text(), relative, tag))
+
+
 def package(commit, output):
     """Assemble installable packages and service instructions from one exact commit.
 
@@ -202,6 +217,7 @@ def package(commit, output):
                 )
             else:
                 shutil.copy2(source / relative, destination)
+        stage_pairing_guide(source, staged, tag)
         (staged / "constraints.txt").write_text(
             (source / "host/docker/requirements-firmware.txt").read_text()
             + "\npaho-mqtt==2.1.0\n"

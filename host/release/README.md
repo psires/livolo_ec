@@ -108,6 +108,14 @@ and reads optional secrets from `/etc/livolod/environment`. Protect that file
 with mode `0600`, owned by root; systemd reads it before dropping privileges.
 Never put tokens into download URLs or source control.
 
+## Pairing in the next release
+
+The next release adds **Pair new device** in Web and HA. Follow the
+[pairing guide](../../docs/PAIRING.md) for its one-device session, supported
+profiles and confirmation requirements. This feature is in development and is
+not included in the published 0.4.0 bundle. New bundles include the guide as
+`docs/PAIRING.md` alongside these instructions.
+
 ## Upgrade, backup and removal
 
 Stop the actual radio owner before upgrading. For the systemd installation:

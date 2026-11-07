@@ -61,6 +61,9 @@ def test_channel_zip_is_complete_and_reproducible(tmp_path, exporter):
     assert provenance["source_commit"] == BASELINE
     assert len(provenance["packaging_commit"]) == 40
     assert not provenance["preview"]
+    readme = (output / "README.md").read_text()
+    assert "docs/PAIRING.md" not in readme
+    assert "<!-- pairing-guide -->" not in readme
     assert (
         "homeassistant/channel/workflows/release.yml" in provenance["packaging_files"]
     )
@@ -116,9 +119,52 @@ def test_working_preview_cannot_be_published(tmp_path):
         (ROOT / "custom_components/livolo_ec/manifest.json").read_text()
     )["version"]
     output = exporter.export(commit, version, tmp_path / "preview", preview=True)
+    component = output / "custom_components/livolo_ec"
+    for name in ("button.py", "commissioning.py"):
+        assert (component / name).read_bytes() == (
+            ROOT / "custom_components/livolo_ec" / name
+        ).read_bytes()
+    assert (component / "_client/__init__.py").read_bytes() == (
+        ROOT / "client/livolo_ec_client/__init__.py"
+    ).read_bytes()
+    assert "non-release preview" in (output / "README.md").read_text()
     builder = module(output / "scripts/build_release.py", "preview_builder")
     with pytest.raises(ValueError, match="non-preview"):
         builder.build(output)
+
+
+def test_guide_link_uses_selected_source_not_packaging_head(
+    tmp_path, exporter, monkeypatch
+):
+    """A guide-bearing source uses its own SHA even with a newer packaging recipe.
+
+    @param tmp_path Isolated generated distribution parent.
+    @param exporter Export helper with a committed-recipe fixture.
+    @param monkeypatch Scoped simulation of the guide existing at the source SHA.
+    """
+    original = subprocess.run
+
+    def guide_exists(command, **kwargs):
+        """Model a guide-bearing revision without changing historical application code.
+
+        @param command Git existence check or unrelated subprocess invocation.
+        @param kwargs Original subprocess options.
+        @return Successful guide check or the real unrelated subprocess result.
+        """
+        if command == ["git", "cat-file", "-e", BASELINE + ":docs/PAIRING.md"]:
+            return subprocess.CompletedProcess(command, 0)
+        return original(command, **kwargs)
+
+    monkeypatch.setattr(exporter.subprocess, "run", guide_exists)
+    output = exporter.export(BASELINE, "0.2.0", tmp_path / "guide-channel")
+    readme = (output / "README.md").read_text()
+    assert f"/blob/{BASELINE}/docs/PAIRING.md" in readme
+    assert "/blob/main/docs/PAIRING.md" not in readme
+    provenance = json.loads((output / "source.json").read_text())
+    assert (
+        provenance["distribution_files"]["README.md"]
+        == hashlib.sha256((output / "README.md").read_bytes()).hexdigest()
+    )
 
 
 def test_disposable_supervisor_catalog_is_radio_free(tmp_path):

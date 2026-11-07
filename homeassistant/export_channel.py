@@ -103,7 +103,32 @@ def export(commit, version, output, preview=False):
         shutil.copytree(component, output / "custom_components/livolo_ec")
         shutil.copy2(source / "LICENSE", output / "LICENSE")
     shutil.copy2(TEMPLATES / "hacs.json", output / "hacs.json")
-    shutil.copy2(TEMPLATES / "README.md", output / "README.md")
+    guide_available = (
+        subprocess.run(
+            ["git", "cat-file", "-e", commit + ":docs/PAIRING.md"],
+            cwd=ROOT,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode
+        == 0
+    )
+    guide = ""
+    if guide_available and not preview:
+        guide = (
+            "Use **Pair new device** to start a bounded session for one new switch. "
+            "Wait for confirmed pairing; detection alone is not success. See the "
+            "[pairing guide for this source revision]"
+            f"(https://github.com/psires/livolo_ec/blob/{commit}/docs/PAIRING.md)."
+        )
+    elif preview:
+        guide = (
+            "Automatic pairing is in development. Review `docs/PAIRING.md` in "
+            "the source checkout alongside this non-release preview."
+        )
+    (output / "README.md").write_text(
+        (TEMPLATES / "README.md").read_text().replace("<!-- pairing-guide -->", guide)
+    )
     shutil.copytree(
         TEMPLATES / "scripts",
         output / "scripts",
