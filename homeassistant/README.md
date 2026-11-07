@@ -387,8 +387,15 @@ For advanced targeted pairing, register first. Manual profile fields remain expl
 not an inferred gang count. Pairing acceptance opens the window, and the management UI shows
 later confirmation/expiry. No generic automatic admission is enabled.
 
-New registry devices appear without reloading HA. Forgotten channels become
-unavailable; remove their HA devices after forgetting them in the daemon.
+New registry devices appear without reloading HA. **Delete** on a switch's HA
+device page forgets its daemon record, verifies that it is absent, and removes
+the HA device and its entities. The daemon must be reachable; a rejected or
+uncertain result keeps the HA record so you can check the daemon and retry.
+The gateway device is protected. Deleting a switch is not a physical factory reset.
+
+Forgetting through the web interface or **Configure** makes its HA channels
+unavailable. Use the HA device's **Delete** action to clean up those entries;
+it verifies absence without submitting another remove command.
 HA-local friendly-name and area overrides remain under HA control. Existing HA
 names are not automatically synchronized back to daemon names.
 
