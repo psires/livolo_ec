@@ -17,7 +17,7 @@ service changed, GPIO driven, firmware flashed or switch operated by this audit.
 | Nordic PCA10059 | Standalone Pi `10.1.1.21`, application USB device; standalone daemon running | Requires an agreed bench maintenance window and a person able to operate SW2/unplug it |
 | cod.m CC2652P | Fresh exclusive VERSION/CAPS/update-status probe on `.21` reports application 0.12, bootloader 0.2 and the development key | Application-reported trust is not independent bootloader readback; release-key reprovisioning and physical recovery still need an operator |
 | Sonoff ZBDongle-E | CP210x USB device on sniffer Pi `10.1.1.120`; no capture process found | Previously the independent sniffer; repurposing it removes that reference receiver until another receiver is assigned |
-| ZB-GW04 v1.2 | Fresh HA specialist status places firmware 0.13 on active HA `10.1.1.40` | Owner selected a [maintenance plan](ZBGW04_HA_MAINTENANCE.md); execution is not yet authorized |
+| ZB-GW04 | Owner will provide a dedicated test unit later; exact revision and baseline remain to be identified | Await the dedicated unit. The active HA gateway at `10.1.1.40` is excluded from qualification; the earlier [maintenance proposal](ZBGW04_HA_MAINTENANCE.md) is superseded |
 
 The bench Pi has GNU Arm GCC 14.2.1 and the existing pinned SDK trees. Builds
 can run in fresh temporary directories without owning a radio. The local Mac
@@ -84,10 +84,20 @@ SHA-256 `cc139af7280d530954f3484533ce5608a91b64a8803f1fbb936f4fe808b4f930`.
 Final deliverables must retain these files and present the reviewed terms in
 the download/image channels; that publication check remains pending.
 
-For ZB-GW04, the [maintenance packet](ZBGW04_HA_MAINTENANCE.md) now identifies
-the exact 0.14 bench daemon and inspected 0.13 return artifact. Its first proposed
-window returns the existing 0.13 software/radio pair to HA. It does not assume a
-production 0.14 upgrade or claim qualification of the HA updater.
+For ZB-GW04, the owner will supply a dedicated test unit later. The active HA
+gateway will remain in service; the earlier 90-minute HA outage proposal and
+its pending approval question are withdrawn. The staged private bench runtime,
+candidate artifacts and notices remain available for the dedicated unit.
+
+On arrival, identify its exact board revision, USB path, existing application,
+bootloader and physical recovery route before selecting an artifact. The
+current candidate is specifically for `zb-gw04-1v2`; neither that identity nor
+the HA gateway's 0.13 baseline and confirmed button access transfers to a new
+unit. Preserve the dedicated unit's own recoverable baseline. Use an isolated
+database/network and the available test switches. Reassess bench-host ownership
+and any Nordic service interruption when scheduling; no such interruption is
+scheduled or authorized now. Qualification of the actual HA updater remains a
+separate test, not a consequence of successful manual bench testing.
 
 ### Execution checks
 

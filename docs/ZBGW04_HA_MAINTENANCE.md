@@ -1,5 +1,19 @@
 # ZB-GW04 Home Assistant maintenance plan
 
+**Superseded on 2026-11-07:** the owner will provide a dedicated ZB-GW04 for
+testing later. The active HA gateway is no longer a qualification target. The
+90-minute outage proposal and its pending approval question are withdrawn; no
+HA outage or Nordic bench-service stop is scheduled. Follow the current
+[dedicated-unit qualification plan](FIRMWARE_QUALIFICATION_PLAN.md).
+
+The material below is retained as historical planning and artifact/recovery
+reference, not an active execution request. The staged bench runtime can be
+reused after identifying the dedicated unit, but its revision, firmware,
+bootloader and recovery route must be verified independently. Do not assume
+that this HA unit's baseline, USB mapping or button access describes the spare.
+
+## Historical proposal
+
 Prepared 2026-11-07. **Planning only: no permission to stop, move, reset, flash
 or reconfigure the active HA gateway has been given.** The owner requested a
 maintenance plan rather than identifying a spare board. Execution needs a

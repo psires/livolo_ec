@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "scope": "release_readiness_not_physical_qualification",
-  "recorded_at_utc": "2026-11-07T16:15:09.279065+00:00",
+  "recorded_at_utc": "2026-11-07T16:20:30.971736+00:00",
   "candidate_versions": {
     "distribution": "0.6.0",
     "daemon": "0.15.0",
@@ -15,12 +15,12 @@
   "publication_enabled": false,
   "public_firmware_qualified": false,
   "owner_decisions": {
-    "ha_gateway": "Prepare maintenance plan; no firmware downtime/flash authorization",
+    "ha_gateway": "Owner will provide a dedicated ZB-GW04 later. Active HA gateway excluded from qualification; earlier outage proposal and approval question withdrawn.",
     "nordic_serial_prefix": "livolo.sfires.net:",
     "ti_private_key_custody": "Owner laptop, protected primary and verified local recovery copy; no off-device backup established",
     "gecko_sdk": "Owner confirmed existing acceptance and recalled official MSLA link approximately two weeks before 2026-11-07",
     "physical_operator": "Owner confirmed they can operate radios and both isolated one-/two-gang test switches are available; no maintenance window or flash authorization inferred",
-    "zbgw04_physical_access": "Owner confirmed accessible buttons labeled BOOT and RESET; entry sequence not yet tested; no firmware authorization inferred"
+    "zbgw04_physical_access": "BOOT/RESET access was confirmed for the active HA unit only; dedicated unit access and recovery route remain unverified."
   },
   "mg21": {
     "review_basis": "20260804, reasoned assessment from owner recollection and official source; no exact historical acceptance date asserted",
@@ -338,6 +338,18 @@
       "HA updater qualification",
       "Injected interruption",
       "Production output commands"
-    ]
+    ],
+    "status": "withdrawn_superseded_by_dedicated_test_unit",
+    "active": false
+  },
+  "zbgw04_qualification": {
+    "status": "awaiting_dedicated_test_unit",
+    "active_ha_gateway_in_scope": false,
+    "dedicated_revision_verified": false,
+    "dedicated_baseline_verified": false,
+    "dedicated_recovery_verified": false,
+    "existing_private_bench_staging_retained": true,
+    "bench_service_interruption_scheduled": false,
+    "next_step": "Identify the dedicated unit and preserve its own recoverable baseline before selecting exact-board artifacts and scheduling tests."
   }
 }
