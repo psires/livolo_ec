@@ -113,6 +113,30 @@
       "source_tag": "ha-0.5.0",
       "source_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
       "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2"
+    },
+    {
+      "enabled": true,
+      "kind": "standalone",
+      "image": "ghcr.io/psires/livolod",
+      "version": "0.5.1",
+      "daemon_version": "0.14.1",
+      "firmware_compat_version": "0.13",
+      "version_schema": 2,
+      "source_tag": "standalone-0.5.1",
+      "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+      "previous_image": "ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f"
+    },
+    {
+      "enabled": true,
+      "kind": "ha",
+      "image": "ghcr.io/psires/livolo-ec-ha-app",
+      "version": "0.5.1",
+      "daemon_version": "0.14.1",
+      "firmware_compat_version": "0.13",
+      "version_schema": 2,
+      "source_tag": "ha-0.5.1",
+      "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+      "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d92820a4b34e725854a351f6d"
     }
   ]
 }
