@@ -1,0 +1,45 @@
+{
+  "verified_at_utc": "2026-11-07T16:06:59.826702+00:00",
+  "scope": "Temporary one-module pairing profile fix; no radio firmware change",
+  "baseline_commit": "bd06c6b02f4598eca266b72293abc11900cae419",
+  "diagnostic_patch_commit": "92aaba8d17007bd92bf05ebc6c63f90cf56a54ee",
+  "profile_patch_commit": "a410b2c4c0d9ccf35e06d6725067c434291a62bc",
+  "image": "ghcr.io/psires/livolo-ec-ha-app:0.5.0",
+  "image_id": "sha256:f0cca0732895704ee817df35419798ec97a1719bb1f7f607f1fb12e97b939480",
+  "app_started_at": "2026-11-07T16:05:08.701663534Z",
+  "native_checks": {
+    "verified_utc": "2026-11-07T16:06:18.516907+00:00",
+    "ready": true,
+    "device_count": 3,
+    "outputs": 5,
+    "all_online": true,
+    "radio_version": "0.13",
+    "profile_module_sha256": "9bf98afd6d8c1bfe3941156caaa68ce8205607af7e8f5417a386f1379a6c6ad1",
+    "diagnostic_module_sha256": "e122edd6c1b01b5484040adb6897058395193fd67bf08c507d6be18860fedeca",
+    "catalog_config_options_unchanged": true,
+    "registry_network_journal_unchanged": true,
+    "command_ids_unchanged": true,
+    "pairing_history_unchanged": true
+  },
+  "ha_checks": {
+    "code_inventory_unchanged": true,
+    "core_not_restarted": true,
+    "identities_names_areas_preserved": true,
+    "entry_count": 1,
+    "entity_count": 12,
+    "device_count": 4,
+    "healthy_native_outputs": 5,
+    "native_output_states": "all off"
+  },
+  "limitation": "Both private daemon overlays are lost on app recreation/update. Published image/tag unchanged. User pairing retry required; no physical pairing success yet verified.",
+  "schema": 1,
+  "same_container_preserved": true,
+  "recoverable_backups_retained_privately": true,
+  "offline_tests": {
+    "exact_backport_profile_discovery": 26,
+    "exact_backport_commissioning_cli": 39
+  },
+  "automatic_pairing_or_output_commands": false,
+  "firmware_operations": false,
+  "profile_patch_sha256": "d0136fe424590dbbf1aad4f5ae68484c821c24fbdbc4da9596ed09dcd8b1a6b2"
+}
