@@ -78,6 +78,17 @@ The finalized [binary terms and channel requirements](MG21_BINARY_TERMS.md)
 provide the scoped wording. No further acceptance or receipt is requested from
 the owner on the evidence now supplied.
 
+For the 0.14 candidates, Tech Lead also approved the exact staged artifact/notice
+mapping with inventory SHA-256
+`cc139af7280d530954f3484533ce5608a91b64a8803f1fbb936f4fe808b4f930`.
+The review verified all 43 bound files and 319 preserved notice blocks. Each
+MG21 mapping explicitly includes the complete MSLA, its retrieval/hash record,
+and the exact candidate input inventory; the 0.12 dependency summary is labeled
+historical background. See the [readiness record](verification/firmware-readiness-20261107.json).
+This closes the staged notice-mapping review. Physical qualification and
+retention/presentation of those documents in the final assets and channels
+remain required before publication.
+
 If that review cannot resolve channel coverage or the project wants unrestricted
 downstream redistribution, the owner/license holder can submit this prepared
 vendor inquiry. It has **not** been sent:

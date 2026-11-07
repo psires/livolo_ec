@@ -94,8 +94,10 @@ variants in tests are synthetic too. They must not be described as captured
 full frames. Matching uses the payload layout, never the example device ID.
 
 See the [investigation record](verification/pairing-67181844-20261107.md) for
-session provenance and limits. Successful local admission and control of this
-variant remain unverified. All existing freshness, ambiguity and locally
+session provenance and limits. After the private host fix, the owner reported
+that pairing worked perfectly; this is owner-reported live pairing success on
+radio 0.13, not an independently observed output-control test or firmware 0.14
+qualification. All existing freshness, ambiguity and locally
 addressed state-report confirmation requirements still apply; neither a matching
 profile nor an offline lifecycle test establishes physical pairing success.
 

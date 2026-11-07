@@ -28,8 +28,7 @@
     "entry_count": 1,
     "entity_count": 12,
     "device_count": 4,
-    "healthy_native_outputs": 5,
-    "native_output_states": "all off"
+    "healthy_native_outputs": 5
   },
   "limitation": "Both private daemon overlays are lost on app recreation/update. Published image/tag unchanged. User pairing retry required; no physical pairing success yet verified.",
   "schema": 1,

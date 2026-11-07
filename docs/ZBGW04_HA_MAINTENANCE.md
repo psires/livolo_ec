@@ -22,7 +22,7 @@ final candidate, compatibility target, hashes and acceptance record.
 | HA identity | November 7 stored registry: integration 0.5.0, 12 enabled entities and four devices; only Bedroom device has an assigned area | Preserve private exact-ID export; verify live loaded HA state separately |
 | Old deployment | November 7: `local_livolo_ec` 0.1.0 stopped, manual boot, watchdog/automatic updates disabled | Confirm it cannot restart and compete for this UART |
 | Catalog | November 7: persistent `firmware_catalog=local`, `/data/firmware`, schema 1 compatibility 0.13 | Recheck manifest/payload hashes, backup and recreation behavior |
-| Access to device | Owner confirmed they can operate the radios and both isolated one- and two-gang test switches are available | Verify this board's physical BOOT/RESET mapping, recovery instructions and agreed window |
+| Access to device | Owner confirmed radio operation, isolated one-/two-gang switches, and accessible buttons labeled BOOT and RESET | Verify the entry sequence on this exact board before programming; agree the window |
 
 Sources: [HA migration](verification/ha-app-migration-0.3.0-20261105.json),
 [preflight](verification/ha-zbgw04-0.13-preflight-20261105.json),
@@ -118,7 +118,93 @@ reported 0.13 application uses the retained trial image hash
 `5dc5624d45c48bd3003012a0391922d288a03d2ff22f00a2e92757b70028241c`
 and is the first current-version return candidate to verify and stage. It is
 not automatically the next release candidate. New bytes need their assigned
-new version and hash. No future candidate is selected by this plan.
+new version and hash.
+
+### Frozen first-window proposal
+
+The November 7 offline preparation selects the following exact artifacts for
+review. This is a manual bench qualification followed by restoration of 0.13
+to HA; it does not include a production 0.14 upgrade or HA updater qualification.
+
+| Purpose | Version/source | SHA-256 |
+| --- | --- | --- |
+| ZB-GW04 application candidate GBL | 0.14, source `0fd515ca156823e513d2d86f0507b8da9b8558e8` | `b1358ed6f1ec77043544ca44e84f90d8214817b36d8185eea341ed70b67ba4c7` |
+| Private bench daemon wheel | 0.15.0, compatibility 0.14, source `a410b2c4c0d9ccf35e06d6725067c434291a62bc` | `ec9dcd5706e9dbcf1ef3dc0082e6fb417a5333ac75d413b2f9128545bce5a54c` |
+| Return application GBL | 0.13 | `5dc5624d45c48bd3003012a0391922d288a03d2ff22f00a2e92757b70028241c` |
+| Retained HA image, ARM64 platform | Published app 0.5.0, daemon 0.14.0, compatibility 0.13 | `f0cca0732895704ee817df35419798ec97a1719bb1f7f607f1fb12e97b939480` |
+
+Both GBLs passed offline board/version/layout/CRC inspection using the built
+bench wheel. Its installed-wheel simulator test passed upgrade from published
+daemon 0.14.0 to 0.15.0 and explicit rollback, preserving catalog bytes, registry
+and request history. These checks do not establish physical operation.
+The wheel contains no release firmware catalog and is not an HA image.
+
+Private artifacts, inspection results and test logs are staged under
+`.local/release-0.14-candidate-0fd515c/bench-packet/`; candidate firmware and
+hash-bound notices are in the sibling `review-staging/` directory.
+
+The active 0.5.0 container also has two private daemon overlays, recorded in the
+[diagnostic receipt](verification/ha-pairing-diagnostics-deployment-20261107.json)
+and [profile-fix receipt](verification/ha-pairing-profile-deployment-20261107.json).
+Preserve these exact modules and the current HA integration in the fresh backup.
+Recreating the published image alone loses the overlays. User pairing attempts
+after those receipts may change the registry: capture current state at the
+window, not merely the earlier three-switch baseline.
+
+Before requesting execution approval, assign the bench host and independent
+receiver, stage its pinned helper/runtime dependencies, and define the
+stop-new-tests deadline and recovery budget. The owner has confirmed accessible
+BOOT and RESET buttons; this is not yet evidence of successful bootloader entry.
+The first window excludes injected interruption tests and production-output
+commands. Isolated one-/two-gang control checks require the owner's explicit
+approval in that window. Restore the return 0.13 application before reconnecting
+to the retained compatibility-0.13 HA deployment.
+
+The 0.14-to-0.13 return is an explicitly reviewed **manual Gecko recovery**:
+stop the bench daemon, prove exclusive ownership, enter the preserved Gecko
+bootloader through the confirmed physical route, and use the pinned helper at
+115200 to upload the hash-bound return GBL. Then verify VERSION/CAPS at 460800
+before returning the board to HA. The normal compatibility-0.14 updater refuses
+this downgrade, and the maintenance CLI's recovery operation is Nordic-specific.
+Do not relax either guard, retag the 0.13 artifact or reset an update journal.
+
+Offline bench preparation is complete in a new private environment on `.21`:
+`/home/sfires/livolo-ec/bench-zbgw04-014-20261107`. The exact wheel above,
+`universal-silabs-flasher==0.0.31`, pyserial 3.5, 34 dependency wheels and the
+reviewed notices are staged. Dependency validation and nine version/help/offline
+artifact checks passed. The local receipt under
+`bench-packet/pi-receipt/readiness.json` has SHA-256
+`6d87490cf5280130a27504b3db208133a4c539749136d29a97308700aa788045`.
+No existing service, SDK, radio or network configuration changed during staging.
+
+Board-maintainer [physical-entry guidance](https://github.com/darkxst/silabs-firmware-builder/issues/99#issuecomment-2167321397)
+describes holding BOOT while pressing and releasing RESET with USB power
+connected, then releasing BOOT after a few seconds. This unit has **not** passed
+that check. During the authorized window, require the expected Gecko identity
+at 115200 before uploading; abort if it is absent. PD4 is not this entry method.
+
+Reviewed return command template, **not executed**:
+
+```sh
+/home/sfires/livolo-ec/bench-zbgw04-014-20261107/venv/bin/python \
+  -m universal_silabs_flasher \
+  --device '<EXACT_REIDENTIFIED_ZBGW04_PORT>' \
+  --bootloader-baudrate 115200 --probe-method bootloader \
+  flash --firmware /home/sfires/livolo-ec/bench-zbgw04-014-20261107/artifacts/zb-gw04-1v2-return-0.13.gbl
+```
+
+Resolve the port only after physical board identification and exclusive
+ownership are established. No force, cross-flashing, downgrade override or GPIO
+reset option is included. Verify the hash again before use and VERSION/CAPS
+after transfer; helper completion alone does not authorize HA reconnection.
+
+Proposed budget: reserve 90 minutes with the owner present. Stop starting new
+tests at minute 45 and use the remaining time for the manual 0.13 return,
+restoration of HA and the Nordic standalone service, and identity/health checks.
+If physical entry or backups cannot be confirmed, abort before programming.
+This is a scheduling budget, not a guarantee of recovery time: if recovery is
+unfinished, leave the affected services safely stopped and continue the agreed
+recovery procedure with the owner. Never shorten verification to meet the clock.
 
 Offline inspection can be prepared without opening the radio:
 
@@ -154,11 +240,11 @@ Do not restore the production database on a bench daemon. If RF tests are
 required, assign isolated test switches and an independent receiver explicitly;
 production lights are not implicit test loads.
 
-The standalone Pi `10.1.1.21` is a possible bench host, but it already owns the
+The proposed bench host is the standalone Pi `10.1.1.21`, but it already owns the
 Nordic gateway. Using it requires a separately approved, backed-up stop/mapping
 change and subsequent restoration of that deployment. Do not assume its UART
-or USB mappings are free. The Sonoff on `10.1.1.120` can remain a reference
-receiver if assigned and confirmed available. Never arm two radios with the
+or USB mappings are free. The Sonoff on `10.1.1.120` is the proposed reference
+receiver, subject to confirmed availability. Never arm two radios with the
 production network identity.
 
 ## Authorized execution sequence

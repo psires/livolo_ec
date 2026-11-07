@@ -1,7 +1,8 @@
 # Exact-board firmware qualification plan
 
-Prepared on 2026-11-07 against software baseline `c306cbf`. This is an execution
-plan, not a qualification result. Release engineering owns artifact versions,
+Prepared on 2026-11-07, initially against software baseline `c306cbf`; the frozen
+0.14 candidate packet below supersedes the initial build prerequisites. This is
+an execution plan, not a qualification result. Release engineering owns artifact versions,
 public-download acceptance and catalog eligibility; these are separate gates.
 Any dependency, signing-key or USB-identity change requires newly identified
 artifacts. Published or recorded 0.13 bytes must not be replaced under that name.
@@ -54,6 +55,41 @@ those earlier runs nor a byte-identical rebuild establish a new release's
 complete physical update/recovery qualification.
 
 ## Common test sequence
+
+### Frozen 0.14 candidate packet
+
+Firmware source is `0fd515ca156823e513d2d86f0507b8da9b8558e8`. Two fresh
+builds produced identical application/bootstrap bytes and canonical packages.
+The Nordic ZIP has normalized metadata with unchanged member bytes. The signed
+TI package was produced locally with the laptop-held release key; its embedded
+application key and the bootstrap key match the tracked public key. No existing
+radio trust was changed.
+
+| Board / artifact | SHA-256 |
+| --- | --- |
+| cod.m CC2652P 0.14 signed application | `fba500a304e9a16884c2fc0ea57772397f239f199e5fc4daae6a4d5bd660798c` |
+| cod.m CC2652P bootstrap 0.2 with release key | `3405e403b0175258a7bc8282dbb58c922eac46f6ed211fc8ff36e70d804baa8b` |
+| Nordic PCA10059 0.14 DFU ZIP | `83d230089be60e60bf4d16f4049cf8725f9d9533478877bb0845ddac880a262a` |
+| Sonoff ZBDongle-E 0.14 GBL | `87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6` |
+| ZB-GW04 1v2 0.14 GBL | `b1358ed6f1ec77043544ca44e84f90d8214817b36d8185eea341ed70b67ba4c7` |
+
+The [readiness record](verification/firmware-readiness-20261107.json) binds the
+build/input/notice inventory and distinguishes completed offline work from
+pending hardware acceptance. Private staging is
+`.local/release-0.14-candidate-0fd515c/`. These artifacts have not been publicly
+released or admitted to an updater catalog. The 751 input hashes were collected
+after both builds, so the inventory does not claim immutable during-build SDK
+snapshots. Tech Lead approved the exact per-board notice mapping with inventory
+SHA-256 `cc139af7280d530954f3484533ce5608a91b64a8803f1fbb936f4fe808b4f930`.
+Final deliverables must retain these files and present the reviewed terms in
+the download/image channels; that publication check remains pending.
+
+For ZB-GW04, the [maintenance packet](ZBGW04_HA_MAINTENANCE.md) now identifies
+the exact 0.14 bench daemon and inspected 0.13 return artifact. Its first proposed
+window returns the existing 0.13 software/radio pair to HA. It does not assume a
+production 0.14 upgrade or claim qualification of the HA updater.
+
+### Execution checks
 
 1. Identify the exact board and exclusive owner. Preserve the current artifact,
    application/bootloader identities, configured USB profile, catalog and a

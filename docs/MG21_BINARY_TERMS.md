@@ -58,11 +58,16 @@ accepted by finalizing this notice.
 
 Retain a readable complete copy of the referenced MSLA and its retrieval/hash
 record with the final notice bundle; links alone do not fulfill this packaging
-requirement. Check the final dependency inventory, license mappings and visible
+requirement. Each MG21 artifact's export must also retain
+`provenance/input-notice-inventory.json` and `provenance/msla-retrieval.json` from
+the bundle root, alongside the referenced notices. The former records the exact
+candidate inputs; the older repository inventory below is background, not a
+substitute for that artifact-bound record.
+Check the final dependency inventory, license mappings and visible
 channel wording against the reviewed scope. Reopen the review if a dependency,
 agreement or distribution channel changes. A special vendor permission or
 additional owner assent is not a routine prerequisite for this scoped route.
 
 Primary references: [official MSLA](https://www.silabs.com/about-us/legal/master-software-license-agreement),
 [pinned SDK license](https://github.com/SiliconLabs/gecko_sdk/blob/59d2160fe448b13730a91c0f019a8b4c53c43eb2/License.txt),
-and the [exact dependency inventory](../firmware/THIRD_PARTY_NOTICES.md).
+and the [historical dependency background](../firmware/THIRD_PARTY_NOTICES.md).

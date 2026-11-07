@@ -1,0 +1,343 @@
+{
+  "schema": 1,
+  "scope": "release_readiness_not_physical_qualification",
+  "recorded_at_utc": "2026-11-07T16:15:09.279065+00:00",
+  "candidate_versions": {
+    "distribution": "0.6.0",
+    "daemon": "0.15.0",
+    "radio": "0.14",
+    "client": "0.6.0",
+    "ha_integration": "0.6.0",
+    "ha_app": "0.6.0",
+    "api": 1,
+    "uart": 3
+  },
+  "publication_enabled": false,
+  "public_firmware_qualified": false,
+  "owner_decisions": {
+    "ha_gateway": "Prepare maintenance plan; no firmware downtime/flash authorization",
+    "nordic_serial_prefix": "livolo.sfires.net:",
+    "ti_private_key_custody": "Owner laptop, protected primary and verified local recovery copy; no off-device backup established",
+    "gecko_sdk": "Owner confirmed existing acceptance and recalled official MSLA link approximately two weeks before 2026-11-07",
+    "physical_operator": "Owner confirmed they can operate radios and both isolated one-/two-gang test switches are available; no maintenance window or flash authorization inferred",
+    "zbgw04_physical_access": "Owner confirmed accessible buttons labeled BOOT and RESET; entry sequence not yet tested; no firmware authorization inferred"
+  },
+  "mg21": {
+    "review_basis": "20260804, reasoned assessment from owner recollection and official source; no exact historical acceptance date asserted",
+    "route": "Tech Lead accepted scoped project GitHub/GHCR/HA application distribution",
+    "notice": "docs/MG21_BINARY_TERMS.md",
+    "provenance": "docs/verification/mg21-license-provenance-20261107.md",
+    "retained_agreement_sha256": "e6966d27e4eab74f720c9705e3ebf8ecf240cd61f3d2e5d17d93ecbcd4286014",
+    "remaining": [
+      "Include reviewed notices and per-artifact provenance in final deliverables",
+      "Verify visible release/channel presentation",
+      "Physical board qualification"
+    ]
+  },
+  "ti": {
+    "release_public_key_sha256": "bca880c386b2f437fb8a5807188dbb139960a29a3a17b28b262f7ea694051e92",
+    "baseline": "docs/verification/ti-readonly-baseline-20261107.json",
+    "trust_migration_performed": false,
+    "remaining": [
+      "Authorized first installation/reprovisioning and recovery tests",
+      "Signed update, confirmation and rollback qualification"
+    ],
+    "local_signing_complete": true,
+    "matching_application_bootstrap_public_key_verified": true
+  },
+  "nordic": {
+    "application_vid_pid": "16c0:27dd",
+    "legacy_vid_pid": "cafe:4001",
+    "factory_dfu_vid_pid": "1915:521f",
+    "serial_suffix": "Unchanged DEVICEID[1] then DEVICEID[0], 16 lowercase hex digits",
+    "offline_evidence": "docs/verification/nordic-shared-identity-offline-20261107.json",
+    "host_tests": 352,
+    "targeted_independent_review_tests": 43,
+    "remaining": [
+      "Physical legacy-to-public migration, reconnect and recovery"
+    ],
+    "final_build_inspected": true
+  },
+  "ha_maintenance_plan": "docs/ZBGW04_HA_MAINTENANCE.md",
+  "packaging_gate_commit": "cc438e9",
+  "packaging_checks": [
+    {
+      "name": "daemon-upgrade",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167162/job/128446884710"
+    },
+    {
+      "name": "offline",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167198/job/128446884665"
+    },
+    {
+      "name": "validate (ha, ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0...",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167162/job/128446884660"
+    },
+    {
+      "name": "firmware-delivery",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167162/job/128446884647"
+    },
+    {
+      "name": "hassfest",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167163/job/128446884615"
+    },
+    {
+      "name": "validate (standalone, ghcr.io/psires/livolod@sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f...",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167162/job/128446884416"
+    },
+    {
+      "name": "wireshark",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167198/job/128446884393"
+    },
+    {
+      "name": "integration",
+      "result": "success",
+      "url": "https://github.com/psires/livolo_ec/actions/runs/42387167163/job/128446884347"
+    }
+  ],
+  "package_fixture_scope": "Non-flashable synthetic four-board applications plus TI bootstrap; actual wheels/sdists/standalone/HA archives and both ARM64 images; no hardware or publication",
+  "candidate_source_preparation": "eeb0c64f221ff0a60c7753e8265cf0ca4d4f35ce",
+  "candidate_local_checks": {
+    "tools": 84,
+    "ha": 214,
+    "nordic": 5,
+    "actual_package_fixture_delivery": "passed",
+    "firmware_native": 204,
+    "host": 359
+  },
+  "remaining_common": [
+    "Real per-board manual install, recovery, boot and control evidence",
+    "Separate updater lifecycle qualification for each advertised path",
+    "Final package/image provenance and full release acceptance"
+  ],
+  "separate_diagnostic_deployment": {
+    "scope": "User authorized software-only HA pairing diagnostics from 0.5.0 baseline plus 92aaba8; no 0.6.0 or radio update",
+    "source_receipt": "Private /private/tmp/livolo-ha-pairing-diagnostics-92aaba8/deployment-source.json",
+    "status": "Completed and verified; user invited to retry",
+    "receipt": "docs/verification/ha-pairing-diagnostics-deployment-20261107.json"
+  },
+  "firmware_candidate_source": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
+  "candidate_artifacts": [
+    {
+      "board": "codm-cc2652p",
+      "role": "application",
+      "path": "artifacts/codm-cc2652p-0.14.ecupd",
+      "sha256": "fba500a304e9a16884c2fc0ea57772397f239f199e5fc4daae6a4d5bd660798c",
+      "bytes": 69400,
+      "qualification": "pending physical execution",
+      "updater_eligible": false
+    },
+    {
+      "board": "codm-cc2652p",
+      "role": "bootstrap",
+      "path": "artifacts/codm-cc2652p-bootstrap-0.2.bin",
+      "sha256": "3405e403b0175258a7bc8282dbb58c922eac46f6ed211fc8ff36e70d804baa8b",
+      "bytes": 13424,
+      "qualification": "pending physical execution",
+      "updater_eligible": false
+    },
+    {
+      "board": "nordic-pca10059",
+      "role": "application",
+      "path": "artifacts/nordic-pca10059-0.14.zip",
+      "sha256": "83d230089be60e60bf4d16f4049cf8725f9d9533478877bb0845ddac880a262a",
+      "bytes": 49568,
+      "qualification": "pending physical execution",
+      "updater_eligible": false
+    },
+    {
+      "board": "sonoff-zbdongle-e",
+      "role": "application",
+      "path": "artifacts/sonoff-zbdongle-e-0.14.gbl",
+      "sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+      "bytes": 60572,
+      "qualification": "pending physical execution",
+      "updater_eligible": false
+    },
+    {
+      "board": "zb-gw04-1v2",
+      "role": "application",
+      "path": "artifacts/zb-gw04-1v2-0.14.gbl",
+      "sha256": "b1358ed6f1ec77043544ca44e84f90d8214817b36d8185eea341ed70b67ba4c7",
+      "bytes": 60564,
+      "qualification": "pending physical execution",
+      "updater_eligible": false
+    }
+  ],
+  "offline_build_evidence": {
+    "source_archive_sha256": "fb3e32df2760549459b790da7e0522622387669ebab3c6245b7c9b078d588133",
+    "fresh_builds": 2,
+    "all_application_bootstrap_and_canonical_package_bytes_equal": true,
+    "nordic_zip_normalization": "Sorted entries, fixed metadata; member bytes preserved",
+    "input_files_hashed": 751,
+    "input_inventory_sha256": "fc6f76fda8ebb613bc0d2dc97818e8838071980201d1d23bdc8430383668953b",
+    "limitations": "SDK input hashes collected after both builds; not immutable during-build SDK snapshots. No hardware qualification."
+  },
+  "notice_staging": {
+    "scope": "Private review inventory, not accepted release descriptor",
+    "inventory_sha256": "cc139af7280d530954f3484533ce5608a91b64a8803f1fbb936f4fe808b4f930",
+    "notice_documents": 29,
+    "files_hashed": 43,
+    "review": "Tech Lead approved exact scoped mapping; 43 file hashes, all per-artifact references and 319 byte-preserved notice blocks verified. Physical qualification/final packaging/channel presentation remain separate gates.",
+    "full_msla_retained": true
+  },
+  "separate_profile_deployment": {
+    "receipt": "docs/verification/ha-pairing-profile-deployment-20261107.json",
+    "status": "Completed and verified; owner subsequently reported successful pairing to Tech Lead",
+    "scope": "Private software-only 0.5 baseline + diagnostics + a410b2c; radio unchanged",
+    "outcome_limit": "Owner-reported pairing on radio 0.13, not an independent output-control test or firmware 0.14 qualification"
+  },
+  "latest_baseline_ci": {
+    "commit": "c1b09390737fe2be6d51e2f012359578c3645ab3",
+    "checks": [
+      {
+        "name": "integration",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388899001/job/128452100906"
+      },
+      {
+        "name": "hassfest",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388899001/job/128452100526"
+      },
+      {
+        "name": "validate (standalone, ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15c...",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388898975/job/128452100492"
+      },
+      {
+        "name": "validate (ha, ghcr.io/psires/livolo-ec-ha-app@sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d9282...",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388898975/job/128452100448"
+      },
+      {
+        "name": "firmware-delivery",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388898975/job/128452100434"
+      },
+      {
+        "name": "offline",
+        "result": "failure",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388899011/job/128452100411"
+      },
+      {
+        "name": "wireshark",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388899011/job/128452100255"
+      },
+      {
+        "name": "daemon-upgrade",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42388898975/job/128452100231"
+      }
+    ],
+    "offline_failure": "Locally reproduced stale compatibility fixtures corrected by test-only commit 0adeab6; 359 host tests passed; final CI pending. Exact historical job log unavailable (GitHub HTTP 403)."
+  },
+  "bench_host": {
+    "source": "a410b2c4c0d9ccf35e06d6725067c434291a62bc",
+    "wheel_sha256": "ec9dcd5706e9dbcf1ef3dc0082e6fb417a5333ac75d413b2f9128545bce5a54c",
+    "version": "0.15.0",
+    "compatibility": "0.14",
+    "installed_upgrade_rollback": "Passed from published 0.14.0/compatibility 0.13, simulated radios; catalog/registry/request rows preserved",
+    "production_ha_upgrade": false,
+    "isolated_pi_staging": {
+      "ready": true,
+      "readiness_sha256": "6d87490cf5280130a27504b3db208133a4c539749136d29a97308700aa788045",
+      "stage_manifest_sha256": "03d760ab3c4c79c796eea923ca3c51e97cb2e23b334f9c290273a42f3459b0d9",
+      "physical_entry_review_sha256": "e5d1c45a5e8b60d5b6f57cb677ad68daf65c22b7ae554b60ff5bf882ce2c41fd",
+      "offline_checks_passed": 9,
+      "pinned_dependency_wheels": 34,
+      "helper": "universal-silabs-flasher 0.0.31",
+      "pip_check": "passed",
+      "mapped_notice_references_verified": 33,
+      "existing_deployments_changed": false,
+      "radio_accessed": false,
+      "entry_verified": false,
+      "window_authorized": false
+    }
+  },
+  "version_fixture_fix": {
+    "commit": "0adeab6",
+    "runtime_changes": false,
+    "focused_tests": 17,
+    "host_tests": 359,
+    "ci": "all eight source/container/HA checks passed"
+  },
+  "notice_review": {
+    "reviewer": "Tech Lead / PO",
+    "inventory_sha256": "cc139af7280d530954f3484533ce5608a91b64a8803f1fbb936f4fe808b4f930",
+    "status": "approved_scoped_artifact_notice_mapping",
+    "artifact_bytes_unchanged": true,
+    "closed_findings": [
+      "Historical 0.12 dependency background no longer described as exact candidate inventory",
+      "Both MG21 artifact mappings explicitly bind exact input inventory and MSLA retrieval record"
+    ],
+    "limits": "No hardware qualification, final delivery-channel acceptance or unrestricted redistribution grant"
+  },
+  "final_source_ci": {
+    "commit": "0adeab6da504e696a7e32768e776de253b8b46e7",
+    "checks": [
+      {
+        "name": "wireshark",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110976/job/128455709437"
+      },
+      {
+        "name": "firmware-delivery",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110978/job/128455709387"
+      },
+      {
+        "name": "daemon-upgrade",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110978/job/128455709346"
+      },
+      {
+        "name": "validate (standalone, ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15c...",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110978/job/128455709299"
+      },
+      {
+        "name": "validate (ha, ghcr.io/psires/livolo-ec-ha-app@sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d9282...",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110978/job/128455709183"
+      },
+      {
+        "name": "offline",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110976/job/128455709132"
+      },
+      {
+        "name": "integration",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110973/job/128455709101"
+      },
+      {
+        "name": "hassfest",
+        "result": "success",
+        "url": "https://github.com/psires/livolo_ec/actions/runs/42390110973/job/128455708887"
+      }
+    ],
+    "result": "all_eight_success"
+  },
+  "proposed_ha_window": {
+    "duration_minutes": 90,
+    "stop_new_tests_at_minute": 45,
+    "scope": "Isolated manual bench 0.14 qualification then direct Gecko recovery to 0.13 and restoration of retained HA deployment; temporary Nordic bench service stop requires authorization",
+    "approved": false,
+    "entry_verified": false,
+    "excludes": [
+      "Production 0.14 upgrade",
+      "HA updater qualification",
+      "Injected interruption",
+      "Production output commands"
+    ]
+  }
+}
