@@ -115,7 +115,7 @@
       "previous_image": "ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "kind": "standalone",
       "image": "ghcr.io/psires/livolod",
       "version": "0.5.1",
@@ -127,7 +127,7 @@
       "previous_image": "ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f"
     },
     {
-      "enabled": true,
+      "enabled": false,
       "kind": "ha",
       "image": "ghcr.io/psires/livolo-ec-ha-app",
       "version": "0.5.1",

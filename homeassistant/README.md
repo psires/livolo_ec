@@ -25,7 +25,7 @@ firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
 **Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
 Install **Livolo EC**, then restart HA. The current
-[0.5.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.0) contains
+[0.5.1 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.1) contains
 the assembled client and component. Shared default-catalog inclusion is separate;
 this installation uses a custom repository. Marketplace custom repositories
 require the user's GitHub authorization.
@@ -46,7 +46,7 @@ source revision to distinguish them.
 
 Add `https://github.com/psires/livolo_ec` under the app store's **Repositories**,
 then install **Livolo EC**. The repository supplies the public **aarch64** wrapper
-image `ghcr.io/psires/livolo-ec-ha-app:0.5.0`; it does not build on the HA host.
+image `ghcr.io/psires/livolo-ec-ha-app:0.5.1`; it does not build on the HA host.
 Configure the options documented below before starting the app. Install the
 native integration separately and use the app's actual internal hostname and
 the same API secret.
@@ -60,7 +60,16 @@ database and reconfigures the existing HA entry. Never start a second daemon on
 the same radio. HA Container users instead use the
 [standalone daemon container](../host/docker/README.md).
 
-Public integration upgrades from **0.4.0 to 0.5.0** passed with HACS on HA
+Public **0.5.0 to 0.5.1** upgrades passed through HACS on HA 2026.10.4 and
+Marketplace on HA 2026.11.0. Separate-process archive checks preserved actual
+disposable HA storage across stock/patched 0.5.0, 0.5.1 and rollback. Both ARM64
+images passed installed upgrade/persistence checks from public 0.5.0. The release
+incorporates the private pairing fixes, with daemon 0.14.1 and radio compatibility
+0.13; no live HA deployment or firmware change was performed. See the
+[0.5.1 verification](../docs/verification/software-release-0.5.1-20261107.json)
+for exact public hashes and test limits.
+
+Historical public integration upgrades from **0.4.0 to 0.5.0** passed with HACS on HA
 2026.10.4 and Marketplace on HA 2026.11.0, preserving configuration and entity
 identity through real ZIP replacement and entry reload. These isolated checks
 verify restart-required handling, not a complete HA process restart. Both ARM64
@@ -92,7 +101,7 @@ Build an archive from the repository root:
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.5.0.zip` into the HA configuration directory so
+Extract `dist/livolo-ec-ha-0.5.1.zip` into the HA configuration directory so
 `custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
@@ -116,8 +125,8 @@ Maintainers export a reviewed, committed source revision with:
 
 ```sh
 python3 homeassistant/export_channel.py --commit <full-source-commit> \
-  --version 0.5.0 --output dist/ha-channel-0.5.0
-python3 dist/ha-channel-0.5.0/scripts/build_release.py --tag 0.5.0
+  --version 0.5.1 --output dist/ha-channel-0.5.1
+python3 dist/ha-channel-0.5.1/scripts/build_release.py --tag 0.5.1
 ```
 
 The generated repository contains the complete integration, client, original
@@ -127,7 +136,7 @@ explicit `--preview` export cannot be released. Push the generated repository
 and ordinary matching SemVer tag only after review. Its `livolo_ec.zip` contains
 component files at its root, unlike the manual archive above.
 
-The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.5.0`. The production
+The app configuration names `ghcr.io/psires/livolo-ec-ha-app:0.5.1`. The production
 catalog is advanced only after that exact image passes container upgrade and
 anonymous registry checks. The historical Supervisor qualification above remains
 separate.

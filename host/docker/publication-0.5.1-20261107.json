@@ -1,0 +1,45 @@
+{
+  "verified_at_utc": "2026-11-07T20:49:26.551036+00:00",
+  "registry_auth": "Anonymous scoped pull tokens; no account credentials",
+  "architecture": "linux/arm64",
+  "radio_access": false,
+  "live_testbed_upgrade": false,
+  "images": [
+    {
+      "image": "ghcr.io/psires/livolod:0.5.1",
+      "index_digest": "sha256:d4c1ea27432bb08d8f2350d669f16f231d85f45e9bb7d146f0b062557836929b",
+      "platform_digest": "sha256:c4cf2e6579d01adb94e7d1a431a425e5f347bc50d0050169ee9e7593b9b60183",
+      "config_digest": "sha256:176e2b5c7b39dd41a43e159f9b618b266da00b7b2a396ecdaf7b80d5559c63f4",
+      "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+      "recipe_commit": "9caebc23c579e90d122ca4aacf437d969dd899bc",
+      "daemon_version": "0.14.1",
+      "firmware_compat_version": "0.13",
+      "attestation_digests": [
+        "sha256:623b532477dbf96a5f9dd161116162043d525d0c653f1287c3104249f04c200d"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true
+    },
+    {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.5.1",
+      "index_digest": "sha256:a493530d6e7ea712b21ce9f8b1e5cb0c0cf0cbaad822a02a2df3d37d35a73927",
+      "platform_digest": "sha256:3f39bf4c058cc455932aa94e7b774655d1f2dd2e1d15822773e92b91a75e2426",
+      "config_digest": "sha256:8ded3663a6769734090dfe9a63d5c8c2a31ef49c55b528e7c5388ad7a6e008e0",
+      "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+      "recipe_commit": "9caebc23c579e90d122ca4aacf437d969dd899bc",
+      "daemon_version": "0.14.1",
+      "firmware_compat_version": "0.13",
+      "attestation_digests": [
+        "sha256:9204d533da22c648fcb20a81cd7a7ded597f2137b793f45bc1e2d2ff1c55be49"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true
+    }
+  ]
+}

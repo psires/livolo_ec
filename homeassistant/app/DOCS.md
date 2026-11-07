@@ -73,7 +73,7 @@ qualified.
 
 ## Pair a new switch
 
-With app/integration **0.5.0**, in the Web UI or on the Livolo gateway device
+With app/integration **0.5.1**, in the Web UI or on the Livolo gateway device
 in HA, press **Pair new device**,
 then put one intended new switch into physical pairing mode. The daemon detects
 its supported profile and attempts registration and pairing within a 120-second
@@ -85,8 +85,8 @@ shows a notification with a device link after confirmation. It does not create
 Discovered cards or a separate integration entry for each switch. An unconfirmed
 registered device remains visible; use advanced targeted pairing to retry.
 
-See the [0.5.0 pairing guide](https://github.com/psires/livolo_ec/blob/ha-0.5.0/docs/PAIRING.md)
+See the [0.5.1 pairing guide](https://github.com/psires/livolo_ec/blob/ha-0.5.1/docs/PAIRING.md)
 for supported profiles, failure handling and limits, and the
-[versioning guide](https://github.com/psires/livolo_ec/blob/ha-0.5.0/docs/VERSIONING.md)
-for daemon software 0.14.0 versus firmware compatibility 0.13. The software
+[versioning guide](https://github.com/psires/livolo_ec/blob/ha-0.5.1/docs/VERSIONING.md)
+for daemon software 0.14.1 versus firmware compatibility 0.13. The software
 release contains no firmware payloads; updating the app does not flash a radio.

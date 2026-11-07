@@ -7,7 +7,16 @@
 - Candidate daemon 0.15.0 targets radio 0.14; API 1 and UART 3 remain unchanged.
 - Preserve rejected pairing evidence and improve session diagnostics.
 - No deployment or public firmware qualification is established by this version
-  allocation. The published 0.5.0 channel remains the installation baseline.
+  allocation. The published 0.5.1 channel remains the installation baseline.
+
+## 0.5.1
+
+- Recognize the additional observed two-gang pairing payload while retaining
+  exact matching, freshness, conflict and confirmation checks.
+- Retain bounded pairing rejection evidence and clarify HA session results.
+- Package daemon 0.14.1; radio compatibility remains 0.13 (API 1/UART 3).
+- Incorporate the private diagnostic/profile fixes into the official image.
+- Software-only: no radio firmware, bootloader or trust-key changes.
 
 ## 0.5.0
 
