@@ -61,6 +61,21 @@ Required board identifiers:
 - `zb-gw04-1v2`
 - `nordic-pca10059`
 
+This is the frozen schema-1 release scope, defined by `REQUIRED_BOARDS_V1` in
+the trusted release validator. It is independent of the runtime `BOARDS`
+backend/layout registry. Adding an experimental backend does not require or
+permit its inclusion in a schema-1 bundle; removing a backend does not waive a
+required artifact. Candidate specifications cannot supply their own required
+set or policy override. The validator rejects missing, duplicate and out-of-scope
+boards, including substitutions that preserve the inventory's item count.
+
+Future support expansion needs a separately reviewed release-policy/contract
+revision and an independent selection rule in trusted release metadata. Do not
+rewrite schema-1 membership or let a candidate select a smaller legacy scope
+for a release that requires newer support. Historical schema-1 bundles retain
+their original inventory, catalog and checksum bytes. Staging reports the
+verified inventory's board count, not the number of installed updater backends.
+
 The qualification file has exactly these fields:
 
 | Field | Required value |

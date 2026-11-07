@@ -42,6 +42,17 @@ UPDATE_CHECKS = {
     "interruption_recovery": "physical",
 }
 MAX_TOTAL = 16 * 1024 * 1024
+# Trusted schema-1 release policy, frozen independently of updater capabilities.
+# Preserve this historical scope; new membership requires a reviewed contract.
+# Neither a candidate specification nor an experimental backend may redefine it.
+REQUIRED_BOARDS_V1 = frozenset(
+    {
+        "codm-cc2652p",
+        "sonoff-zbdongle-e",
+        "zb-gw04-1v2",
+        "nordic-pca10059",
+    }
+)
 
 
 def decode(data):
@@ -202,7 +213,7 @@ def license_mapping(records):
 
 
 def release_files(spec_path):
-    """Validate all four manual artifacts and derive only qualified updater entries.
+    """Enforce frozen schema-1 release scope and derive qualified updater entries.
 
     @param spec_path Reviewed release JSON beside its confined input directories.
     @return Complete relative-path/byte export map; no unreferenced files are copied.
@@ -224,15 +235,19 @@ def release_files(spec_path):
     if not isinstance(source, str) or not re.fullmatch(r"[0-9a-f]{40}", source):
         raise ValueError("A frozen firmware source commit is required")
     items = spec["artifacts"]
-    if not isinstance(items, list) or len(items) != len(BOARDS):
-        raise ValueError("Every supported exact board is required")
+    if not isinstance(items, list) or len(items) != len(REQUIRED_BOARDS_V1):
+        raise ValueError("Every schema-1 required exact board is required")
     files, entries, seen, public_notices = {}, [], set(), []
     for item in items:
         if not isinstance(item, dict):
             raise ValueError("Invalid board record")
         board = item.get("board")
-        if not isinstance(board, str) or board not in BOARDS or board in seen:
-            raise ValueError("Unsupported or duplicate board")
+        if (
+            not isinstance(board, str)
+            or board not in REQUIRED_BOARDS_V1
+            or board in seen
+        ):
+            raise ValueError("Board outside schema-1 release policy or duplicated")
         seen.add(board)
         fields = {"board", "artifact", "qualification", "notices"}
         if board == "codm-cc2652p":
@@ -633,7 +648,7 @@ def stage_for_source(source, bundle=None, candidate=False):
         )
     return dict(
         pin,
-        board_count=len(BOARDS),
+        board_count=len(decode(files["release.json"])["artifacts"]),
         updater_board_count=len(decode(files["catalog/manifest.json"])["artifacts"]),
         delivery="firmware-release/",
         catalog="host/livolod/firmware/",

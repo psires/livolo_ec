@@ -208,6 +208,68 @@ class PublicReleaseTests(unittest.TestCase):
                 self.package()
             self.assertFalse((self.root / "output").exists())
 
+    def test_experimental_backend_preserves_historical_bundle(self):
+        """Backend expansion cannot alter accepted schema-1 exports or verification."""
+        self.records["sonoff-zbdongle-e"]["automatic_update"] = dict(
+            eligible=True,
+            reviewer="Synthetic updater reviewer",
+            tested_runtime_image="ghcr.io/example/test@sha256:" + "b" * 64,
+            checks=self.checks(UPDATE_CHECKS),
+        )
+        digest = self.package()
+        pins = dict(inventory_sha256=digest, source_commit="a" * 40, version="0.12")
+        original = verify(self.root / "output", **pins)
+        with patch.dict(
+            "firmware_release.BOARDS",
+            {"experimental-board": ("unimplemented", "unqualified-layout")},
+        ):
+            self.assertEqual(verify(self.root / "output", **pins), original)
+            self.assertEqual(self.package("expanded-backends"), digest)
+            self.assertEqual(verify(self.root / "expanded-backends", **pins), original)
+
+    def test_backend_removal_cannot_shrink_required_release(self):
+        """Removing runtime support never authorizes omission from frozen release scope."""
+        self.spec["artifacts"] = self.spec["artifacts"][:-1]
+        with patch.dict("firmware_release.BOARDS") as backends:
+            del backends["nordic-pca10059"]
+            with self.assertRaisesRegex(ValueError, "schema-1 required"):
+                self.package()
+        self.assertFalse((self.root / "output").exists())
+
+    def test_unknown_or_experimental_board_cannot_replace_required_board(self):
+        """A same-sized inventory cannot substitute an unknown or experimental target."""
+        spec_path = self.specification()
+        candidate = copy.deepcopy(self.spec)
+        for known_backend in (False, True):
+            with self.subTest(known_backend=known_backend):
+                candidate["artifacts"][-1]["board"] = "experimental-board"
+                self.file("spec.json", json.dumps(candidate).encode())
+                with patch.dict("firmware_release.BOARDS") as backends:
+                    if known_backend:
+                        backends["experimental-board"] = (
+                            "unimplemented",
+                            "unqualified-layout",
+                        )
+                    with self.assertRaisesRegex(ValueError, "release policy"):
+                        assemble(spec_path, self.root / "output")
+                self.assertFalse((self.root / "output").exists())
+
+    def test_candidate_cannot_override_trusted_scope(self):
+        """Candidate fields and unsupported schemas cannot replace reviewed board policy."""
+        spec_path = self.specification()
+        for change in (
+            {"required_boards": ["sonoff-zbdongle-e"]},
+            {"release_policy": "experimental"},
+            {"schema": 2},
+            {"schema": True},
+        ):
+            with self.subTest(change=change):
+                candidate = dict(self.spec, **change)
+                self.file("spec.json", json.dumps(candidate).encode())
+                with self.assertRaisesRegex(ValueError, "Unsupported public firmware"):
+                    assemble(spec_path, self.root / "output")
+                self.assertFalse((self.root / "output").exists())
+
     def test_local_trial_cannot_be_promoted_by_relabeling_catalog(self):
         """A local installation-trial approval cannot authorize public distribution."""
         self.records["sonoff-zbdongle-e"]["scope"] = "standalone_local_update_test"
@@ -345,7 +407,11 @@ class PublicReleaseTests(unittest.TestCase):
             self.assertRaises(ValueError),
         ):
             stage_for_source(source)
-        result = stage_for_source(source, self.root / "output")
+        with patch.dict(
+            "firmware_release.BOARDS",
+            {"experimental-board": ("unimplemented", "unqualified-layout")},
+        ):
+            result = stage_for_source(source, self.root / "output")
         self.assertEqual((result["board_count"], result["updater_board_count"]), (4, 0))
         self.assertEqual(
             len(list((source / "firmware-release/artifacts").iterdir())), 5
