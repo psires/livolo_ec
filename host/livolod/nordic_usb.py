@@ -12,6 +12,22 @@ import uuid
 
 SYSFS = Path("/sys/class/tty")
 MODES = {"application": (0xCAFE, 0x4001), "dfu": (0x1915, 0x521F)}
+APPLICATION_PREFIX = "livolo.sfires.net:"
+
+
+def application_identity(serial):
+    """Bind an exact application serial to its supported USB identity scheme.
+
+    @param serial Explicit legacy serial or namespaced public hardware serial.
+    @return Vendor, product and serial tuple; foreign namespaces raise ValueError.
+    """
+    if not isinstance(serial, str):
+        raise ValueError("An explicit Nordic application serial is required")
+    if re.fullmatch(re.escape(APPLICATION_PREFIX) + r"[0-9a-f]{16}", serial):
+        return (0x16C0, 0x27DD, serial)
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,128}", serial):
+        return (*MODES["application"], serial)
+    raise ValueError("Unsupported Nordic application USB serial namespace")
 
 
 def profile(raw):
@@ -29,7 +45,11 @@ def profile(raw):
     }
     if raw == {}:
         return {}
-    if not isinstance(raw, dict) or set(raw) != keys:
+    if (
+        not isinstance(raw, dict)
+        or not keys <= set(raw)
+        or set(raw) - keys - {"application_serial_after_update"}
+    ):
         raise ValueError("firmware_nordic requires a complete explicit USB profile")
     for key in ("usb_path", "device_directory", "helper_python"):
         value = raw[key]
@@ -42,11 +62,17 @@ def profile(raw):
             raise ValueError("Invalid Nordic profile path")
     if not raw["usb_path"].startswith("/sys/devices/"):
         raise ValueError("Nordic USB topology must identify its physical sysfs device")
-    for key in ("application_serial", "dfu_serial"):
-        if not isinstance(raw[key], str) or not re.fullmatch(
-            r"[A-Za-z0-9_-]{1,128}", raw[key]
-        ):
-            raise ValueError("An explicit Nordic USB serial is required for each mode")
+    application_identity(raw["application_serial"])
+    if not isinstance(raw["dfu_serial"], str) or not re.fullmatch(
+        r"[A-Za-z0-9_-]{1,128}", raw["dfu_serial"]
+    ):
+        raise ValueError("An explicit Nordic factory DFU serial is required")
+    if "application_serial_after_update" in raw and (
+        not re.fullmatch(r"[0-9a-f]{16}", raw["application_serial"])
+        or raw["application_serial_after_update"]
+        != APPLICATION_PREFIX + raw["application_serial"]
+    ):
+        raise ValueError("Nordic USB migration must preserve the exact hardware suffix")
     if raw["application_serial"] == raw["dfu_serial"]:
         raise ValueError("Nordic application and factory DFU serials must be distinct")
     return dict(raw)
@@ -78,29 +104,33 @@ def enumerate_usb():
     return result
 
 
-def usb_identity(settings, mode):
+def usb_identity(settings, mode, *, expected_serial=None):
     """Require a unique serial and the exact physical USB path in the requested mode.
 
     @param settings Validated explicit operator profile.
     @param mode Application or factory DFU mode.
+    @param expected_serial Optional stricter identity required at a transfer/recovery boundary.
     @return Matching sysfs record; absence, duplication or replacement raises ValueError.
     """
     settings = profile(settings)
     if not settings or mode not in MODES:
         raise ValueError("Nordic USB integration is not configured")
-    vid, pid = MODES[mode]
+    identities = {(*MODES["dfu"], settings["dfu_serial"])}
+    if mode == "application":
+        identities = {application_identity(settings["application_serial"])}
+        if "application_serial_after_update" in settings:
+            identities.add(
+                application_identity(settings["application_serial_after_update"])
+            )
     ports = enumerate_usb()
-    matches = [
-        p
-        for p in ports
-        if (p["vid"], p["pid"], p["serial"]) == (vid, pid, settings[mode + "_serial"])
-    ]
+    matches = [p for p in ports if (p["vid"], p["pid"], p["serial"]) in identities]
     topology = [p for p in ports if p["usb_path"] == settings["usb_path"]]
     if (
         len(matches) != 1
         or len(topology) != 1
         or matches[0] != topology[0]
         or matches[0]["major"] != 166
+        or (expected_serial is not None and matches[0]["serial"] != expected_serial)
     ):
         raise ValueError(
             "The configured Nordic USB identity is unavailable or ambiguous"

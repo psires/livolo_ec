@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "date": "2026-11-07",
+  "scope": "Offline descriptor tests and isolated cross-build only; not a released or hardware-qualified image",
+  "source_version_at_test": "0.13",
+  "version_allocation_pending": true,
+  "native_tests_passed": 5,
+  "descriptor_sanitizers": ["address", "undefined"],
+  "shared_build_inputs": {
+    "USB_RELEASE": 1,
+    "USB_VID": "0x16c0",
+    "USB_PID": "0x27dd",
+    "USB_SHARED_LIVOLO": 1
+  },
+  "shared_serial": "livolo.sfires.net:<DEVICEID[1] then DEVICEID[0], lowercase 8 hex digits each>",
+  "legacy_identity": "cafe:4001 with unprefixed hardware suffix",
+  "language": "0409",
+  "compiler": "arm-none-eabi-gcc 14.2.1 20241119 (Debian 15:14.2.rel1-1)",
+  "build_directory": "/tmp/livolo-fw-readiness-20261107/firmware/nrf52840/build-shared-identity-review",
+  "legacy_build": {
+    "bytes": 49000,
+    "sha256": "a7dd66d72cb0da40a142bc92a329359ebf0f4b1d4f04a7a09290089755e592f2"
+  },
+  "shared_build": {
+    "bytes": 49016,
+    "sha256": "f4a8f61738a6e8e7c7ab123fe3292218ae84796644525b054b76697f7dcb8d5d"
+  },
+  "same_directory_legacy_shared_legacy_rebuild_matches": true,
+  "existing_release_payloads_modified": false,
+  "radio_flashes": 0,
+  "live_usb_transition_tested": false
+}

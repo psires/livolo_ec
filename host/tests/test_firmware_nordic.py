@@ -34,6 +34,13 @@ SETTINGS = dict(
     device_directory="/dev/livolod-usb",
     helper_python="/opt/nrfutil/bin/python3.10",
 )
+LEGACY_SERIAL = "0123456789abcdef"
+PUBLIC_SERIAL = "livolo.sfires.net:" + LEGACY_SERIAL
+TRANSITION = dict(
+    SETTINGS,
+    application_serial=LEGACY_SERIAL,
+    application_serial_after_update=PUBLIC_SERIAL,
+)
 
 
 class NordicTests(unittest.TestCase):
@@ -142,7 +149,9 @@ class NordicTests(unittest.TestCase):
             patch.object(
                 nordic,
                 "target",
-                side_effect=lambda settings, mode: settings["device_directory"]
+                side_effect=lambda settings, mode, **kwargs: settings[
+                    "device_directory"
+                ]
                 + "/"
                 + mode,
             ),
@@ -185,12 +194,125 @@ class NordicTests(unittest.TestCase):
                 )
             )
 
-    def perform(self, *, acknowledgement=None, helper=None, returned_version="0.12"):
+    def test_explicit_namespace_and_same_suffix_transition_validation(self):
+        """Public identity opt-in preserves old profiles and rejects implicit/foreign migration."""
+        self.assertEqual(profile(SETTINGS), SETTINGS)
+        self.assertEqual(profile(TRANSITION), TRANSITION)
+        public = dict(SETTINGS, application_serial=PUBLIC_SERIAL)
+        self.assertEqual(profile(public), public)
+        for settings in (
+            dict(public, application_serial="other.example:" + LEGACY_SERIAL),
+            dict(public, application_serial=PUBLIC_SERIAL.upper()),
+            dict(public, application_serial=PUBLIC_SERIAL[:-1]),
+            dict(public, application_serial=PUBLIC_SERIAL + "0"),
+            dict(public, application_serial_after_update=PUBLIC_SERIAL),
+            dict(TRANSITION, application_serial_after_update=PUBLIC_SERIAL[:-1] + "0"),
+            dict(TRANSITION, application_serial_after_update=None),
+            dict(TRANSITION, application_serial="application-serial"),
+            dict(TRANSITION, dfu_serial=PUBLIC_SERIAL),
+        ):
+            with self.subTest(settings=settings), self.assertRaises(ValueError):
+                profile(settings)
+
+    def test_migration_matches_only_unique_explicit_identity_on_same_topology(self):
+        """Neither legacy fallback nor a shared VID/PID can select a different board."""
+        legacy = dict(self.record, serial=LEGACY_SERIAL)
+        public = dict(self.record, vid=0x16C0, pid=0x27DD, serial=PUBLIC_SERIAL)
+        new_settings = dict(SETTINGS, application_serial=PUBLIC_SERIAL)
+        for record in (legacy, public):
+            with patch("livolod.nordic_usb.enumerate_usb", return_value=[record]):
+                self.assertEqual(usb_identity(TRANSITION, "application"), record)
+                if record is legacy:
+                    with self.assertRaises(ValueError):
+                        usb_identity(
+                            TRANSITION, "application", expected_serial=PUBLIC_SERIAL
+                        )
+                    with self.assertRaises(ValueError):
+                        usb_identity(new_settings, "application")
+                else:
+                    self.assertEqual(usb_identity(new_settings, "application"), public)
+                    with self.assertRaises(ValueError):
+                        usb_identity(
+                            dict(SETTINGS, application_serial=LEGACY_SERIAL),
+                            "application",
+                        )
+        bad = [
+            [],
+            [public, public],
+            [public, dict(legacy, usb_path=legacy["usb_path"] + "-other")],
+            [legacy, dict(public, usb_path=public["usb_path"] + "-other")],
+            [public, dict(public, serial="foreign")],
+        ]
+        bad += [
+            [dict(public, **change)]
+            for change in (
+                {"serial": "other.example:" + LEGACY_SERIAL},
+                {"serial": "livolo.sfires.net:fedcba9876543210"},
+                {"serial": LEGACY_SERIAL},
+                {"vid": 0xCAFE, "pid": 0x4001},
+                {"usb_path": public["usb_path"] + "-moved"},
+                {"major": 188},
+            )
+        ]
+        for records in bad:
+            with (
+                self.subTest(records=records),
+                patch("livolod.nordic_usb.enumerate_usb", return_value=records),
+            ):
+                with self.assertRaises(ValueError):
+                    usb_identity(TRANSITION, "application")
+        dfu = dict(self.record, vid=0x1915, pid=0x521F, serial=SETTINGS["dfu_serial"])
+        with patch("livolod.nordic_usb.enumerate_usb", return_value=[dfu]):
+            self.assertEqual(usb_identity(TRANSITION, "dfu"), dfu)
+            with self.assertRaises(ValueError):
+                usb_identity(TRANSITION, "application")
+
+    def test_configured_manual_restore_requires_actual_selected_transition_serial(self):
+        """An allowed legacy serial cannot verify a currently namespaced application."""
+        from livolod.firmware_manual import application_target_status
+
+        public = dict(self.record, vid=0x16C0, pid=0x27DD, serial=PUBLIC_SERIAL)
+        node = SimpleNamespace(st_mode=stat.S_IFCHR | 0o660, st_rdev=os.makedev(166, 0))
+        with (
+            patch("livolod.nordic_usb.enumerate_usb", return_value=[public]),
+            patch.object(Path, "lstat", return_value=node),
+            patch("os.access", return_value=True),
+            patch("os.statvfs", return_value=SimpleNamespace(f_flag=0)),
+        ):
+            self.assertTrue(
+                application_target_status(
+                    "/dev/livolod-usb/application",
+                    PUBLIC_SERIAL,
+                    usb_profile=TRANSITION,
+                )
+            )
+            self.assertFalse(
+                application_target_status(
+                    "/dev/livolod-usb/application",
+                    LEGACY_SERIAL,
+                    usb_profile=TRANSITION,
+                )
+            )
+            self.assertFalse(
+                application_target_status(
+                    "/dev/ttyACM0", PUBLIC_SERIAL, usb_profile=TRANSITION
+                )
+            )
+
+    def perform(
+        self,
+        *,
+        acknowledgement=None,
+        helper=None,
+        returned_version="0.12",
+        settings=SETTINGS,
+    ):
         """Run the backend with a fake UART/helper while retaining its phase order.
 
         @param acknowledgement Optional parent callback, including injected ACK failure.
         @param helper Optional child mock with timeout or nonzero exit behavior.
         @param returned_version Application version observed after synthetic USB return.
+        @param settings Explicit legacy, public or transition profile.
         @return Recorded phases, progress, UART history and helper spawn for assertions.
         """
         before = Radio("nordic-pca10059")
@@ -206,17 +328,21 @@ class NordicTests(unittest.TestCase):
             patch.object(
                 nordic,
                 "target",
-                side_effect=lambda settings, mode: settings["device_directory"]
+                side_effect=lambda settings, mode, **kwargs: settings[
+                    "device_directory"
+                ]
                 + "/"
                 + mode,
             ),
             patch.object(
                 nordic,
                 "wait_target",
-                side_effect=lambda settings, mode: settings["device_directory"]
+                side_effect=lambda settings, mode, **kwargs: settings[
+                    "device_directory"
+                ]
                 + "/"
                 + mode,
-            ),
+            ) as returned,
             patch("livolod.firmware_update.UpdatePort", side_effect=[before, after]),
             patch.object(nordic.subprocess, "Popen", return_value=child) as spawn,
         ):
@@ -227,7 +353,15 @@ class NordicTests(unittest.TestCase):
                     9,
                     acknowledgement or phases.append,
                     progress,
-                    SETTINGS,
+                    settings,
+                )
+                returned.assert_any_call(
+                    settings,
+                    "application",
+                    expected_serial=settings.get(
+                        "application_serial_after_update",
+                        settings["application_serial"],
+                    ),
                 )
             except BaseException:
                 self.failure_spawn, self.failure_before, self.failure_progress = (
@@ -237,6 +371,10 @@ class NordicTests(unittest.TestCase):
                 )
                 raise
         return phases, progress, before, after, spawn
+
+    def test_transition_worker_requires_new_identity_after_transfer(self):
+        """Migration explicitly binds the return wait to the new application serial."""
+        self.perform(settings=TRANSITION)
 
     def test_fixed_helper_only_after_ack_and_exact_application_return(self):
         """The helper inherits ownership and may transfer only after durable flash ACK."""
@@ -330,6 +468,47 @@ class NordicRestoreTests(unittest.IsolatedAsyncioTestCase):
         self.service.stop.set()
         await asyncio.wait_for(task, 2)
         self.service.gateway_factory.assert_not_called()
+
+    def test_transition_daemon_restore_rejects_old_identity_after_completed_transfer(
+        self,
+    ):
+        """Matching UART versions cannot bypass the migration's exact post-transfer USB identity."""
+        self.service.config = replace(self.config, firmware_nordic=TRANSITION)
+        self.manager.job.update(
+            nordic_profile=dict(TRANSITION), transfer_completed=True
+        )
+        caps = dict(
+            board="nordic-pca10059", proto="3", fw_version=FIRMWARE_COMPAT_VERSION
+        )
+        legacy = dict(
+            usb_path=SETTINGS["usb_path"],
+            serial=LEGACY_SERIAL,
+            vid=0xCAFE,
+            pid=0x4001,
+            major=166,
+            minor=0,
+        )
+        public = dict(legacy, serial=PUBLIC_SERIAL, vid=0x16C0, pid=0x27DD)
+        node = SimpleNamespace(st_mode=stat.S_IFCHR | 0o660, st_rdev=os.makedev(166, 0))
+        with (
+            patch("livolod.nordic_usb.enumerate_usb", return_value=[legacy]) as ports,
+            patch.object(Path, "lstat", return_value=node),
+            patch("os.access", return_value=True),
+            patch("os.statvfs", return_value=SimpleNamespace(f_flag=0)),
+        ):
+            with self.assertRaises(LinkError):
+                self.manager.check_nordic_restore(caps, caps)
+            self.assertTrue(self.manager.busy)
+            ports.return_value = [public]
+            self.manager.check_nordic_restore(caps, caps)
+            with self.assertRaises(LinkError):
+                self.manager.check_nordic_restore(dict(caps, fw_version="0.1"), caps)
+            ports.return_value = [
+                public,
+                dict(legacy, usb_path=legacy["usb_path"] + "-other"),
+            ]
+            with self.assertRaises(LinkError):
+                self.manager.check_nordic_restore(caps, caps)
 
     async def test_replaced_usb_blocks_before_network_or_arm(self):
         """Even a matching version response cannot authorize a different physical device."""

@@ -14,14 +14,20 @@ service changed, GPIO driven, firmware flashed or switch operated by this audit.
 | Board | Observed location and role | Availability for physical tests |
 | --- | --- | --- |
 | Nordic PCA10059 | Standalone Pi `10.1.1.21`, application USB device; standalone daemon running | Requires an agreed bench maintenance window and a person able to operate SW2/unplug it |
-| cod.m CC2652P | `/dev/ttyAMA0` exists on `10.1.1.21` | MCU presence/version/key and GPIO recovery need a fresh exclusive probe; a UART node alone does not prove a working MCU |
+| cod.m CC2652P | Fresh exclusive VERSION/CAPS/update-status probe on `.21` reports application 0.12, bootloader 0.2 and the development key | Application-reported trust is not independent bootloader readback; release-key reprovisioning and physical recovery still need an operator |
 | Sonoff ZBDongle-E | CP210x USB device on sniffer Pi `10.1.1.120`; no capture process found | Previously the independent sniffer; repurposing it removes that reference receiver until another receiver is assigned |
-| ZB-GW04 v1.2 | Last deployment evidence places it on active HA `10.1.1.40` | Not inspected or authorized for disruption; obtain a spare or an explicit maintenance/move plan |
+| ZB-GW04 v1.2 | Fresh HA specialist status places firmware 0.13 on active HA `10.1.1.40` | Owner selected a [maintenance plan](ZBGW04_HA_MAINTENANCE.md); execution is not yet authorized |
 
 The bench Pi has GNU Arm GCC 14.2.1 and the existing pinned SDK trees. Builds
 can run in fresh temporary directories without owning a radio. The local Mac
 has a native C compiler but no ARM cross-compiler or container runtime on PATH.
 The physical operator's availability has not been established.
+
+The initial inventory above was passive. A subsequent
+[TI read-only baseline](verification/ti-readonly-baseline-20261107.json) used
+three documented commands at 460800 with exclusive ownership and restored the
+UART settings. It made no reset, GPIO, service, network or firmware changes.
+Its reported key differs from the new release key; no key migration occurred.
 
 ## Evidence already available
 

@@ -74,11 +74,17 @@ def application_target_status(port_name, serial_number, *, usb_profile=None):
     @param port_name Exact configured application device path, not a DFU path guess.
     @param serial_number Operator-supplied application USB serial (may differ from DFU).
     @param usb_profile Optional explicit topology profile for container-published nodes.
-    @return Unique cafe:4001 identity match; caller must still verify live firmware/session.
+    @return Exact legacy or namespaced identity match; live firmware/session still needs verification.
     """
     if usb_profile:
         return configured_target(port_name, serial_number, usb_profile, "application")
-    return _usb_target(port_name, serial_number, 0xCAFE, 0x4001)
+    from .nordic_usb import application_identity
+
+    try:
+        vid, pid, serial = application_identity(serial_number)
+    except ValueError:
+        return False
+    return _usb_target(port_name, serial, vid, pid)
 
 
 def configured_target(port_name, serial_number, settings, mode):
@@ -93,8 +99,11 @@ def configured_target(port_name, serial_number, settings, mode):
     from .firmware_nordic import target
 
     try:
-        return serial_number == settings[mode + "_serial"] and port_name == target(
-            settings, mode
+        allowed = {settings[mode + "_serial"]}
+        if mode == "application" and "application_serial_after_update" in settings:
+            allowed.add(settings["application_serial_after_update"])
+        return serial_number in allowed and port_name == target(
+            settings, mode, expected_serial=serial_number
         )
     except (BundleError, KeyError, ValueError, OSError):
         return False

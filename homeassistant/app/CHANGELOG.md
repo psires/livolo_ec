@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.0 (unreleased candidate)
+
+- Prepare coordinated all-board firmware delivery, with separate manual-download
+  and automatic-update qualification and exact dependency notices.
+- Candidate daemon 0.15.0 targets radio 0.14; API 1 and UART 3 remain unchanged.
+- Preserve rejected pairing evidence and improve session diagnostics.
+- No deployment or public firmware qualification is established by this version
+  allocation. The published 0.5.0 channel remains the installation baseline.
+
 ## 0.5.0
 
 - Add one-action pairing shared by Web, native HA and the commissioning CLI,

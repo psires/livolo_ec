@@ -415,7 +415,17 @@ class FirmwareManager:
                 raise LinkError(
                     "Nordic update requires explicit recovery before radio restoration"
                 )
-            if target(settings, "application") != self.service.config.serial_port:
+            expected = (
+                settings.get(
+                    "application_serial_after_update", settings["application_serial"]
+                )
+                if automatic
+                else None
+            )
+            if (
+                target(settings, "application", expected_serial=expected)
+                != self.service.config.serial_port
+            ):
                 raise LinkError("Nordic application path changed")
         except (BundleError, ValueError) as error:
             raise LinkError("Configured Nordic USB identity is unavailable") from error

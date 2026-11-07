@@ -204,8 +204,10 @@ tooling. Existing `.local/release-0.13` records remain local-trial evidence and
 cannot pass the public gate. The distributed runtime catalog remains empty.
 The owner selected `livolo.sfires.net` for the shared Nordic serial namespace
 and laptop custody for the dedicated TI release key. The owner also confirmed
-accepting the Gecko SDK licence. Physical tests, identification of the applicable
-MG21 agreement revision and final notice review remain open. See
+accepting the Gecko SDK licence and identified the official agreement link seen
+approximately two weeks earlier. The Tech Lead accepted the scoped MG21 route
+using version 20260804 as the review basis. Exact final notice delivery, channel
+presentation and physical qualification remain open. See
 [distribution decisions](FIRMWARE_DISTRIBUTION.md),
 [qualification plan](FIRMWARE_QUALIFICATION_PLAN.md), and
 [release acceptance](RELEASE_PROCESS.md).

@@ -9,6 +9,7 @@ BUILD = build
 USB_VID ?= 0xcafe
 USB_PID ?= 0x4001
 USB_RELEASE ?= 0
+USB_SHARED_LIVOLO ?= 0
 INCLUDES = . ../gateway $(TUSB)/src $(TUSB)/lib/CMSIS_5/CMSIS/Core/Include \
  $(NRFX) $(NRFX)/mdk $(NRFX)/hal $(NRFX)/drivers/include $(NRFX)/drivers/src \
  $(TUSB)/hw/bsp/nrf $(RADIO) $(RADIO)/fem/none
@@ -16,6 +17,7 @@ CFLAGS = -Os -g3 -std=c11 -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp
  -ffunction-sections -fdata-sections -Wall -Wextra \
  -DNRF52840_XXAA -DEC_PLATFORM_NRF52840 -DEC_UART_BAUD=460800 \
  -DEC_USB_VID=$(USB_VID) -DEC_USB_PID=$(USB_PID) -DEC_USB_RELEASE=$(USB_RELEASE) \
+ -DEC_USB_SHARED_LIVOLO=$(USB_SHARED_LIVOLO) \
  -DEC_AUTO_ACK_PHASE=1 -DEC_ENABLE_SCHEDULER=1 -DEC_SCHED_HZ=1000000 \
  -DNRF_802154_PROJECT_CONFIG=\"radio-config.h\" -DENABLE_FEM=0 \
  -D__START=main -D__STARTUP_CLEAR_BSS -D__STACK_SIZE=8192 -D__HEAP_SIZE=8192 \
@@ -49,10 +51,10 @@ vpath %.c $(sort $(dir $(SOURCES)))
 all: $(BUILD)/ec-nrf52840.hex $(BUILD)/ec-nrf52840.bin
 $(BUILD):
 	mkdir -p $@
-$(BUILD)/.usb-$(USB_VID)-$(USB_PID)-$(USB_RELEASE): | $(BUILD)
+$(BUILD)/.usb-$(USB_VID)-$(USB_PID)-$(USB_RELEASE)-$(USB_SHARED_LIVOLO): | $(BUILD)
 	rm -f $(BUILD)/.usb-*
 	touch $@
-$(OBJECTS): Makefile $(BUILD)/.usb-$(USB_VID)-$(USB_PID)-$(USB_RELEASE)
+$(OBJECTS): Makefile $(BUILD)/.usb-$(USB_VID)-$(USB_PID)-$(USB_RELEASE)-$(USB_SHARED_LIVOLO)
 $(BUILD)/%.o: %.c | $(BUILD)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 $(BUILD)/startup.o: $(NRFX)/mdk/gcc_startup_nrf52840.S | $(BUILD)

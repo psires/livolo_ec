@@ -14,15 +14,16 @@ from .firmware_bundle import BundleError
 from .nordic_usb import profile, usb_identity
 
 
-def target(settings, mode):
+def target(settings, mode, *, expected_serial=None):
     """Match a narrowly published device node to its current sysfs identity.
 
     @param settings Validated operator profile, including the mounted device directory.
     @param mode Application or factory DFU mode.
+    @param expected_serial Optional exact serial required after transfer or during recovery.
     @return Exact device node path after checking mode, topology, serial and device number.
     """
     try:
-        record = usb_identity(settings, mode)
+        record = usb_identity(settings, mode, expected_serial=expected_serial)
     except ValueError as error:
         raise BundleError(
             "usb_identity_unavailable",
@@ -47,18 +48,19 @@ def target(settings, mode):
     return str(path)
 
 
-def wait_target(settings, mode, timeout=20):
+def wait_target(settings, mode, timeout=20, *, expected_serial=None):
     """Wait boundedly for only the configured board to enter the requested USB mode.
 
     @param settings Validated operator profile.
     @param mode Expected USB mode.
     @param timeout Maximum handoff duration in seconds.
+    @param expected_serial Optional exact post-transfer identity, without legacy fallback.
     @return Verified device node path; never a substitute serial port.
     """
     deadline = time.monotonic() + timeout
     while True:
         try:
-            return target(settings, mode)
+            return target(settings, mode, expected_serial=expected_serial)
         except BundleError:
             if time.monotonic() >= deadline:
                 raise
@@ -174,7 +176,10 @@ def install(candidate, port_name, lock_fd, before, progress, settings):
             raise BundleError(
                 "flash_failed", "Nordic transfer failed; explicit recovery is required"
             )
-        wait_target(settings, "application")
+        returned_serial = settings.get(
+            "application_serial_after_update", settings["application_serial"]
+        )
+        wait_target(settings, "application", expected_serial=returned_serial)
         # Check the exact target before allowing the parent to begin network restoration.
         port = UpdatePort(port_name, candidate["app_baudrate"])
         try:

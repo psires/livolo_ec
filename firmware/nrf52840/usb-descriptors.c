@@ -47,24 +47,27 @@ const uint8_t *tud_descriptor_configuration_cb(uint8_t index)
 
 /** @brief Encode USB strings, including a stable hardware-derived serial.
  * @param index String descriptor index.
- * @param langid Requested language, ignored for these ASCII labels.
+ * @param langid Requested language; nonzero strings require English/US.
  * @return Borrowed UTF-16 descriptor valid until the next callback.
  */
 const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 {
 	static uint16_t buffer[64];
-	char serial[17];
+	char serial[sizeof(EC_USB_SERIAL_PREFIX) + 16];
 	const char *text;
 	unsigned length;
-	(void)langid;
 	if (index == 0) {
 		buffer[0] = (TUSB_DESC_STRING << 8) | 4;
 		buffer[1] = 0x0409;
 		return buffer;
 	}
-	snprintf(serial, sizeof(serial), "%08lx%08lx",
+	if (langid != 0x0409)
+		return NULL;
+	int written = snprintf(serial, sizeof(serial), EC_USB_SERIAL_PREFIX "%08lx%08lx",
 		 (unsigned long)NRF_FICR->DEVICEID[1],
 		 (unsigned long)NRF_FICR->DEVICEID[0]);
+	if (written < 0 || (size_t)written >= sizeof(serial))
+		return NULL;
 	switch (index) {
 	case 1:
 		text = "Livolo local gateway";
@@ -82,6 +85,8 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 		return NULL;
 	}
 	length = strlen(text);
+	if (length >= sizeof(buffer) / sizeof(buffer[0]) || length > 126)
+		return NULL;
 	for (unsigned i = 0; i < length; i++)
 		buffer[i + 1] = text[i];
 	buffer[0] = (TUSB_DESC_STRING << 8) | (2 * length + 2);

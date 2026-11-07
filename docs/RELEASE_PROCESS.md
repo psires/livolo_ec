@@ -93,12 +93,13 @@ requirements separately for each board.
   fixes, minor for compatible features and major for breaking distribution/API
   changes; record migration requirements explicitly, including during 0.x.
 - Preserve the numeric `major.minor` radio compatibility domain
-  in root `VERSION`. It is currently `0.13`, while the recorded software
-  distribution is `0.5.0`. API and UART revisions are separate identifiers.
+  in root `VERSION`. The next candidate allocates `0.14`, while its software
+  distribution is `0.6.0`. Published 0.5.0 retains compatibility 0.13.
+  API and UART revisions are separate identifiers.
 - Allocate independent, monotonically increasing `major.minor.patch` daemon
-  package versions for changed software. Development daemon `0.14.0` retains
-  explicit firmware compatibility `0.13`; coordinated distribution versions
-  remain unchanged until release preparation. Do not publish different daemon
+  package versions for changed software. Candidate daemon `0.15.0` targets
+  firmware `0.14`; coordinated distribution/client/HA versions are `0.6.0`.
+  These allocations do not publish or qualify the candidate. Do not publish different daemon
   wheels or radio bytes under an existing identity. Firmware admission and TI
   trial confirmation compare against the explicit compatibility target, never
   the daemon package number. A compatibility bump still requires matched firmware

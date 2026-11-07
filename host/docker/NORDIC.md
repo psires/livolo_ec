@@ -16,8 +16,13 @@ Python packages do not install this extra runtime automatically.
 
 ## Protected host publisher
 
-Record the exact application (`cafe:4001`) and factory DFU (`1915:521f`) serials
-and physical USB sysfs parent. These serials may differ. Use `udevadm info
+Record the exact application and factory DFU (`1915:521f`) serials and physical
+USB sysfs parent. Legacy applications use `cafe:4001` with an unprefixed serial.
+Public applications use `16c0:27dd` with the exact serial
+`livolo.sfires.net:<16 lowercase hexadecimal characters>`. The suffix is the
+unchanged hardware identity, FICR DEVICEID[1] followed by DEVICEID[0]. A shared
+VID/PID alone never identifies a board. Factory DFU has its own separately
+configured serial; it is never derived from the application serial. Use `udevadm info
 --attribute-walk --name=/dev/serial/by-id/EXACT_ID` to identify the USB ancestor
 containing `idVendor`, `idProduct` and `serial`, not its interface or tty child.
 An unplugged, duplicated or moved board must fail closed. Do not guess the first
@@ -38,6 +43,42 @@ does not require a host daemon installation. Create root-owned mode 0600
   "helper_python": "/opt/nrfutil/bin/python3.10"
 }
 ```
+
+Set `application_serial` to the exact serial for the currently installed identity
+scheme. Existing legacy profiles remain legacy-only; setting a namespaced serial
+selects only `16c0:27dd`. Foreign namespaces and malformed public serials are
+rejected. The same explicit profile must be used by the host publisher and daemon.
+
+### Explicit legacy-to-public migration
+
+Only use a transition profile with a reviewed firmware artifact whose qualified
+USB descriptors use the new identity. A version number or profile setting alone
+does not prove that an artifact changes the descriptors. Before installing that
+artifact, add this field to both profiles, preserving the observed hardware suffix:
+
+```json
+{
+  "application_serial": "0123456789abcdef",
+  "application_serial_after_update": "livolo.sfires.net:0123456789abcdef"
+}
+```
+
+These are the two application fields of the complete profile above, not a
+standalone configuration. The optional field is valid only with an exact
+16-character lowercase hexadecimal legacy serial and the identical suffix in
+the new serial. The publisher and preflight can recognize either explicitly
+configured identity at the same physical USB parent, but reject simultaneous or
+duplicated identities, even on another port. After transfer, both the worker and
+daemon require the new identity before restoration; an old-only return is a
+failure requiring explicit recovery. The firmware version and normal restoration
+checks still apply. This is not an implicit rollback path.
+
+Once migration is verified, set `application_serial` to the full new serial and
+remove `application_serial_after_update` from both profiles while the daemon is
+stopped. This removes the transitional legacy allowance. Do not rewrite either
+serial or the physical USB path automatically. The publisher script must be
+upgraded alongside the daemon to understand these profiles; the tty udev rule
+below works for both identity schemes.
 
 Create `/etc/tmpfiles.d/livolod-usb.conf`:
 
@@ -109,6 +150,8 @@ mounts and ownership locks. Explicit recovery requires all of:
 Use `--check-only` first. A successful manual transfer returns exit 2 and
 `manual_verification_required`. Separately run `recover --application-serial
 EXACT_APPLICATION_SERIAL` with the same config to verify identity and restore
-the network; only then restart the normal container. No automatic retry or
+the network; supply the full new serial for a public application. In a transition
+profile, the supplied serial must match the identity actually present, not merely
+either configured alternative. Only then restart the normal container. No automatic retry or
 same-version banner can clear an incomplete transfer. The earlier command ledger
 is retained when an explicit retry supersedes an interrupted Nordic job.

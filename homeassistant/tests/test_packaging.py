@@ -21,7 +21,7 @@ spec.loader.exec_module(app)
 
 
 def test_release_bundles_client_and_license(tmp_path):
-    """Release archives retain the client dependency and redistribution license.
+    """Candidate archives retain the client/license and cannot masquerade as a release.
 
     @param tmp_path Isolated output directory for the existing release builder.
     """
@@ -30,6 +30,7 @@ def test_release_bundles_client_and_license(tmp_path):
             sys.executable,
             str(ROOT / "homeassistant/build_release.py"),
             "--app",
+            "--candidate",
             "--output",
             str(tmp_path),
         ],
@@ -46,6 +47,7 @@ def test_release_bundles_client_and_license(tmp_path):
             == (ROOT / "client/livolo_ec_client/__init__.py").read_bytes()
         )
     context = tmp_path / "ha-addons/livolo_ec"
+    assert (context / "CANDIDATE-NOT-FOR-RELEASE.txt").is_file()
     with zipfile.ZipFile(archive) as bundle:
         for name in ("button.py", "commissioning.py"):
             assert (

@@ -34,6 +34,13 @@ establish radio qualification.
 
 ## MG21: resolve the actual header grant
 
+The owner confirmed accepting the Gecko SDK license and identified the official
+MSLA link seen approximately two weeks before 2026-11-07. Combined with the
+published version 20260804 and current SDK references, this is a reasonable
+release-review basis for the scoped route below. The approximate date is not
+an exact acceptance timestamp or an archived contract receipt; see the
+[provenance findings](verification/mg21-license-provenance-20261107.md).
+
 The pinned Gecko SDK's [license](https://github.com/SiliconLabs/gecko_sdk/blob/59d2160fe448b13730a91c0f019a8b4c53c43eb2/License.txt)
 expressly gives the RAIL release archive a Zlib exception. That exception does
 not cover `application_properties.h` or `btl_reset_info.h`. Both application
@@ -56,20 +63,20 @@ licensed substitute has been verified. Do not replace their notices with BSD,
 claim a clean-room implementation after inspecting their source, or infer
 permission from the small size of the interface.
 
-First review a concrete packaging route under the existing grant: separate
+The reviewed packaging route under the existing grant uses separate
 MG21 binary terms and the applicable agreement in every download/image,
 release-page notice before download, and a visible container license/notice
 location. Limit those terms to the affected vendor portions, preserving the
 project's BSD license and other dependencies' grants. Treat GitHub/GHCR/HA
 delivery as project distribution channels; do not promise unrestricted mirrors
-of the restricted payload. The license holder must review whether the proposed
-delivery provides effective downstream terms. Merely retaining copyrights does
-not establish that. This is a viable closure route, not a conclusion that it
-has already passed review.
+of the restricted payload. The Release Engineer must verify the complete notice
+bundle and channel presentation in the final assets; retaining copyrights alone
+does not implement this route. This closes the route/notice decision, not the
+remaining artifact, packaging or hardware qualification checks.
 
-The [review-only binary notice and channel proposal](MG21_BINARY_TERMS_DRAFT.md)
-provides concrete wording and lists the acquisition facts needed for that
-decision. It is not effective release licensing.
+The finalized [binary terms and channel requirements](MG21_BINARY_TERMS.md)
+provide the scoped wording. No further acceptance or receipt is requested from
+the owner on the evidence now supplied.
 
 If that review cannot resolve channel coverage or the project wants unrestricted
 downstream redistribution, the owner/license holder can submit this prepared
@@ -119,19 +126,21 @@ prefix followed by a colon, continued control of that namespace, and matching
 that prefix as well as VID/PID. The class driver must be used. This is a shared
 identity, not an exclusive allocation to Livolo EC.
 
-This is the recommended implementable route if the owner accepts the namespace
-responsibility. No domain/email has been selected or ownership assumed. Do not
-publish a guessed identifier. After that decision:
+The owner selected `livolo.sfires.net` on 2026-11-07. The selected application
+serial is `livolo.sfires.net:` followed by the unchanged 16-hex-digit hardware
+identity. That decision resolves the namespace choice, not the implementation
+or physical migration tests below:
 
 1. Define the application serial as `<controlled-namespace>:<device-id>`,
    retaining the stable hardware-derived device ID and English/US descriptor.
 2. Update firmware descriptors and host identity/profile handling together.
-   The current Nordic host helpers hardcode `cafe:4001`; changing firmware
-   alone would strand reconnection and recovery. Treat the new application
+   Firmware and host changes have now passed offline review and tests; their
+   final artifact and physical migration qualification remain pending. Treat the new application
    identity, legacy development identity and factory DFU `1915:521f` as
-   distinct modes with explicit transition rules. Update profile validation
-   too: the current application-serial parser accepts only 16 hexadecimal
-   characters, not the proposed colon-prefixed namespace format.
+   distinct modes with explicit transition rules. The optional same-suffix
+   `application_serial_after_update` profile admits a deliberate legacy-to-new
+   transition and requires the new identity after transfer. Existing profiles
+   remain legacy-only; see [the host migration instructions](../host/docker/NORDIC.md).
 3. Require the correct namespace and exact expected serial/topology for an
    update. Shared VID/PID alone never identifies the intended radio. Preserve
    explicit mappings to the separate factory-DFU serial. Reject unrelated
@@ -153,10 +162,12 @@ in that inspected set. Exact runtime/archive notices still belong with the
 final binaries. The remaining release trust decision is separate from licensing.
 
 Use a dedicated release Ed25519 identity, separate from the existing test key.
-The owner must designate the signing custodian and protected backup location
-before generating it. The Release Engineer coordinates signing of frozen,
-reviewed image hashes. No private key belongs in Git, a build artifact, a
-container, a radio or a general CI log/cache.
+The owner selected custody on their laptop on 2026-11-07. The Release Engineer
+created the separate release identity there and recorded its
+[public trust material](../firmware/release-keys/README.md). The additional local
+recovery copy is not an off-device backup. The Release Engineer coordinates
+signing of frozen, reviewed image hashes. No private key belongs in Git, a build
+artifact, a container, a radio or a general CI log/cache.
 
 The existing `tools/firmware_package.py keygen` produces a raw 32-byte public
 key, its build header and a private PEM, and reports the public key's SHA-256.

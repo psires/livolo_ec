@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "observed_date": "2026-11-07",
+  "target": "10.1.1.21",
+  "port": "/dev/ttyAMA0",
+  "scope": "Exclusive read-only identity commands; no reset, GPIO, network mutation, service stop or flash",
+  "prior_port_owners": [],
+  "baud_basis": "analysis/development/ti-012-20261101.md and subsequent Nordic handover record",
+  "baud": 460800,
+  "commands": ["VERSION", "CAPS", "UPDATE_STATUS"],
+  "all_matching_replies_ok": true,
+  "reported_board": "codm-cc2652p",
+  "reported_application_version": "0.12",
+  "reported_bootloader_version": "0.2",
+  "reported_protocol": "3",
+  "reported_update": "uart_signed_v1",
+  "reported_update_state": "fffffff0",
+  "receiving": false,
+  "trial": false,
+  "application_reported_public_key_sha256": "75b78d9ff67bd1cae26cc2c949d33c9fac0d469faffad56082c7a569a1fab93a",
+  "reported_current_and_candidate_sha512": "dbbe9b822ee0e867a35651dcd8e3199104b4081a21870567a4b0ec56692d4c5b6186ad67c54d601b6df801d3f55c076eb0ac4bed2f06bfd74b33701627917e77",
+  "limitations": [
+    "Identity and metadata were reported by the running application, not independently read from bootloader flash",
+    "The new release trust key is not installed; no trust migration was attempted",
+    "Initial attempt aborted before commands because tty settings differed; subsequent probe explicitly selected the bench-documented application rate"
+  ],
+  "termios_restored": true,
+  "port_closed": true,
+  "active_nordic_service_unchanged": true,
+  "ha_accessed_or_modified": false
+}

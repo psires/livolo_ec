@@ -103,22 +103,33 @@ is not implemented here: `update=none` remains accurate. Factory open DFU accept
 unsigned application packages, so authenticating update artifacts is a host or
 deployment responsibility.
 
-USB uses TinyUSB's development VID/PID `cafe:4001`, a project label and a stable
-FICR-derived serial. Obtain an appropriate VID/PID allocation before distributing
-a product. The bootloader's serial string may differ; select each mode explicitly.
-Build inputs `USB_VID`, `USB_PID` and `USB_RELEASE` select the application
-identity. Developer defaults preserve the existing descriptor bytes. A release
-build must set `USB_RELEASE=1` and explicit permitted IDs; compilation rejects
-the development vendor ID, invalid numeric values and the factory DFU identity.
-Changing these inputs rebuilds the objects even in a reused build directory.
+Developer builds retain TinyUSB's `cafe:4001` and the unprefixed, stable 16-digit
+lowercase hexadecimal serial: FICR `DEVICEID[1]`, then `DEVICEID[0]`, each padded
+to eight digits. The owner-approved shared CDC identity uses `16c0:27dd` and
+the exact serial `livolo.sfires.net:<same 16-digit suffix>`. Both expose ASCII
+strings in English/US (`0x0409`). The factory DFU identity remains unchanged and
+must be identified separately.
 
-These checks do not establish a right to use a USB identifier. The shared
-`16c0:27dd` CDC identity is also rejected until its required owner-qualified
-serial namespace is implemented and approved. Do not substitute an invented ID.
-Changing the application identity also requires a coordinated host USB-profile
-migration: current host discovery explicitly expects `cafe:4001`. The factory
-DFU identity must remain unchanged. No allocated release identity is selected by
-this source change.
+Select the shared identity explicitly:
+
+```sh
+make -C firmware/nrf52840 USB_RELEASE=1 USB_VID=0x16c0 USB_PID=0x27dd USB_SHARED_LIVOLO=1
+```
+
+The shared pair without `USB_SHARED_LIVOLO=1`, or that flag with a different
+pair, fails compilation. The prefix is fixed in source and cannot be supplied
+as an arbitrary build string. Release mode also rejects the development vendor
+ID, invalid numbers and factory DFU impersonation. All four identity inputs
+invalidate existing objects when reusing a build directory. These guards do not
+constitute an exclusive USB allocation; the shared grant and continued namespace
+ownership requirements are recorded in [distribution review](../../docs/FIRMWARE_DISTRIBUTION.md).
+
+Migration from a legacy application requires an explicitly configured host
+transition profile and the matching reviewed artifact. The host must bind the
+same hardware suffix and physical USB path, reject ambiguous matches, and require
+the new serial after transfer. Merely matching the shared VID/PID is insufficient.
+Existing legacy profiles remain legacy-only. This source change does not bump a
+release version, publish an image, or qualify a live identity transition.
 The port boots unconfigured/disarmed. Never run this adapter and another gateway
 with the same network identity armed together during qualification.
 

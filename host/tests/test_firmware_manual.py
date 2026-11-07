@@ -102,6 +102,44 @@ class ManualFirmwareTests(unittest.TestCase):
                     self.assertIn("-I", call.args[0])
                     self.assertNotIn("--port", call.args[0])
 
+    def test_namespaced_application_matches_exact_serial_pair_and_selected_path(self):
+        """Shared IDs alone, a foreign namespace or a duplicated board never authorizes recovery."""
+        serial = "livolo.sfires.net:0123456789abcdef"
+        app = usb(serial=serial, vid=0x16C0, pid=0x27DD)
+        for entries, expected in (
+            ([app], True),
+            (
+                [
+                    app,
+                    usb(device="/dev/ttyACM1", serial=serial, vid=0x16C0, pid=0x27DD),
+                ],
+                False,
+            ),
+            ([usb(serial=serial, vid=0xCAFE, pid=0x4001)], False),
+            (
+                [usb(serial="other.example:0123456789abcdef", vid=0x16C0, pid=0x27DD)],
+                False,
+            ),
+            ([usb(serial="0123456789abcdef", vid=0x16C0, pid=0x27DD)], False),
+            (
+                [usb(device="/dev/ttyACM1", serial=serial, vid=0x16C0, pid=0x27DD)],
+                False,
+            ),
+        ):
+            with (
+                self.subTest(entries=entries),
+                patch("serial.tools.list_ports.comports", return_value=entries),
+            ):
+                self.assertEqual(
+                    application_target_status("/dev/ttyACM0", serial), expected
+                )
+                self.assertFalse(
+                    application_target_status(
+                        "/dev/ttyACM0", "other.example:0123456789abcdef"
+                    )
+                )
+                self.assertFalse(_target("/dev/ttyACM0", serial))
+
     def test_status_is_sanitized_and_wrong_operations_never_probe(self):
         """Public checks expose reasons rather than local paths or helper exceptions."""
         args = dict(
