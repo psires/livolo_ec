@@ -9,10 +9,12 @@ import logging
 import os
 import re
 import secrets
+import sqlite3
 import time
 import uuid
 
 from .config import Device, hex_value, identity, integer, mqtt_config
+from .commissioning import Commissioning
 from .device_profile import pairing_profile
 from .homeassistant import discovery_messages
 from .protocol import decode, frame, heartbeat, key_values, rx_envelope
@@ -130,7 +132,9 @@ class Service:
         self.started = time.monotonic()
         self.change_listeners = set()
         self.command_inflight = None
+        self.peer_capacity = 0
         self.firmware_manager = FirmwareManager(self)
+        self.commissioning = Commissioning(self)
 
     def start_firmware_update(self, payload):
         """Start an explicitly selected update through the shared durable manager.
@@ -315,11 +319,20 @@ class Service:
             if previous:
                 self.publish("bridge/result", previous)
                 return previous
-            if self.firmware_manager.busy and action != "snapshot":
+            if self.firmware_manager.busy and action not in (
+                "snapshot",
+                "commission_cancel",
+            ):
                 raise ValueError("Firmware maintenance blocks conflicting commands")
             values = self.validate_action(action, request)
             self.store.begin(request_id, recorded)
             self.notify_changed()
+            if action == "commission_cancel":
+                return self.commissioning.cancel(request_id, values["session_id"])
+            if action == "commission":
+                return self.commissioning.start(request_id, values["seconds"])
+            if self.commissioning.active and action != "snapshot":
+                return self.result(request_id, "rejected", error="commissioning_active")
             if action in ("add", "rename", "remove"):
                 return self.manage_registry(request_id, action, values)
             if action == "snapshot":
@@ -395,6 +408,8 @@ class Service:
             "results": self.store.recent_results(),
             "mqtt": self.mqtt_summary(),
             "firmware_update": self.firmware_update_snapshot(),
+            "commissioning_supported": True,
+            "commissioning": self.commissioning.snapshot(),
         }
 
     api_snapshot = web_snapshot
@@ -660,6 +675,20 @@ class Service:
         @return Validated operation-specific fields.
         """
         request = dict(request)
+        if action == "commission":
+            if set(request) - {"request_id", "seconds"}:
+                raise ValueError("Unknown commissioning fields")
+            return {"seconds": integer(request.get("seconds", 120), 10, 120, "seconds")}
+        if action == "commission_cancel":
+            session_id = request.get("session_id")
+            if (
+                set(request) - {"request_id", "session_id"}
+                or not isinstance(session_id, str)
+                or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", session_id)
+                or session_id == request.get("request_id")
+            ):
+                raise ValueError("Cancellation requires a distinct valid session_id")
+            return {"session_id": session_id}
         if action == "set":
             if self.config.output_mode == "disabled":
                 raise ValueError(
@@ -833,6 +862,7 @@ class Service:
             raise LinkError("Adapter baud does not match serial_baudrate")
         if not capable:
             raise LinkError("Adapter capabilities do not meet daemon requirements")
+        self.peer_capacity = min(256, int(caps["peers"]))
         if self.config.output_mode == "experimental_phase":
             self.phase_client = PhaseClient(
                 self.gateway,
@@ -922,6 +952,7 @@ class Service:
                 (json.dumps(firmware),),
             )
         self.ready = True
+        self.commissioning.restored()
         self.firmware_manager.restored(caps, update)
         self.last_rx = None
         self.snapshot()
@@ -960,7 +991,14 @@ class Service:
             return await self._transmit(raw)
 
     async def _transmit(
-        self, raw, *, reference_setup=False, still_needed=None, phase_query=False
+        self,
+        raw,
+        *,
+        reference_setup=False,
+        still_needed=None,
+        phase_query=False,
+        before_send=None,
+        after_send=None,
     ):
         """Submit a frame with bounded retries only for definite channel-busy non-sends.
 
@@ -968,6 +1006,8 @@ class Service:
         @param reference_setup Whether a heartbeat may establish the reference during restore.
         @param still_needed Optional predicate checked before each radio attempt.
         @param phase_query Use guarded query phase stamping instead of raw SEND.
+        @param before_send Optional callback immediately before each actual UART send.
+        @param after_send Optional callback receiving successful TX or definite non-send.
         @return True after submission, or False if busy or no longer needed.
         """
         # CCA busy is a definite non-send. Other TX failures have uncertain RF outcome.
@@ -977,13 +1017,21 @@ class Service:
             if not self.ready and not (reference_setup and raw[21:23] == b"\x8c\x08"):
                 raise LinkError("Radio session is being reconciled")
             try:
+                if before_send:
+                    before_send()
                 if phase_query:
                     if self.phase_reference_missing:
                         return False
                     metadata = await self.phase_client.query(raw)
                     self.diagnostics["query_phase_tx"] = dict(metadata)
                 else:
-                    await self.gateway.command(f"SEND {self.session} {raw.hex()}")
+                    reply = await self.gateway.command(
+                        f"SEND {self.session} {raw.hex()}"
+                    )
+                    if after_send and reply != "OK TX 0":
+                        raise LinkError("Admission transmission was not confirmed")
+                if after_send:
+                    after_send(True)
                 return True
             except CommandError as error:
                 if phase_query and str(error) == "ERR PHASE_REFERENCE":
@@ -998,6 +1046,8 @@ class Service:
                         )
                 if not busy:
                     raise LinkError(str(error)) from error
+                if after_send:
+                    after_send(False)
                 if attempt < 3:
                     await asyncio.sleep(0.025 * (attempt + 1))
         return False
@@ -1144,18 +1194,40 @@ class Service:
             if self.schedule and self.schedule[0][0] <= now:
                 _, opcode, data = heapq.heappop(self.schedule)
                 if self.pairing:
+                    pair = self.pairing
                     device = self.devices[self.pairing["device"]]
-                    await self.transmit(
-                        frame(
-                            self.config.gateway,
-                            self.config.tag,
-                            device.id,
-                            device.suffix,
-                            self.next_sequence(),
-                            opcode,
-                            data,
-                        )
+                    raw = frame(
+                        self.config.gateway,
+                        self.config.tag,
+                        device.id,
+                        device.suffix,
+                        self.next_sequence(),
+                        opcode,
+                        data,
                     )
+                    async with self.radio_lock:
+                        # Cancellation/expiry can occur while acquiring the lock
+                        # or during CCA retry sleeps. Never send a closed window.
+                        def current_pair():
+                            """Keep retries bound to the still-open original window."""
+                            return (
+                                self.pairing is pair
+                                and time.monotonic() < pair["deadline"]
+                            )
+
+                        if not current_pair():
+                            continue
+                        admission = pair.get("commissioning") and opcode == 0xFA
+                        await self._transmit(
+                            raw,
+                            still_needed=current_pair,
+                            before_send=(
+                                self.commissioning.begin_transmit if admission else None
+                            ),
+                            after_send=(
+                                self.commissioning.end_transmit if admission else None
+                            ),
+                        )
             self.publish_availability()
             await asyncio.sleep(0.05)
 
@@ -1198,6 +1270,7 @@ class Service:
             return
         if not retained:
             self.observe_discovery(packet, received, rssi, lqi)
+            self.commissioning.observe(packet, received)
         device = self.devices.get(packet.source)
         if (
             not device
@@ -1207,7 +1280,8 @@ class Service:
             or packet.destination not in (self.config.gateway, "ffffffff")
         ):
             return
-        self.handle_pairing(received, device, packet)
+        if not retained:
+            self.handle_pairing(received, device, packet)
         if packet.tag != self.config.tag:
             return
         self.seen[device.id] = received
@@ -1294,6 +1368,10 @@ class Service:
             or not pair["started"] <= received < pair["deadline"]
         ):
             return
+        if pair.get("commissioning"):
+            self.commissioning.report(packet, received)
+            if self.pairing is not pair or packet.tag != "ff":
+                return
         if packet.tag == self.config.tag:
             self.finish_pairing("confirmed")
         elif (
@@ -1320,6 +1398,13 @@ class Service:
         @param error Optional explanation of failure or cancellation.
         """
         if self.pairing:
+            if self.pairing.get("commissioning"):
+                self.commissioning.finish(
+                    "expired" if status == "timeout" else status,
+                    "confirmation_timeout" if status == "timeout" else error,
+                )
+                self.snapshot()
+                return
             values = {"device": self.pairing["device"]}
             if error:
                 values["error"] = error
@@ -1887,11 +1972,21 @@ class Service:
     async def run(self):
         """Run catalog observation independently of radio reconnects and maintenance."""
         catalog = asyncio.create_task(self.firmware_manager.watch_catalog())
+        commissioning = asyncio.create_task(self.commissioning.watch())
+        radio = asyncio.create_task(self._run_radio())
         try:
-            await self._run_radio()
+            done, _ = await asyncio.wait(
+                (radio, commissioning), return_when=asyncio.FIRST_COMPLETED
+            )
+            for task in done:
+                task.result()
         finally:
+            self.stop.set()
             catalog.cancel()
-            await asyncio.gather(catalog, return_exceptions=True)
+            commissioning.cancel()
+            radio.cancel()
+            await asyncio.gather(catalog, commissioning, radio, return_exceptions=True)
+            self.commissioning.finish("unknown", "daemon_stopped")
 
     async def _run_radio(self):
         """Keep the gateway reconciled across failures until shutdown is requested."""
@@ -1904,6 +1999,7 @@ class Service:
             firmware_task = None
             guard = None
             handoff = False
+            expected_reconfigure = False
             try:
                 self.reconfigure.clear()
                 guard = radio_guard(self.config.database)
@@ -1930,6 +2026,13 @@ class Service:
                     if task is self.gateway.fault:
                         raise task.result()
                     task.result()
+                expected_reconfigure = (
+                    reconfigure_task in done
+                    and not self.stop.is_set()
+                    and firmware_task not in done
+                    and not any(task in done for task in tasks)
+                    and self.gateway.fault not in done
+                )
             except (OSError, LinkError, CommandError, ValueError) as error:
                 LOG.warning("Radio unavailable: %s; reconnecting", error)
             except asyncio.CancelledError:
@@ -1941,17 +2044,26 @@ class Service:
                 for task in tasks + waiters:
                     task.cancel()
                 await asyncio.gather(*tasks, *waiters, return_exceptions=True)
-                self.finish_pairing("unknown", "radio session ended")
-                while not self.commands.empty():
-                    _, _, request_id, _, _ = self.commands.get_nowait()
-                    self.result(
-                        request_id,
-                        "rejected",
-                        error="radio session ended before execution",
-                    )
-                self.seen.clear()
-                self.state_received.clear()
-                self.snapshot()
+                try:
+                    self.commissioning.radio_ended(expected_reconfigure)
+                    self.finish_pairing("unknown", "radio session ended")
+                    while not self.commands.empty():
+                        _, _, request_id, _, _ = self.commands.get_nowait()
+                        self.result(
+                            request_id,
+                            "rejected",
+                            error="radio session ended before execution",
+                        )
+                    self.seen.clear()
+                    self.state_received.clear()
+                    self.snapshot()
+                except (OSError, sqlite3.Error):
+                    # A failed journal must never skip disarming/closing the
+                    # adapter or leave an owner task running without a timer.
+                    self.stop.set()
+                    self.pairing = None
+                    self.schedule.clear()
+                    LOG.exception("Could not persist radio session shutdown")
                 try:
                     if self.gateway:
                         verified = False

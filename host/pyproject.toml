@@ -21,6 +21,7 @@ flash = ["cryptography>=46.0.3,<47", "universal-silabs-flasher==0.0.31"]
 livolod = "livolod.__main__:main"
 livolod-firmware = "livolod.firmware_update:main"
 livolod-firmware-manage = "livolod.firmware_cli:main"
+livolod-commission = "livolod.commission_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["livolod*"]

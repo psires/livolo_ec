@@ -39,6 +39,7 @@ let snapshot = null,
   filter = 'all',
   selectedId = null,
   refreshPromise = null;
+const commissionUi = { pending: null, storageKey: null, posting: false, local: null, error: '' };
 const addUi = { selection: null, manual: null };
 const busyDevices = new Set();
 const watched = new Map();
@@ -216,6 +217,7 @@ async function refresh() {
       showError('#connection-error', '');
       for (const result of [...snapshot.results].reverse()) observeResult(result);
       await reconcileFirmwareRequest();
+      await reconcileCommissioning();
       render();
       return true;
     } catch (error) {
@@ -268,6 +270,8 @@ function observeResult(result) {
 async function command(action, fields) {
   if (!connected || !snapshot) throw new Error('Connect to the gateway before making changes.');
   if (firmwareBusy()) throw new Error('Device changes are paused for firmware maintenance.');
+  if (commissioningActive(snapshot.commissioning))
+    throw new Error('Device changes are paused while pairing a new switch.');
   const payload = { ...fields, request_id: requestId() };
   const local = {
     request_id: payload.request_id,
@@ -330,11 +334,22 @@ function render() {
     : 'Firmware maintenance is in progress. Device changes are temporarily unavailable.';
   $('#refresh-label').textContent = connected ? 'Updates automatically' : 'Connection interrupted';
   $('#simulation').hidden = !snapshot?.simulated;
-  $('#add-device').disabled = !connected || maintenance || $('#add-form').dataset.busy === 'true';
+  $('#add-device').disabled =
+    !connected ||
+    maintenance ||
+    commissioningActive(snapshot?.commissioning) ||
+    Boolean(commissionUi.pending) ||
+    $('#add-form').dataset.busy === 'true';
+  renderCommissioning();
   for (const id of ['#add-form', '#rename-form', '#forget-form']) {
     const form = $(id);
     $$('input,select,button[type="submit"]', form).forEach(
-      (control) => (control.disabled = !connected || maintenance || form.dataset.busy === 'true'),
+      (control) =>
+        (control.disabled =
+          !connected ||
+          maintenance ||
+          commissioningActive(snapshot?.commissioning) ||
+          form.dataset.busy === 'true'),
     );
   }
   if (!snapshot) {
@@ -374,6 +389,7 @@ function renderDevices() {
       const disabled =
         controlsDisabled ||
         firmwareBusy() ||
+        commissioningActive(snapshot.commissioning) ||
         !connected ||
         !snapshot.ready ||
         !online ||
@@ -419,7 +435,7 @@ function renderDevices() {
     const empty = !snapshot.devices.length;
     $('#empty-state h2').textContent = empty ? 'Your home starts here' : 'No matching devices';
     $('#empty-state p').textContent = empty
-      ? 'Add your first Livolo switch to give it a name and connect it to your gateway.'
+      ? 'Pair your first Livolo switch to connect it to your gateway.'
       : 'Try another name, device ID, or status filter.';
   }
   $('#list-summary').textContent =
@@ -430,7 +446,7 @@ function renderDevices() {
  */
 function renderPairing() {
   const pair = snapshot.pairing;
-  $('#pairing-banner').hidden = !pair;
+  $('#pairing-banner').hidden = !pair || commissioningActive(snapshot.commissioning);
   if (!pair) return;
   const seconds = Math.max(0, pair.seconds_remaining || 0);
   $('#pairing-title').textContent =
@@ -439,6 +455,411 @@ function renderPairing() {
     'Put this switch into pairing mode using its documented procedure. A device report confirms success.';
   $('#stop-pairing').disabled = !connected || !snapshot.ready || firmwareBusy();
 }
+/**
+ * Identify daemon-owned commissioning phases, including expected radio reconciliation.
+ * @param {Object|null} session - Snapshot or durable commissioning result.
+ * @returns {boolean} Whether the bounded session still owns admission.
+ */
+function commissioningActive(session) {
+  return ['listening', 'registering', 'pairing'].includes(session?.status);
+}
+
+/**
+ * Persist only unresolved request identities; never replay a start after reload.
+ * @param {Object|null} intent - Start/cancel operation with request and session identities.
+ */
+function rememberCommissioning(intent) {
+  commissionUi.pending = intent;
+  try {
+    if (intent) sessionStorage.setItem(commissionUi.storageKey, JSON.stringify(intent));
+    else sessionStorage.removeItem(commissionUi.storageKey);
+  } catch {
+    // The daemon snapshot still exposes accepted sessions when browser storage is unavailable.
+  }
+}
+
+/**
+ * Apply a result to its original operation; cancellation confirmation is never pairing success.
+ * @param {Object} intent - Original operation and target session identity.
+ * @param {Object} result - Durable command envelope returned by the daemon.
+ */
+function acceptCommissioningResult(intent, result) {
+  if (!result || result.request_id !== intent.request_id)
+    throw new Error('Pairing request ID mismatch.');
+  observeResult(result);
+  const current = snapshot?.commissioning;
+  const matching = current?.session_id === intent.session_id;
+  if (intent.operation === 'cancel') {
+    if (result.status === 'confirmed') {
+      commissionUi.local =
+        matching && !commissioningActive(current)
+          ? null
+          : {
+              ...(matching ? current : commissionUi.local),
+              session_id: intent.session_id,
+              status: 'cancelled',
+              error: null,
+            };
+      rememberCommissioning(null);
+      commissionUi.error = '';
+    } else if (['rejected', 'failed', 'unknown'].includes(result.status)) {
+      commissionUi.error =
+        result.error || 'Cancellation was not confirmed. Check the session or cancel again.';
+      rememberCommissioning({
+        operation: 'start',
+        request_id: intent.session_id,
+        session_id: intent.session_id,
+      });
+    }
+    return;
+  }
+  if (
+    ['confirmed', 'expired', 'cancelled', 'conflict', 'failed', 'unknown', 'rejected'].includes(
+      result.status,
+    )
+  ) {
+    commissionUi.local = matching
+      ? null
+      : {
+          ...result,
+          session_id: intent.session_id,
+          status: result.status === 'rejected' ? 'failed' : result.status,
+        };
+    rememberCommissioning(null);
+    commissionUi.error = result.error || '';
+  }
+}
+
+/** Resolve uncertain requests by snapshot or GET while preserving their original identity. */
+async function reconcileCommissioning() {
+  const key = 'livolo-commission:' + apiUrl('/') + ':' + snapshot?.gateway + ':' + snapshot?.tag;
+  if (commissionUi.storageKey !== key) {
+    commissionUi.storageKey = key;
+    commissionUi.pending = null;
+    commissionUi.local = null;
+    commissionUi.error = '';
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(key) || 'null');
+      if (
+        saved &&
+        ['start', 'cancel'].includes(saved.operation) &&
+        [saved.request_id, saved.session_id].every(
+          (id) => typeof id === 'string' && /^[A-Za-z0-9_.:-]{1,128}$/.test(id),
+        )
+      )
+        commissionUi.pending = saved;
+    } catch {
+      // Invalid browser storage must not create or replay any daemon operation.
+    }
+  }
+  const intent = commissionUi.pending;
+  if (!intent || commissionUi.posting) return;
+  const current = snapshot?.commissioning;
+  if (
+    current?.session_id === intent.session_id &&
+    (intent.operation === 'start' || !commissioningActive(current))
+  ) {
+    commissionUi.local = null;
+    commissionUi.error = '';
+    rememberCommissioning(null);
+    return;
+  }
+  try {
+    const result = await api('/api/commands/' + encodeURIComponent(intent.request_id));
+    if (commissionUi.pending !== intent) return;
+    acceptCommissioningResult(intent, result);
+  } catch {
+    commissionUi.error =
+      'The request outcome is not confirmed. Checking the same request; cancel to close this attempt safely.';
+  }
+}
+
+/**
+ * Choose authoritative session data without mistaking an older session for a newly submitted one.
+ * @returns {Object|null} Visible session or an unresolved local request placeholder.
+ */
+function displayedCommissioning() {
+  const current = snapshot?.commissioning;
+  const intent = commissionUi.pending;
+  if (intent && current?.session_id !== intent.session_id)
+    return { ...(commissionUi.local || {}), session_id: intent.session_id, status: 'unknown' };
+  if (!intent && commissioningActive(current)) return current;
+  if (commissionUi.local && current?.session_id !== commissionUi.local.session_id)
+    return commissionUi.local;
+  return current || commissionUi.local;
+}
+
+/**
+ * Explain stable session and observation reasons in ordinary pairing language.
+ * @param {string|null} reason - Public daemon reason or local transport explanation.
+ * @returns {string} User-visible explanation without internal operation names.
+ */
+function commissioningReason(reason) {
+  const messages = {
+    unknown_pairing_suffix:
+      'This switch type is not supported by automatic pairing. Use advanced setup.',
+    unknown_pairing_payload: 'The switch’s pairing message is not recognized. Use advanced setup.',
+    unsupported_device_seen:
+      'Only unsupported switch profiles were heard. Use advanced setup with the known device settings.',
+    known_pairing_signature: 'Supported switch detected.',
+    multiple_devices:
+      'Multiple switches requested pairing. Activate only the intended switch and try again.',
+    conflicting_pairing_profiles:
+      'Conflicting switch profiles were heard. Use advanced setup or try with only one switch in pairing mode.',
+    discovery_timeout: 'No supported new switch was detected before the window closed.',
+    confirmation_timeout:
+      'The device was registered, but a fresh report did not confirm pairing before the window closed.',
+    daemon_restarted:
+      'The gateway restarted during pairing. The session was not resumed automatically.',
+    radio_session_ended: 'The radio disconnected unexpectedly. Pairing could not be confirmed.',
+    registry_full: 'The device registry is full. Free a slot before trying again.',
+    registry_error: 'The gateway could not save the device. Check gateway storage.',
+    radio_busy: 'The radio is busy. Wait for its current operation to finish.',
+    commissioning_active: 'Another pairing session is already running.',
+    not_a_session: 'This request does not identify a pairing session.',
+  };
+  return messages[reason] || reason || '';
+}
+
+/** Render listening, detected profile and terminal outcomes without optimistic pairing success. */
+function renderCommissioning() {
+  const session = displayedCommissioning();
+  const active = commissioningActive(session);
+  const unresolved = Boolean(commissionUi.pending);
+  const viewable = active || unresolved || commissionUi.posting;
+  const primary = $('#pair-new-device');
+  primary.textContent = viewable ? 'View pairing' : 'Pair new device';
+  primary.disabled =
+    !viewable &&
+    (!connected ||
+      !snapshot?.ready ||
+      firmwareBusy() ||
+      snapshot?.commissioning_supported !== true ||
+      Boolean(snapshot?.pairing));
+  primary.title =
+    snapshot?.commissioning_supported === true
+      ? ''
+      : 'Update the daemon for automatic pairing; advanced setup remains available.';
+  const stages = {
+    listening: [
+      'Listening',
+      'Activate pairing on your switch',
+      'The gateway is listening for one supported switch. Keep only the intended switch in pairing mode. Device changes pause until this session ends.',
+    ],
+    registering: [
+      'Setting up',
+      'Switch detected',
+      'Saving the detected profile and preparing the targeted pairing exchange. Registration alone does not confirm pairing.',
+    ],
+    pairing: [
+      'Pairing',
+      'Connecting your switch',
+      'Waiting for a fresh device report to confirm pairing. Keep the switch in its documented pairing mode.',
+    ],
+    confirmed: [
+      'Paired',
+      'Device paired successfully',
+      'A fresh device report confirmed pairing. You can now give the switch a friendly name.',
+    ],
+    expired: [
+      'Expired',
+      'Pairing window expired',
+      'No confirmed pairing completed within this session. Activate pairing on the switch and try again when ready.',
+    ],
+    cancelled: [
+      'Cancelled',
+      'Pairing session closed',
+      'Automatic admission has stopped. Cancellation does not reset or unpair a physical switch.',
+    ],
+    conflict: [
+      'Conflict',
+      'More than one candidate or conflicting reports',
+      'Put only one supported switch into pairing mode, then start a new session. Advanced setup remains available.',
+    ],
+    failed: [
+      'Failed',
+      'Pairing did not complete',
+      'Check the switch and gateway, then try again. No successful pairing was confirmed.',
+    ],
+    unknown: [
+      'Unknown',
+      'Pairing outcome is unknown',
+      'The gateway cannot confirm the outcome. Check the switch before attempting another pairing.',
+    ],
+  };
+  let detail = stages[session?.status] || [
+    'Ready',
+    'Pair a new switch',
+    'Start a bounded session, then activate the switch’s documented pairing mode.',
+  ];
+  if (commissionUi.posting)
+    detail =
+      commissionUi.pending?.operation === 'cancel'
+        ? [
+            'Cancelling',
+            'Closing the pairing session…',
+            'Waiting for the gateway to confirm cancellation.',
+          ]
+        : [
+            'Starting',
+            'Opening a 2-minute pairing window…',
+            'Activate pairing on the intended switch using its documented procedure.',
+          ];
+  else if (unresolved)
+    detail = [
+      'Checking',
+      'Checking the pairing request',
+      'The request outcome is not confirmed. Do not start another session; cancel to close this attempt.',
+    ];
+  if (!connected && (session || viewable))
+    detail = [
+      'Disconnected',
+      'Connection interrupted',
+      'The last reported outcome may be out of date. Reconnect to check this session; no start request will be replayed.',
+    ];
+  $('#pair-session-status').textContent = detail[0];
+  $('#pair-session-status').className =
+    'badge' + (connected && !viewable && session?.status === 'confirmed' ? ' online' : '');
+  $('#pair-session-stage').textContent = detail[1];
+  $('#pair-session-description').textContent =
+    detail[2] +
+    (connected && !viewable && session?.registered && session.status !== 'confirmed'
+      ? ' The device remains registered. Open its device details to retry targeted pairing; it has not been removed.'
+      : '');
+  const seconds = session?.seconds_remaining;
+  $('#pair-session-time').textContent =
+    connected && active && Number.isFinite(seconds)
+      ? Math.max(0, Math.ceil(seconds)) > 0
+        ? `${Math.ceil(seconds)} seconds remaining`
+        : 'Window ending; waiting for the gateway’s final result.'
+      : '';
+  const rows = session?.device
+    ? [
+        [
+          'Detected type',
+          [1, 2].includes(session.outputs)
+            ? `Livolo EC ${session.outputs}-gang switch`
+            : 'Livolo EC switch',
+        ],
+        ['Device ID', session.device],
+        ['Outputs', session.outputs ?? 'Unknown'],
+        ['Name', session.name || deviceName(session.device)],
+      ]
+    : [];
+  $('#pair-session-device').hidden = !rows.length;
+  $('#pair-session-device').innerHTML = rows
+    .map(([label, value]) => `<dt>${label}</dt><dd>${escapeHTML(value)}</dd>`)
+    .join('');
+  const observations = Array.isArray(session?.observations) ? session.observations.slice(-8) : [];
+  $('#pair-session-observations').hidden = !observations.length;
+  $('#pair-session-observations').innerHTML =
+    '<strong>Heard during this session</strong><ul>' +
+    observations
+      .map(
+        (item) =>
+          `<li><span>${escapeHTML(item.device)}</span><small>${escapeHTML(commissioningReason(item.reason))}</small></li>`,
+      )
+      .join('') +
+    '</ul>';
+  showError('#pair-session-error', commissioningReason(commissionUi.error || session?.error));
+  $('#pair-session-background').hidden = !viewable;
+  $('#pair-session-cancel').hidden = !viewable;
+  $('#pair-session-cancel').disabled = !connected || commissionUi.posting;
+  $('#pair-session-cancel').textContent = unresolved ? 'Close this attempt' : 'Cancel pairing';
+  const manageable = session?.registered && deviceById(session.device);
+  $('#pair-session-name').hidden = !manageable || active || unresolved;
+  $('#pair-session-name').disabled = !connected || firmwareBusy();
+  $('#pair-session-name').textContent =
+    session?.status === 'confirmed' ? 'Name this device' : 'Manage registered device';
+  $('#pair-session-banner').hidden = !session && !viewable;
+  $('#pair-session-banner-title').textContent = detail[1];
+  $('#pair-session-banner-description').textContent = session?.device
+    ? `Device ${session.device} · ${detail[0]}`
+    : detail[2];
+}
+
+/**
+ * Submit one start or targeted cancellation and let snapshots own the session lifecycle.
+ * @param {'start'|'cancel'} operation - Explicit user action; never an automatic retry.
+ * @returns {Promise<void>} Completion of the submission and immediate status refresh.
+ */
+async function submitCommissioning(operation) {
+  if (!connected || commissionUi.posting) return;
+  const current = displayedCommissioning();
+  if (
+    operation === 'start' &&
+    (!snapshot?.ready ||
+      firmwareBusy() ||
+      snapshot?.commissioning_supported !== true ||
+      commissioningActive(current) ||
+      commissionUi.pending ||
+      snapshot.pairing)
+  )
+    return;
+  const sessionId =
+    operation === 'start' ? requestId() : commissionUi.pending?.session_id || current?.session_id;
+  if (!sessionId) return;
+  const intent = {
+    operation,
+    request_id: operation === 'start' ? sessionId : requestId(),
+    session_id: sessionId,
+  };
+  if (operation === 'start') commissionUi.local = { session_id: sessionId, status: 'unknown' };
+  commissionUi.error = '';
+  rememberCommissioning(intent);
+  commissionUi.posting = true;
+  render();
+  try {
+    const payload =
+      operation === 'start'
+        ? { request_id: intent.request_id, seconds: 120 }
+        : { request_id: intent.request_id, session_id: sessionId };
+    const result = await api(operation === 'start' ? '/api/commission' : '/api/commission_cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Livolo-Token': snapshot.csrf_token },
+      body: JSON.stringify(payload),
+    });
+    acceptCommissioningResult(intent, result);
+  } catch {
+    commissionUi.error =
+      'The request outcome is not confirmed. Checking the same request; cancel to close this attempt safely.';
+  } finally {
+    commissionUi.posting = false;
+    await refresh();
+    render();
+  }
+}
+
+/** Start one deliberate bounded session, or reopen a currently running/uncertain session. */
+$('#pair-new-device').addEventListener('click', async () => {
+  openDialog('#pair-session-dialog');
+  if (!commissionUi.storageKey) await reconcileCommissioning();
+  if (commissioningActive(displayedCommissioning()) || commissionUi.pending) {
+    renderCommissioning();
+    return;
+  }
+  await submitCommissioning('start');
+});
+/** Reopen authoritative session results without starting a new pairing window. */
+$('#pair-session-view').addEventListener('click', () => {
+  openDialog('#pair-session-dialog');
+  renderCommissioning();
+});
+/** Cancel only the displayed or unresolved target, leaving other sessions untouched. */
+$('#pair-session-cancel').addEventListener('click', () => submitCommissioning('cancel'));
+/** Reuse normal naming and targeted pairing controls after the automatic session finishes. */
+$('#pair-session-name').addEventListener('click', () => {
+  const session = displayedCommissioning();
+  const device = deviceById(session?.device);
+  if (!device || commissioningActive(session) || commissionUi.pending) return;
+  selectedId = device.id;
+  $('#device-name').value = device.name;
+  showError('#device-error', '');
+  $('#pair-session-dialog').close();
+  renderDeviceDetails();
+  openDialog('#device-dialog');
+});
+
 /**
  * Show recent command outcomes from the browser and daemon activity history.
  */
@@ -453,6 +874,8 @@ function renderActivity() {
     remove: 'Forget device',
     set: 'Set output',
     pair: 'Pair device',
+    commission: 'Pair new device',
+    commission_cancel: 'Cancel pairing session',
     snapshot: 'Refresh state',
     firmware_update: 'Firmware update',
   };
@@ -528,8 +951,16 @@ function renderDeviceDetails() {
   $('#device-details').innerHTML = rows
     .map(([key, value]) => `<div><span>${key}</span><strong>${escapeHTML(value)}</strong></div>`)
     .join('');
-  const busy = $('#rename-form').dataset.busy === 'true' || firmwareBusy();
-  $('#pair-device').disabled = busy || !connected || !snapshot.ready || Boolean(snapshot.pairing);
+  const busy =
+    $('#rename-form').dataset.busy === 'true' ||
+    firmwareBusy() ||
+    commissioningActive(snapshot?.commissioning);
+  $('#pair-device').disabled =
+    busy ||
+    !connected ||
+    !snapshot.ready ||
+    Boolean(snapshot.pairing) ||
+    commissioningActive(snapshot.commissioning);
   $('#forget-device').disabled = busy || !connected || busyDevices.has(d.id);
 }
 /** Return whether the user explicitly selected experimental device setup. */
@@ -589,7 +1020,11 @@ function reviewedDetection() {
 /** Keep manual fields editable and experimental fields bound to the reviewed discovery. */
 function renderAddSetup() {
   const auto = autoSetup();
-  const blocked = !connected || firmwareBusy() || $('#add-form').dataset.busy === 'true';
+  const blocked =
+    !connected ||
+    firmwareBusy() ||
+    commissioningActive(snapshot?.commissioning) ||
+    $('#add-form').dataset.busy === 'true';
   $('#add-dialog').classList.toggle('auto-setup', auto);
   $('#device-fields').hidden = auto;
   $('#auto-help').hidden = !auto;
@@ -619,7 +1054,11 @@ function renderAddSetup() {
 function renderDiscoveries() {
   const auto = autoSetup();
   const candidates = snapshot.discoveries.filter((c) => !c.configured && !deviceById(c.device));
-  const blocked = !connected || firmwareBusy() || $('#add-form').dataset.busy === 'true';
+  const blocked =
+    !connected ||
+    firmwareBusy() ||
+    commissioningActive(snapshot?.commissioning) ||
+    $('#add-form').dataset.busy === 'true';
   const markup = candidates.length
     ? '<strong>Nearby devices requesting pairing</strong>' +
       candidates
@@ -1036,7 +1475,10 @@ function renderMqtt() {
     : 'Transport: plain MQTT. TLS certificates can be configured on the gateway.';
   $('#mqtt-topic-help').textContent =
     'Example state topic: ' + (settings?.base_topic || 'livolo') + '/<device-id>/state';
-  const busy = $('#mqtt-form').dataset.busy === 'true' || firmwareBusy();
+  const busy =
+    $('#mqtt-form').dataset.busy === 'true' ||
+    firmwareBusy() ||
+    commissioningActive(snapshot?.commissioning);
   $$('input,select,button', $('#mqtt-form')).forEach(
     (el) => (el.disabled = busy || !connected || !settings?.editable),
   );
@@ -1069,6 +1511,10 @@ $('#mqtt-form').addEventListener('submit', (event) => {
   event.preventDefault();
   if (firmwareBusy()) {
     showError('#mqtt-error', 'Settings changes are paused for firmware maintenance.');
+    return;
+  }
+  if (commissioningActive(snapshot?.commissioning)) {
+    showError('#mqtt-error', 'Settings changes are paused while pairing a new switch.');
     return;
   }
   const fields = {
@@ -1156,6 +1602,8 @@ function firmwareBlockedReason() {
   if (!firmware) return 'This daemon does not provide firmware installation through the web UI.';
   if (firmware.recovery) return 'Firmware recovery is required before device changes can resume.';
   if (firmwareBusy()) return 'An update is in progress or its outcome is being checked.';
+  if (commissioningActive(snapshot?.commissioning))
+    return 'Finish or cancel pairing before updating firmware.';
   if (firmware.preflight_supported !== true)
     return 'Update the daemon to enable firmware preflight and installation.';
   if (firmware.blocked_reason) {
@@ -1286,6 +1734,8 @@ function firmwarePreflightKey() {
     snapshot?.gateway,
     snapshot?.tag,
     snapshot?.session,
+    snapshot?.commissioning?.session_id,
+    snapshot?.commissioning?.status,
     ...[
       'board',
       'candidate_id',

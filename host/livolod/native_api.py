@@ -15,7 +15,16 @@ from aiohttp import web
 from . import __version__
 
 API_VERSION = 1
-ACTIONS = {"set", "refresh", "add", "rename", "remove", "pair"}
+ACTIONS = {
+    "set",
+    "refresh",
+    "add",
+    "rename",
+    "remove",
+    "pair",
+    "commission",
+    "commission_cancel",
+}
 MAX_BODY = 4096
 FIRMWARE_FIELDS = {
     "preflight_supported",
@@ -130,6 +139,8 @@ def native_snapshot(service):
         "candidate_id",
         "stage",
         "recovery",
+        "session_id",
+        "registered",
     }
     results = [
         {k: v for k, v in result.items() if k in result_fields}
@@ -172,6 +183,10 @@ def native_snapshot(service):
         discoveries=discoveries,
         results=results,
     )
+    commissioning = getattr(service, "commissioning", None)
+    if commissioning is not None:
+        data["commissioning_supported"] = True
+        data["commissioning"] = commissioning.snapshot()
     firmware_snapshot = getattr(service, "firmware_update_snapshot", None)
     firmware = firmware_snapshot() if firmware_snapshot else None
     if isinstance(firmware, dict):

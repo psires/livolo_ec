@@ -1,0 +1,120 @@
+{
+  "schema": 1,
+  "scope": "Exact captured excerpts for offline protocol tests; not executable firmware or proof of automatic commissioning qualification.",
+  "gateway": "2a992b12",
+  "tag": "a7",
+  "captures": {
+    "onegang": {
+      "path": "captured/development/onegang-pairing-20261101-nrf52840.pcapng",
+      "sha256": "73ffbb0254ba3068571d297e4076eb16a1bfe8b98bd6e4b07b156633cfbd7a84",
+      "physical_outputs": 1,
+      "device": "66780945",
+      "observation": "User described fresh out of box; one physical button verified after join."
+    },
+    "original_two_gang": {
+      "path": "captured/ec_device_pairing_sequence.pcapng",
+      "physical_outputs": 2,
+      "device": "46715621",
+      "observation": "Physically verified two-gang layout; not proof of factory-fresh commissioning."
+    }
+  },
+  "packets": [
+    {
+      "label": "unregistered_state_to_ec",
+      "capture": "onegang",
+      "frame": 1667,
+      "relative_seconds": -5.60227,
+      "raw_hex": "0188229bf4ea38667809450000000000000000ff009e0566780945000101000101000002008225"
+    },
+    {
+      "label": "one_request",
+      "capture": "onegang",
+      "frame": 1691,
+      "relative_seconds": 0.0,
+      "raw_hex": "018825ffffffff667809450000000000000000ff009e01667809450001000101053401040014ad"
+    },
+    {
+      "label": "one_request_repeat",
+      "capture": "onegang",
+      "frame": 1694,
+      "relative_seconds": 0.598604,
+      "raw_hex": "018827ffffffff667809450000000000000000ff009e01667809450001000101053401040014ad"
+    },
+    {
+      "label": "relayed_request",
+      "capture": "onegang",
+      "frame": 1696,
+      "relative_seconds": 1.004005,
+      "raw_hex": "0188282a992b12467156216678094500000000a7009e01667809450001000101053401040014ad"
+    },
+    {
+      "label": "one_request_latest",
+      "capture": "onegang",
+      "frame": 2119,
+      "relative_seconds": 49.594415,
+      "raw_hex": "0188e1ffffffff667809450000000000000000ff039e016678094500010001010534012e00fd80"
+    },
+    {
+      "label": "admission_ack",
+      "capture": "onegang",
+      "frame": 2123,
+      "relative_seconds": 49.642062,
+      "raw_hex": "018828667809452a992b120000000066780945a71e8cfa667809450001010001010534012e1e000000"
+    },
+    {
+      "label": "admission_ack_repeat",
+      "capture": "onegang",
+      "frame": 2124,
+      "relative_seconds": 49.891717,
+      "raw_hex": "01882a667809452a992b120000000066780945a71e8cfa667809450001010001010534012e1e000000"
+    },
+    {
+      "label": "query_10",
+      "capture": "onegang",
+      "frame": 2125,
+      "relative_seconds": 50.049714,
+      "raw_hex": "01882b667809452a992b120000000066780945a71e8c106678094500010000000000000001ca000000"
+    },
+    {
+      "label": "query_ac",
+      "capture": "onegang",
+      "frame": 2127,
+      "relative_seconds": 50.208254,
+      "raw_hex": "01882c667809452a992b120000000066780945a71e8cac667809450001000000000000000166000000"
+    },
+    {
+      "label": "tag_adopted_old_destination",
+      "capture": "onegang",
+      "frame": 2132,
+      "relative_seconds": 50.453718,
+      "raw_hex": "0188e49bf4ea38667809450000000000000000a7109e0566780945000101000101000004002883"
+    },
+    {
+      "label": "local_state",
+      "capture": "onegang",
+      "frame": 2143,
+      "relative_seconds": 51.859245,
+      "raw_hex": "0188ea2a992b12667809450000000000000000a7109e0566780945000101000101000005001bb2"
+    },
+    {
+      "label": "local_state_ack",
+      "capture": "onegang",
+      "frame": 2144,
+      "relative_seconds": 51.861106,
+      "raw_hex": "0188ea667809452a992b120000000000000000a70e8cfa6678094500010501000101000005c071fe07"
+    },
+    {
+      "label": "local_property",
+      "capture": "onegang",
+      "frame": 2160,
+      "relative_seconds": 53.657598,
+      "raw_hex": "0188f02a992b12667809450000000000000000a7009e156678094500010124020000000200072e"
+    },
+    {
+      "label": "two_request",
+      "capture": "original_two_gang",
+      "frame": 136,
+      "raw_hex": "01880effffffff467156210000000000000000ff009e014671562100020002030534010400ffc6"
+    }
+  ]
+}

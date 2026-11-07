@@ -176,3 +176,69 @@ browser `web.py` and `static/` files owned by Web Specialist. Web Specialist
 owns ingress configuration validation in a separate helper and will coordinate
 any necessary config hook with Unix Specialist. HA Specialist owns
 `custom_components/`, `client/`, `homeassistant/`, and this contract.
+
+## Bounded automatic commissioning
+
+Snapshots advertise `commissioning_supported: true` and `commissioning`, which
+is null before the first session. Legacy daemons omit these fields; clients must
+not infer support from their own version. Submit through the existing command
+endpoint:
+
+```json
+{"action":"commission","payload":{"request_id":"pair-1","seconds":120}}
+```
+
+`seconds` is an integer from 10 through 120, default 120. No device ID or profile
+override is accepted. The start request ID is the session ID. Acceptance returns
+`status: "listening"`, not success. Duplicate requests retrieve the durable result
+without extending the window. Web equivalents are CSRF-protected
+`POST /api/commission` and `/api/commission_cancel` with the payload alone.
+
+The snapshot session contains `session_id`, `status`, `seconds_remaining`,
+`device`, `name`, `outputs`, `suffix`, `profile`, `registered`, `error`, and
+`observations`. Device/profile fields are null until a supported candidate is
+selected. `observations` contains at most eight fresh device observations with
+`device`, `outputs`, `suffix`, `profile` and `reason`; unknown signatures explain
+unsupported devices without registering them. Names default to `Livolo <ID>`;
+existing rename and advanced targeted pairing remain available after the session.
+
+Active statuses are `listening`, `registering`, `pairing`. Terminal statuses are
+`confirmed`, `expired`, `cancelled`, `conflict`, `failed`, `unknown`. The latest
+session persists across reloads/restarts; a process restart converts an active
+session to `unknown` and does not resume it. The full original command result is
+available through `GET /api/v1/commands/{request_id}` and includes `session_id`,
+`device`, `registered`, and `error`. Snapshot metadata remains authoritative.
+
+Only supported unregistered native announcements received after explicit start
+in the owned radio session are eligible. A one-second collection period rejects
+multiple eligible identities or conflicting signatures for the same identity.
+Cached discoveries and retained query reports cannot enroll devices. One session
+can add one device. Registration allocates a free radio-supported slot, preserves
+existing identities/state and briefly reconciles the disarmed peer table. The
+session survives only this intentional reconciliation; unexpected radio loss
+ends it as `unknown`. The total deadline includes setup and never extends.
+
+`registered: true` only means the registry was persisted. `confirmed` requires a
+checksum-valid native state report from the selected ID and profile, addressed
+to this gateway with its tag and valid output mask, after successful admission
+transmission in the current session. A foreign-gateway/broadcast report, generic
+UART acceptance, CCA non-send, or registry entry cannot establish success.
+
+```json
+{"action":"commission_cancel","payload":{"request_id":"close-1","session_id":"pair-1"}}
+```
+
+Cancellation requires a distinct request ID and targets exactly one session.
+Its command result `confirmed` means the window is closed, not that the device
+paired. Already terminal sessions retain their actual outcome. Cancelling an
+unseen session ID records a tombstone so a delayed start cannot reopen it; it
+never cancels a different current session. Cancellation/expiry stops remaining
+scheduled admissions but cannot undo RF already transmitted. A registered but
+unconfirmed device is retained for explicit advanced pairing retry; no physical
+unpairing or restoration of an old gateway is claimed.
+
+After a lost start reply, read the snapshot and original command ID; never replay
+with a new ID automatically. A missing command is not success. Explicitly cancel
+the uncertain session before offering another start. Firmware installation,
+targeted pairing and registry/control commands are blocked while commissioning
+owns the radio policy; snapshot and targeted cancellation remain available.

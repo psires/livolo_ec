@@ -1614,3 +1614,16 @@ dialog::backdrop {
 .check-unknown { color:var(--muted); }
 
 .preflight-checks li span:first-child { flex:0 0 36%; }
+
+.setup-actions { display:flex; gap:10px; flex-wrap:wrap; }
+.pair-session-progress { padding:16px; border:1px solid var(--border); border-radius:10px; }
+.pair-session-progress h3 { margin:12px 0 8px; font-size:18px; }
+.pair-session-progress p { font-size:13px; line-height:1.65; }
+#pair-session-device { padding:0 4px; }
+#pair-session-error { overflow-wrap:anywhere; }
+@media(max-width:600px) { .setup-actions { width:100%; } .setup-actions .button { flex:1; } }
+
+.session-observations { margin:16px 0; font-size:12px; line-height:1.6; }
+.session-observations ul { list-style:none; padding:0; margin:8px 0; }
+.session-observations li { border-top:1px solid var(--border); padding:8px 0; }
+.session-observations small { display:block; color:var(--muted); font-size:12px; }

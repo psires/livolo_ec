@@ -54,6 +54,26 @@ class NativeConfigurationTests(unittest.TestCase):
 
 
 class NativeAPITests(unittest.IsolatedAsyncioTestCase):
+    async def test_commissioning_start_cancel_and_reload_snapshot(self):
+        """Native clients observe one durable session without replaying enrollment."""
+        self.service.ready = True
+        self.service.session = "api-test"
+        result = await self.command("commission", request_id="native-window")
+        self.assertEqual(result["status"], "listening")
+        status, snapshot = await self.get("/api/v1/snapshot")
+        self.assertIs(snapshot["data"]["commissioning_supported"], True)
+        self.assertEqual(
+            snapshot["data"]["commissioning"]["session_id"], "native-window"
+        )
+        result = await self.command(
+            "commission_cancel", request_id="native-cancel", session_id="native-window"
+        )
+        self.assertEqual(result["status"], "confirmed")
+        _, result = await self.get("/api/v1/commands/native-window")
+        self.assertEqual(result["status"], "cancelled")
+        result = await self.command("commission", request_id="native-window")
+        self.assertEqual(result["status"], "cancelled")
+
     async def test_firmware_preflight_is_read_only_and_accepts_only_candidate_id(self):
         """Preflight uses normal bearer authentication without starting a firmware job."""
         changes = self.store.db.total_changes

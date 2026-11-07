@@ -242,6 +242,8 @@ class FirmwareManager:
             or not service.commands.empty()
             or service.pending
             or service.pairing
+            or getattr(service, "commissioning", None)
+            and service.commissioning.active
             or service.reconfigure.is_set()
             or service.radio_lock.locked()
             or service.mqtt_lock.locked()
@@ -481,6 +483,8 @@ class FirmwareManager:
                 or not self.service.commands.empty()
                 or self.service.pending
                 or self.service.pairing
+                or getattr(self.service, "commissioning", None)
+                and self.service.commissioning.active
                 or self.service.reconfigure.is_set()
                 or self.service.radio_lock.locked()
                 or self.service.mqtt_lock.locked()

@@ -18,6 +18,33 @@ from livolod.web import WebServer
 
 
 class WebTests(unittest.IsolatedAsyncioTestCase):
+    async def test_commission_routes_require_csrf_and_share_durable_session(self):
+        """Exercise real direct Web routes, cancellation and command lookup end to end."""
+        _, _, state = await self.http()
+        self.assertIs(state["commissioning_supported"], True)
+        headers = {
+            "Content-Type": "application/json",
+            "X-Livolo-Token": state["csrf_token"],
+        }
+        body = json.dumps({"request_id": "web-window", "seconds": 120})
+        self.assertEqual((await self.http("POST", "/api/commission", body))[0], 403)
+        code, _, result = await self.http("POST", "/api/commission", body, headers)
+        self.assertEqual((code, result["status"]), (200, "listening"))
+        self.assertEqual(result["session_id"], "web-window")
+        code, _, stored = await self.http(path="/api/commands/web-window")
+        self.assertEqual((code, stored["status"]), (200, "listening"))
+        cancel = json.dumps({"request_id": "web-cancel", "session_id": "web-window"})
+        code, _, result = await self.http(
+            "POST", "/api/commission_cancel", cancel, headers
+        )
+        self.assertEqual((code, result["status"]), (200, "confirmed"))
+        _, _, state = await self.http()
+        self.assertEqual(state["commissioning"]["status"], "cancelled")
+        self.assertEqual(
+            (await self.http("POST", "/api/commission", body, headers))[2]["status"],
+            "cancelled",
+        )
+
     async def asyncSetUp(self):
         """Prepare isolated state and asynchronous collaborators for the next test."""
         self.temp = tempfile.TemporaryDirectory()

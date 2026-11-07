@@ -1,10 +1,13 @@
 # Experimental switch profile detection
 
-The optional automatic add flow recognizes the pairing layouts of the tested
-one-gang and two-gang EC switches. It proposes an output configuration from
-observed traffic; it does not perform a standard Zigbee endpoint interview or
-identify every Livolo model. The original manual output-count/suffix flow
-remains available and is required for unknown or conflicting evidence.
+The bounded automatic commissioning flow recognizes the pairing layouts of the
+tested one-gang and two-gang EC switches. An explicit **Pair new device** action
+opens a host-owned observation/admission window; putting the intended switch
+into physical pairing mode supplies the evidence. The daemon selects its output
+configuration from that evidence and verifies local communication after admission.
+This is not a standard Zigbee endpoint interview or a universal Livolo model
+decoder. The manual output-count/suffix flow remains available for unknown or
+conflicting evidence. See [the pairing guide](PAIRING.md) for user instructions.
 
 ## Evidence and matching rule
 
@@ -38,8 +41,11 @@ The raw captures inspected for this change contain:
 
 The first capture is in `captured/`; the latter two are development evidence
 under `captured/development/` and may not be included in a source distribution.
-The unit tests embed four short, exact CRC-valid frames from these captures,
-including early and later requests from each tested switch. They require no
+The profile tests embed four short, exact CRC-valid frames from these captures,
+including early and later requests from each tested switch. The portable
+[`commissioning_capture.json`](../host/tests/fixtures/commissioning_capture.json)
+fixture additionally preserves admission ACKs, relayed requests, old-destination
+reports and the first locally addressed state report. These tests require no
 radio or development capture files.
 
 The [protocol investigation](../analysis/protocol.md#one-gang-discovery-and-binding-on-sonoff-011-2026-11-01)
@@ -82,9 +88,19 @@ aggregation and validates the selected observation again when adding a device:
   an unknown signature alongside a known one. Do not let a later known packet
   silently overwrite the conflict. A new cohort can begin after the freshness
   gap.
-- Bind the user's selection to a server-issued profile token. At submission,
-  derive outputs and suffix from fresh, unambiguous server evidence; do not
-  trust a client-supplied count. A stale or changed token requires reselection.
+- In the manual reviewed-selection path, bind the selection to a server-issued
+  profile token. At submission derive outputs and suffix from fresh,
+  unambiguous server evidence; do not trust a client-supplied count. A stale or
+  changed token requires reselection.
+- In the bounded commissioning path, accept only evidence received after the
+  explicit window opened. A one-second initial settling interval detects
+  competing eligible IDs or conflicting signatures and stops instead of choosing
+  an arbitrary first frame. Latch one eligible unregistered identity atomically;
+  subsequent devices must not replace that target or become extra registrations.
+  Never select a device by strongest RSSI. Known devices and repeated requests
+  must not allocate duplicate slots or entities. Repetition must not extend the
+  window's overall deadline, and conflicting evidence must not be silently
+  overwritten by another familiar request.
 
 The aggregation signature includes suffix, payload bytes 0–5 and byte 7. It
 excludes byte 6 so routine counter changes do not create false conflicts.
@@ -92,21 +108,67 @@ Unknown and ambiguous outcomes must remain visible with a manual fallback.
 
 ## Pairing procedure and limits
 
-Put only the intended new switch into its physical pairing mode, with original
-EC gateway pairing disabled. In the add dialog, choose **Auto-detect · Experimental**
-first, then select the switch's observed ID. Changing modes clears the current
-selection so the profile is reviewed again. If no fresh
-known profile is available, use the existing manual process rather than
-assuming two outputs or using a stale advertisement.
+Open **Pair new device**, then put only the intended new switch into physical
+pairing mode, with original EC gateway pairing disabled. The window is bounded
+to 120 seconds by default and at most 120 seconds, and handles one supported
+device. Previously cached discovery
+alone cannot start admission. The pure classifier never sends anything; the
+explicit host commissioning transaction owns registration, peer configuration,
+the bounded admission sequence and its final result.
 
-After registration, use the existing targeted pairing window and admission
-sequence. Automatic profile selection changes no radio timing, retry limits,
-ACK rules or handshake packets. Verify the actual button count and state
-reporting after joining. The original one-gang capture showed reports initially
-routed toward the original EC gateway even after tag adoption, so temporary
-routing/control problems are not by themselves evidence of a gang mismatch.
+Firmware 0.13 / UART protocol 3 already provides the required transport and
+volatile peer table. `PEER SET` is allowed only while disarmed: adding a peer
+requires a guarded brief radio reconfiguration, not a hot edit while armed.
+The host must preserve existing peers, verify the table and restore ARM, ACK,
+heartbeat scheduling and phase reference before admission traffic. DISARM
+invalidates queued work and timing references. Normal commands and maintenance
+must not race this operation. Firmware retains no authoritative registry.
+
+Admission preserves the observed `fa`, `10`, `ac` exchange. The registration
+ACK body is `01` followed by the selected request's first seven payload bytes;
+the changing request byte must be echoed, not replaced with a profile constant.
+No output toggle is needed to commission a switch. Sending or queueing the ACK,
+registering a database row, receiving a property/query response, or observing
+the expected tag alone does not establish successful local communication.
+
+The automatic confirmation rule requires all of:
+
+- A CRC-valid native family `9e`, opcode `05` report, with immediate source and
+  subject both equal to the selected ID and suffix equal to the detected profile.
+- The configured local network tag and destination equal to **our gateway**.
+  Broadcast reports and reports addressed to the original EC are insufficient
+  for this stronger commissioning result.
+- The supported eight-byte state payload starting `01 00`, with mask and state
+  bits contained in the detected output mask. Validate this before confirmation;
+  an arbitrary tag-matching announcement cannot complete the transaction.
+- Fresh reception during the current admission session, after the admission
+  transmit-start boundary and before its fixed deadline, plus a positive radio
+  TX result for the selected registration ACK. `OK TX 0` proves transmission,
+  not device action; queue acceptance alone does not prove transmission. RX may
+  precede the UART TX reply, so it can be held until that positive result arrives.
+
+In the one-gang capture, our registration ACKs are frames 2123/2124. Reports
+2132–2139 carry the adopted tag but still address the old EC gateway. Frame
+2143 is a valid state report to our gateway and frame 2144 acknowledges it.
+This distinction prevents premature success while routing still points elsewhere.
+The existing manual targeted-pairing path's broader tag-adoption result must not
+be mistaken for this automatic commissioning confirmation.
+
+Timeout, cancellation or a lost session must stop new admission sends. Once an
+ACK may have reached the switch, local cleanup cannot prove that the physical
+switch has become unpaired. Keep that uncertainty explicit; do not claim remote
+unpairing or an automatically restored previous network. A device left registered
+but unconfirmed uses the advanced targeted pairing action for a retry; automatic
+commissioning selects only unregistered devices. Never silently repeat admission
+after a daemon restart.
 
 Older devices exposing four logical gangs, other product types, unknown
 suffixes and different registration payloads remain unqualified. This feature
 must stay labelled experimental until broader independent hardware testing
 establishes its limits.
+
+These rules and capture fixtures support offline implementation and testing.
+They do not establish a live end-to-end qualification of the new one-button
+flow, nor authentication: there is no proven commissioning nonce or device
+identity challenge in this protocol. No new firmware build is required by the
+observed exchange.

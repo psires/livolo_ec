@@ -26,7 +26,7 @@ ASSETS = {
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
 }
-ACTIONS = {"add", "rename", "remove", "pair", "set"}
+ACTIONS = {"add", "rename", "remove", "pair", "set", "commission", "commission_cancel"}
 
 
 class WebServer:
@@ -280,6 +280,8 @@ class WebServer:
                     "/api/command",
                     "/api/settings/mqtt",
                     "/api/firmware/install",
+                    "/api/commission",
+                    "/api/commission_cancel",
                 ):
                     self.send(404, {"error": "Not found"})
                     return
@@ -299,6 +301,8 @@ class WebServer:
                     body = json.loads(self.rfile.read(length))
                     if self.path == "/api/settings/mqtt":
                         body = {"action": "mqtt_settings", "payload": body}
+                    elif self.path in ("/api/commission", "/api/commission_cancel"):
+                        body = {"action": self.path.rsplit("/", 1)[1], "payload": body}
                     elif self.path == "/api/firmware/install":
                         if (
                             not isinstance(body, dict)
@@ -325,6 +329,8 @@ class WebServer:
                             "/api/command": ACTIONS,
                             "/api/settings/mqtt": {"mqtt_settings"},
                             "/api/firmware/install": {"firmware_install"},
+                            "/api/commission": {"commission"},
+                            "/api/commission_cancel": {"commission_cancel"},
                         }[self.path]
                         or not isinstance(body["payload"], dict)
                     ):

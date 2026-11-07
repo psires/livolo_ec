@@ -646,3 +646,26 @@ read-only query experiments; grid queries require AC-only mode and the matching
 adapter capabilities. These are client/harness options, not daemon JSON settings.
 The daemon uses ordinary paired queries. The 14-second query deadline and
 authoritative host registry remain unchanged.
+
+### Pair a new device from the command line
+
+With the native API enabled, export its existing authentication token as
+`LIVOLO_API_TOKEN` and run `livolod-commission` (or
+`python -m livolod.commission_cli` from a source checkout):
+
+```sh
+livolod-commission --url http://127.0.0.1:8090 start --request-id hallway-pair
+livolod-commission --url http://127.0.0.1:8090 status
+livolod-commission --url http://127.0.0.1:8090 status --request-id hallway-pair
+livolod-commission --url http://127.0.0.1:8090 cancel hallway-pair --request-id hallway-close
+```
+
+Put one supported switch into pairing mode during the default 120-second window.
+The daemon detects its profile, persists the registry entry, briefly reconciles
+the radio peer table and attempts pairing. Only `confirmed` on the **start**
+command means the switch sent the required native confirmation. Cancellation's
+`confirmed` result means only that the window is closed. An unconfirmed registry
+entry remains available for explicit targeted pairing; no outputs are toggled
+for confirmation. The CLI never retries a POST automatically. If a reply is
+lost, use the printed request ID to read its result or explicitly cancel it.
+See [the shared session contract](NATIVE_API.md#bounded-automatic-commissioning).
