@@ -242,6 +242,23 @@ retains the installed version and blocking reason but has an unknown update stat
 and no install capability. Older daemons without firmware-update metadata keep
 their switches working and expose the firmware entity as unavailable.
 
+Development builds after the 0.4.0 release add the following diagnostics.
+Open the **Livolo EC gateway** device and find **Radio firmware status** under
+**Diagnostic** for an explanation that remains visible when no update is offered.
+It distinguishes a missing or unusable catalog from a catalog with no compatible
+firmware, and retains the reported installed version and separate last-job details.
+A disappearing offer does not confirm installation. Only a confirmed daemon job
+establishes that its requested update completed; 100% transfer alone does not.
+An old successful job can remain in the history while the current catalog is
+unavailable, so check the reported running version as well.
+
+When a previously available offer disappears because its catalog is unavailable,
+a notice in [Settings → System → Repairs](https://www.home-assistant.io/integrations/repairs/)
+explains the withdrawal. An empty catalog on first setup does not raise this
+notice. Restore a reviewed compatible catalog using the
+[catalog guide](../docs/FIRMWARE_CATALOG.md), then use **Configure → Check firmware
+update (read-only)**. Restoring the catalog does not install firmware.
+
 The initial backend scope is signed TI UART updates and the exact supported
 Sonoff/ZB-GW04 MG21 profiles. Nordic installation remains disabled with a recovery
 reason. Firmware delivery and backend prerequisites are described in the

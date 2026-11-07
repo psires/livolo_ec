@@ -129,5 +129,32 @@
       "radio_not_ready": "The radio is not ready. Wait for it to reconnect before detecting a switch.",
       "preflight_unsupported": "Update the Livolo daemon to a release that supports firmware preflight. Switch control remains available."
     }
+  },
+  "entity": {
+    "sensor": {
+      "firmware_status": {
+        "name": "Radio firmware status",
+        "state": {
+          "not_reported": "Firmware status not reported",
+          "catalog_missing": "Firmware catalog missing",
+          "catalog_unusable": "Firmware catalog unusable",
+          "no_candidate": "No compatible firmware available",
+          "installing": "Firmware update in progress",
+          "recovery_required": "Firmware recovery required",
+          "update_unconfirmed": "Firmware update outcome unknown",
+          "update_failed": "Firmware update failed",
+          "blocked": "Firmware installation unavailable",
+          "update_available": "Firmware update available",
+          "last_update_confirmed": "Last firmware update confirmed",
+          "no_update_available": "No newer firmware offered"
+        }
+      }
+    }
+  },
+  "issues": {
+    "firmware_offer_withdrawn": {
+      "title": "Firmware update offer is no longer available",
+      "description": "The previous radio firmware update offer ({offered_version}) for **{gateway}** is no longer available because the configured catalog is missing, unusable, or has no compatible image. **This does not confirm a firmware installation.**\n\nLast reported installed version: **{installed_version}**. Open the gateway device and inspect **Radio firmware status** under Diagnostic for the reported version and last job result. Restore or select the reviewed firmware catalog, then use **Configure → Check firmware update (read-only)**. This notice does not install firmware or retry a job. It clears when a compatible catalog returns or firmware job status takes precedence."
+    }
   }
 }

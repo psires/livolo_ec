@@ -12,7 +12,11 @@ from unittest.mock import patch
 
 import pytest
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers import area_registry as ar, entity_registry as er
+from homeassistant.helpers import (
+    area_registry as ar,
+    entity_registry as er,
+    issue_registry as ir,
+)
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from livolod import __version__
@@ -23,6 +27,7 @@ from livolod.simulator import Simulator
 from livolod.storage import Store
 
 from test_end_to_end import eventually
+from custom_components.livolo_ec.firmware_notice import issue_id
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.usefixtures("socket_enabled")
@@ -364,7 +369,8 @@ async def test_native_catalog_refresh_without_web(hass, lifecycle):
     """
     state = lifecycle
     session = state.service.session
-    for content in (None, "invalid", state.manifest):
+    empty = json.dumps(dict(schema=1, host_version=__version__, artifacts=[]))
+    for content in (None, "invalid", empty, state.manifest):
         path = state.catalog / "manifest.json"
         if content is None:
             path.unlink()
@@ -375,6 +381,26 @@ async def test_native_catalog_refresh_without_web(hass, lifecycle):
         await eventually(
             lambda: (hass.states.get(state.entity).state == "on") == available
         )
+        expected = (
+            "update_available"
+            if available
+            else (
+                "catalog_missing"
+                if content is None
+                else "catalog_unusable" if content == "invalid" else "no_candidate"
+            )
+        )
+        await eventually(lambda: hass.states.async_all("sensor")[0].state == expected)
+        diagnostic = hass.states.async_all("sensor")[0]
+        assert diagnostic.state == expected
+        assert diagnostic.attributes["installed_version"] == "0.12"
+        notice = ir.async_get(hass).async_get_issue("livolo_ec", issue_id(state.entry))
+        assert bool(notice) is not available
+        if not available:
+            assert (
+                "does not confirm installation" in diagnostic.attributes["explanation"]
+            )
+            assert hass.states.get(state.entity).state == "unknown"
         assert state.service.ready and state.service.session == session
         assert state.spawn_count == 0
         assert_identity(state)

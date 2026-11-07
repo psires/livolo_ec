@@ -4,12 +4,14 @@ from homeassistant.const import Platform
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 
 from ._client import AuthenticationError, Client, LivoloError
 from .const import CONF_TOKEN, CONF_URL, DOMAIN
 from .coordinator import LivoloCoordinator
+from .firmware_notice import issue_id
 
-PLATFORMS = [Platform.SWITCH, Platform.UPDATE]
+PLATFORMS = [Platform.SWITCH, Platform.UPDATE, Platform.SENSOR]
 
 
 async def async_setup_entry(hass, entry):
@@ -79,3 +81,12 @@ async def async_remove_config_entry_device(hass, entry, device_entry):
         for device in entry.runtime_data.data["devices"]
     )
     return not bool(device_entry.identifiers & active)
+
+
+async def async_remove_entry(hass, entry):
+    """Remove this entry's persistent notice only when the configuration is deleted.
+
+    @param hass Home Assistant instance owning the issue registry.
+    @param entry Permanently removed network configuration.
+    """
+    ir.async_delete_issue(hass, DOMAIN, issue_id(entry))
