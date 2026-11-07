@@ -312,6 +312,52 @@ class CommissioningTests(unittest.TestCase):
         self.assertEqual(len(self.manager.state["observations"]), 2)
         self.assertFalse(self.service.devices)
 
+    def test_two_output_variants_conflict_in_both_arrival_orders(self):
+        """Two individually recognized layouts cannot silently replace one another."""
+        bodies = ("0002030534010400", "000203042e003000")
+        for index, order in enumerate((bodies, bodies[::-1])):
+            self.service.submit("commission", {"request_id": f"variants-{index}"})
+            for body in order:
+                self.receive(announcement(suffix="0002", body=body))
+            self.assertEqual(self.manager.state["status"], "conflict")
+            self.assertEqual(
+                self.manager.state["error"], "conflicting_pairing_profiles"
+            )
+            self.assertFalse(self.service.devices)
+            self.assertEqual(
+                [
+                    item["payload"]
+                    for item in self.manager.snapshot()["observations"][0][
+                        "pairing_evidence"
+                    ]
+                ],
+                list(order),
+            )
+
+    def test_empirical_variant_requires_fresh_crc_valid_session_and_restart_does_not_admit(
+        self,
+    ):
+        """Synthetic envelopes around the retained payload obey all existing freshness fences."""
+        raw = announcement(suffix="0002", body="000203042e003000")
+        self.receive(raw)
+        self.start()
+        self.receive(raw, received=99)
+        self.receive(raw, retained=True)
+        invalid = bytearray(raw)
+        invalid[-1] ^= 1
+        self.receive(bytes(invalid))
+        self.service.session = "other"
+        self.receive(raw)
+        self.assertIsNone(self.manager.candidate)
+        self.assertEqual(self.manager.snapshot()["observations"], [])
+        self.service.session = "owned"
+        self.receive(raw)
+        self.assertEqual(self.manager.state["outputs"], 2)
+        restored = Service(self.config, self.store).commissioning
+        self.assertEqual(restored.state["status"], "unknown")
+        self.assertIsNone(restored.candidate)
+        self.assertFalse(restored.service.devices)
+
     def test_duplicate_announcements_do_not_extend_deadline(self):
         """Repeated requests with varying retransmit counters remain one candidate."""
         self.start()
@@ -719,11 +765,15 @@ class CommissioningIntegrationTests(unittest.IsolatedAsyncioTestCase):
         """The one-gang captured profile completes the same real service lifecycle."""
         await self.lifecycle("0001", "0001010534010400")
 
+    async def test_empirical_two_output_variant_synthetic_lifecycle(self):
+        """Synthetic envelope/report proves software lifecycle only, not live device qualification."""
+        await self.lifecycle("0002", "000203042e003000")
+
     async def lifecycle(self, suffix, body):
         """Exercise one exact profile from discovery through disarmed peer setup and RX.
 
         @param suffix Captured device profile suffix.
-        @param body Captured native pairing announcement payload.
+        @param body Observed payload in a synthetic native pairing envelope.
         """
         with tempfile.TemporaryDirectory() as directory:
             config = replace(
@@ -781,12 +831,21 @@ class CommissioningIntegrationTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertTrue(radios[-1].admission.is_set())
                 self.assertEqual(len(store.devices(())), 1)
+                self.assertEqual(
+                    store.devices(())[0].outputs, 2 if suffix == "0002" else 1
+                )
+                admissions = []
                 for radio in radios:
                     for text in radio.commands:
                         if text.startswith("SEND "):
-                            self.assertNotEqual(
-                                decode(bytes.fromhex(text.split()[2])).opcode, 2
-                            )
+                            packet = decode(bytes.fromhex(text.split()[2]))
+                            self.assertNotEqual(packet.opcode, 2)
+                            if packet.opcode == 0xFA:
+                                admissions.append(packet)
+                self.assertTrue(admissions)
+                for packet in admissions:
+                    self.assertEqual(packet.data, b"\x01" + bytes.fromhex(body)[:7])
+                    self.assertEqual(packet.suffix, suffix)
             finally:
                 service.stop.set()
                 await asyncio.wait_for(task, 3)

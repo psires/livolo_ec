@@ -22,6 +22,10 @@ ONE_LATER = bytes.fromhex(
     "0188cfffffffff667809450000000000000000ff039e016678094500010001010534012e00fd80"
 )
 GATEWAY = "2a992b12"
+# Exact eight-byte payload retained by HA session aee36fdb-17af-4234-817d-1f2fa33f1097
+# on 2026-11-07 from owner-confirmed two-gang 67181844. No raw envelope was retained;
+# packets derived below are synthetic, not reconstructed claims of captured frames.
+TWO_VARIANT_PAYLOAD = bytes.fromhex("000203042e003000")
 
 
 class DeviceProfileTests(unittest.TestCase):
@@ -38,6 +42,70 @@ class DeviceProfileTests(unittest.TestCase):
                 self.assertEqual(result["basis"], "pairing_suffix_and_payload")
                 self.assertEqual(result["profile"], f"livolo-ec-suffix-{suffix}")
                 self.assertTrue(result["experimental"])
+
+    def test_empirical_two_output_variant_is_not_bound_to_a_device_id(self):
+        """The observed exact prefix accepts synthetic identities and the existing counter rule."""
+        for device in ("67181844", "12345678", "abcdef12"):
+            for counter in range(256):
+                payload = TWO_VARIANT_PAYLOAD[:6] + bytes((counter, 0))
+                packet = replace(
+                    decode(TWO), source=device, subject=device, data=payload
+                )
+                result = pairing_profile(packet, gateway=GATEWAY)
+                self.assertEqual(result["status"], "detected")
+                self.assertEqual(result["outputs"], 2)
+                self.assertEqual(result["profile"], "livolo-ec-suffix-0002")
+                self.assertEqual(result["signature"], "0002:000203042e00:00")
+                self.assertTrue(result["experimental"])
+
+    def test_empirical_variant_keeps_every_fixed_byte_suffix_and_length_gate(self):
+        """No generalized generation mask or inferred one-gang variant is admitted."""
+        packet = replace(decode(TWO), data=TWO_VARIANT_PAYLOAD)
+        invalid = []
+        for index in (0, 1, 2, 3, 4, 5, 7):
+            data = bytearray(packet.data)
+            data[index] ^= 1
+            invalid.append(replace(packet, data=bytes(data)))
+        invalid += [
+            replace(packet, data=packet.data[:-1]),
+            replace(packet, data=packet.data + b"\0"),
+        ]
+        invalid += [
+            replace(packet, suffix=suffix)
+            for suffix in ("0001", "0000", "0003", "ffff")
+        ]
+        invalid.append(
+            replace(packet, suffix="0001", data=bytes.fromhex("000101042e003000"))
+        )
+        for altered in invalid:
+            with self.subTest(packet=altered):
+                result = pairing_profile(altered, gateway=GATEWAY)
+                self.assertEqual(result["status"], "unknown")
+                self.assertIsNone(result["outputs"])
+        self.assertNotEqual(
+            pairing_profile(packet, gateway=GATEWAY)["signature"],
+            pairing_profile(decode(TWO), gateway=GATEWAY)["signature"],
+        )
+
+    def test_empirical_variant_preserves_native_direct_unregistered_envelope_gates(
+        self,
+    ):
+        """The new payload cannot authorize relay, foreign, reserved or registered traffic."""
+        packet = replace(decode(TWO), data=TWO_VARIANT_PAYLOAD)
+        for change in (
+            dict(source="00000000", subject="00000000"),
+            dict(source="ffffffff", subject="ffffffff"),
+            dict(source="12345678"),
+            dict(subject="12345678"),
+            dict(destination="12345678"),
+            dict(tag="a7"),
+            dict(family=0x8C),
+            dict(opcode=5),
+        ):
+            with self.subTest(change=change):
+                self.assertIsNone(
+                    pairing_profile(replace(packet, **change), gateway=GATEWAY)
+                )
 
     def test_capture_counter_and_route_changes_do_not_change_profile_signature(self):
         """Observed later request counters are excluded from aggregation identity."""
