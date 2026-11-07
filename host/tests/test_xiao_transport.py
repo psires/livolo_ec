@@ -19,15 +19,20 @@ class XiaoTransportTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_diagnostic_caps_never_configure_arm_or_transmit(self):
         """Diagnostic identities cannot arm a gateway, even with no registered peers."""
-        for board, mode, registered, rf_bench in product(
+        for board, mode, registered, build in product(
             ("seeed-xiao-mg24", "seeed-xiao-esp32c6"),
             ("disabled", "experimental_phase"),
             (False, True),
-            (False, True),
+            ("xiao-bringup-1", "xiao-rf-1", "xiao-rx-1"),
         ):
             with self.subTest(
-                board=board, mode=mode, registered=registered, rf_bench=rf_bench
+                board=board, mode=mode, registered=registered, build=build
             ):
+                wire_build = (
+                    "xiao-rx-2"
+                    if board == "seeed-xiao-mg24" and build == "xiao-rx-1"
+                    else build
+                )
                 with tempfile.TemporaryDirectory() as directory:
                     config = replace(
                         load(Path(__file__).parents[1] / "config.example.json"),
@@ -39,24 +44,25 @@ class XiaoTransportTests(unittest.IsolatedAsyncioTestCase):
                         config = replace(config, devices=())
                     with closing(Store(config.database, "network")) as store:
                         service = Service(config, store)
-                        build = "xiao-rf-1" if rf_bench else "xiao-bringup-1"
+                        capabilities = "radio_tx=0"
+                        if build != "xiao-bringup-1":
+                            capabilities = (
+                                "radio_tx=synthetic_only rf_diag=synthetic_v1"
+                            )
+                        if build == "xiao-rx-1":
+                            capabilities += " rx_diag=passive_v1"
                         replies = {
                             "PING": "OK EC-GATEWAY 3",
                             "VERSION": (
                                 f"OK fw_version=0.14 board={board} proto=3 "
-                                f"update=none experimental=1 build={build}"
+                                f"update=none experimental=1 build={wire_build}"
                             ),
                             "CAPS": (
                                 "OK proto=3 peers=0 ack_mask=00 max_raw=0 "
                                 "max_line=319 command_slots=0 request_cache=0 "
                                 "lease_max=0 session_bytes=0 channel=11 baud=115200 "
                                 f"board={board} fw_version=0.14 update=none "
-                                "experimental=1 gateway=0 "
-                                + (
-                                    "radio_tx=synthetic_only rf_diag=synthetic_v1"
-                                    if rf_bench
-                                    else "radio_tx=0"
-                                )
+                                "experimental=1 gateway=0 " + capabilities
                             ),
                         }
                         service.gateway = AsyncMock()

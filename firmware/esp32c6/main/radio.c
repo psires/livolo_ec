@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 #include "rf.h"
+#include "health.h"
 #include "driver/gpio.h"
 #include "esp_ieee802154.h"
 #include "esp_timer.h"
 #include <string.h>
 
 static int initialized;
+static unsigned selected_channel;
 static uint8_t tx[128];
 
 /** @brief Read microseconds modulo 2^32 from the monotonic timer.
@@ -21,6 +23,7 @@ static uint32_t IRAM_ATTR now_us(void)
  */
 static int stop(void)
 {
+	selected_channel = 0;
 	if (initialized) {
 		int result = esp_ieee802154_set_rx_when_idle(false);
 
@@ -34,11 +37,15 @@ static int stop(void)
 	return 0;
 }
 
-/** @brief Start promiscuous channel-26 RX with hardware ACKs disabled.
+/** @brief Start promiscuous fixed-channel RX with hardware ACKs disabled.
+ * @param channel Fixed passive channel 11 or synthetic channel 26.
  * @return Zero on verified setup; nonzero leaves the portable core fail-closed.
  */
-static int start(void)
+static int start(unsigned channel)
 {
+	if (channel != 11 && channel != 26)
+		return -1;
+	selected_channel = 0;
 	if (!initialized) {
 		gpio_config_t pins = {
 			.pin_bit_mask = (1ULL << 3) | (1ULL << 14),
@@ -55,14 +62,17 @@ static int start(void)
 	}
 	/* IDF v5.5.1 sets auto_ack_rx, auto_ack_tx and enhance_ack_tx false here. */
 	if (esp_ieee802154_set_promiscuous(true) != ESP_OK ||
-	    esp_ieee802154_set_channel(26) != ESP_OK ||
+	    esp_ieee802154_set_channel(channel) != ESP_OK ||
 	    esp_ieee802154_set_txpower(0) != ESP_OK ||
 	    esp_ieee802154_set_rx_when_idle(true) != ESP_OK ||
 	    !esp_ieee802154_get_promiscuous() ||
-	    esp_ieee802154_get_channel() != 26 ||
+	    esp_ieee802154_get_channel() != channel ||
 	    esp_ieee802154_get_txpower() > 0)
 		return -1;
-	return esp_ieee802154_receive() == ESP_OK ? 0 : -1;
+	if (esp_ieee802154_receive() != ESP_OK)
+		return -1;
+	selected_channel = channel;
+	return 0;
 }
 
 /** @brief Submit one owned frame; hardware supplies IEEE FCS and optional CCA.
@@ -73,7 +83,7 @@ static int start(void)
  */
 static int send(const uint8_t *mac, size_t length, unsigned cca)
 {
-	if (!initialized || !length || length > 125)
+	if (!initialized || selected_channel != 26 || !length || length > 125)
 		return -1;
 	tx[0] = length + 2;
 	memcpy(tx + 1, mac, length);
@@ -95,7 +105,7 @@ static int power_dbm(void)
 }
 
 const struct ec_rf_ops ec_c6_rf_ops = {
-	now_us, start, stop, send, poll, power_dbm,
+	now_us, start, stop, send, poll, power_dbm, ec_c6_health,
 };
 
 /** @brief Copy valid MAC bytes, then always release the driver's RX buffer.

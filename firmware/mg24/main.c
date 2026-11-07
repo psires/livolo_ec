@@ -70,7 +70,7 @@ static void serial_init(void)
 	NVIC_EnableIRQ(USART0_RX_IRQn);
 }
 
-/** @brief Run diagnostics with RF off until an explicit bounded RFSTART request.
+/** @brief Keep RF off until a bounded RFSTART or receive-only RFLISTEN request.
  * @return Never returns.
  */
 int main(void)
@@ -95,7 +95,7 @@ int main(void)
 #ifdef EC_RF_DIAGNOSTICS
 	ec_rf_setup(&ec_mg24_rf_ops);
 	parser.radio_command = ec_rf_command;
-	parser.build = "xiao-rf-1";
+	parser.build = "xiao-rx-2";
 #endif
 	for (;;) {
 #ifdef EC_RF_DIAGNOSTICS

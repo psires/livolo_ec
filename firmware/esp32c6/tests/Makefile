@@ -13,10 +13,10 @@ $(BUILD)/test_usb_transport: $(SOURCES) $(HEADERS) Makefile
 	mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -Istubs -I../../experimental -I../.. $(SOURCES) -o $@
 
-$(BUILD)/test_rf_usb: ../main/main.c ../../experimental/transport.c ../../experimental/rf.c ../../experimental/rf.h test_rf_usb.c $(HEADERS) Makefile
+$(BUILD)/test_rf_usb: ../main/main.c ../main/health.c ../main/health.h ../../experimental/transport.c ../../experimental/rf.c ../../experimental/rf.h test_rf_usb.c $(HEADERS) Makefile
 	mkdir -p $(BUILD)
-	$(CC) $(CFLAGS) -DEC_RF_DIAGNOSTICS=1 -Istubs -I../../experimental -I../.. \
-	 ../main/main.c ../../experimental/transport.c ../../experimental/rf.c test_rf_usb.c -o $@
+	$(CC) $(CFLAGS) -DEC_RF_DIAGNOSTICS=1 -Istubs -I../main -I../../experimental -I../.. \
+	 ../main/main.c ../main/health.c ../../experimental/transport.c ../../experimental/rf.c test_rf_usb.c -o $@
 
 clean:
 	rm -rf $(BUILD)

@@ -24,7 +24,7 @@ RADIO_LIB = $(RAIL)/autogen/librail_release/librail_efr32xg24_gcc_release.a
 INCLUDES += $(RAIL)/common $(RAIL)/protocol/ieee802154 \
  $(RAIL)/chip/efr32/efr32xg2x $(PA) $(PA)/efr32xg24/config
 CFLAGS += -DEC_RF_DIAGNOSTICS=1
-SOURCES += radio.c ../experimental/rf.c \
+SOURCES += radio.c health.c ../experimental/rf.c \
  $(PA)/pa_conversions_efr32.c $(PA)/pa_curves_efr32.c
 RADIO_LINK = -Wl,--whole-archive $(RADIO_LIB) -Wl,--no-whole-archive
 endif

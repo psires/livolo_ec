@@ -19,6 +19,7 @@ static atomic_uint active, busy, completion, head, tail, received, dropped;
 static uint32_t nonce, started, sent_at;
 static unsigned tx_started, tx_done, tx_failed, tx_sequence, event_pending;
 static unsigned fault;
+static unsigned channel;
 static uint8_t sequences[32], tx_frame[41];
 
 void ec_rf_setup(const struct ec_rf_ops *ops)
@@ -33,6 +34,7 @@ void ec_rf_setup(const struct ec_rf_ops *ops)
 	atomic_store(&dropped, 0);
 	nonce = started = sent_at = 0;
 	tx_started = tx_done = tx_failed = event_pending = fault = 0;
+	channel = 26;
 	memset(sequences, 0, sizeof(sequences));
 }
 
@@ -129,24 +131,36 @@ size_t ec_rf_command(const char *command, char *out, size_t capacity)
 	}
 	if (!count || word)
 		goto done;
+	if (count == 1 && !strcmp(words[0], "RFHEALTH")) {
+		if (radio->health)
+			return radio->health(out, capacity);
+		response = "ERR RF_HEALTH_UNSUPPORTED";
+		goto done;
+	}
 	if (count == 1 && !strcmp(words[0], "RFSTATUS")) {
-		length = snprintf(out, capacity,
-				  "OK active=%u channel=26 power_dbm=%d "
-				  "auto_ack=0 retries=0 "
-				  "tx_started=%u tx_done=%u tx_failed=%u rx=%u "
-				  "dropped=%u "
-				  "queued=%u busy=%u fault=%u ticks_hz=1000000 "
-				  "timestamp=callback bad_crc=unavailable",
-				  atomic_load(&active), radio->power_dbm(),
-				  tx_started, tx_done, tx_failed,
-				  atomic_load(&received), atomic_load(&dropped),
-				  (atomic_load(&head) - atomic_load(&tail)) &
-					  (RX_SLOTS - 1),
-				  atomic_load(&busy), fault);
+		length = snprintf(
+			out, capacity,
+			"OK active=%u channel=%u mode=%s power_dbm=%d "
+			"auto_ack=0 retries=0 "
+			"tx_started=%u tx_done=%u tx_failed=%u rx=%u "
+			"dropped=%u "
+			"queued=%u busy=%u fault=%u ticks_hz=1000000 "
+			"timestamp=callback bad_crc=unavailable",
+			atomic_load(&active), channel,
+			channel == 11 ? "passive" : "synthetic",
+			radio->power_dbm(), tx_started, tx_done, tx_failed,
+			atomic_load(&received), atomic_load(&dropped),
+			(atomic_load(&head) - atomic_load(&tail)) &
+				(RX_SLOTS - 1),
+			atomic_load(&busy), fault);
 		return length > 0 && (size_t)length < capacity ? length : 0;
 	}
 	if (count == 1 && !strcmp(words[0], "RFSTOP")) {
 		response = stop() ? "ERR RF_STOP" : "OK active=0";
+		goto done;
+	}
+	if (!strcmp(words[0], "RFTX") && channel == 11) {
+		response = "ERR RF_PASSIVE";
 		goto done;
 	}
 	if (count != 2 && count != 6)
@@ -154,17 +168,21 @@ size_t ec_rf_command(const char *command, char *out, size_t capacity)
 	if (strlen(words[1]) != 8 || !number(words[1], 16, &values[0]) ||
 	    !values[0])
 		goto done;
-	if (count == 2 && !strcmp(words[0], "RFSTART")) {
+	if (count == 2 &&
+	    (!strcmp(words[0], "RFSTART") || !strcmp(words[0], "RFLISTEN"))) {
+		unsigned selected = !strcmp(words[0], "RFLISTEN") ? 11 : 26;
+
 		if (fault || atomic_load(&active) || event_pending) {
 			response = "ERR RF_BUSY_OR_FAULT";
 			goto done;
 		}
-		if (radio->start() || radio->power_dbm() > 0) {
+		if (radio->start(selected) || radio->power_dbm() > 0) {
 			radio->stop();
 			fault = 1;
 			response = "ERR RF_INIT";
 			goto done;
 		}
+		channel = selected;
 		nonce = values[0];
 		started = radio->now_us();
 		tx_started = tx_done = tx_failed = 0;
@@ -174,7 +192,8 @@ size_t ec_rf_command(const char *command, char *out, size_t capacity)
 		atomic_store(&tail, 0);
 		memset(sequences, 0, sizeof(sequences));
 		atomic_store_explicit(&active, 1, memory_order_release);
-		response = "OK active=1 channel=26";
+		response = channel == 11 ? "OK active=1 channel=11 mode=passive"
+					 : "OK active=1 channel=26";
 		goto done;
 	}
 	if (count != 6 || strcmp(words[0], "RFTX"))

@@ -2,7 +2,8 @@
 
 Planning baseline: 2026-11-07; RF progress updated 2026-11-08. Both boards are
 connected to the development Raspberry Pi and have completed initial diagnostic
-transport, bounded recovery and synthetic radio cross-capture. Neither board is
+transport, bounded recovery, synthetic radio cross-capture and passive reception
+from both test switches. Neither board is
 currently a supported Livolo gateway. This document
 tracks the remaining work; hardware findings belong to the linked verification
 records, not to the planned acceptance criteria below.
@@ -244,12 +245,39 @@ The C6 initially became unresponsive over USB before RF activation. The same
 image worked after application reinstallation, but the cause remains unresolved;
 this result does not establish sustained transport reliability. The MG24
 physical Standard/Sense variant and PCB revision still need visual confirmation.
-The owner confirmed that the nearby, isolated test switches are `46715621` (two gang)
-and `66780945` (one gang), both removed from the HA-managed network. Synthetic
-channel-26 results do not establish reception from those channel-11 switches;
-that needs a separate passive-only experiment. See the
-[RF bench procedure](XIAO_RF_BENCH.md) for exact bounds and evidence semantics.
+The nearby, isolated test switches are `46715621` (two gang) and `66780945`
+(one gang), both removed from the HA-managed network. A separate channel-11
+passive stage received validated native frames from each switch on each XIAO
+without manual stimulus. The first 30-second capture counted 30/14 target frames
+on MG24 and 31/14 on C6. A second 30-second capture with MG24 reason counters
+counted 30/4 on each board, with 34 shared full target payload hashes. These
+counts establish reception, not a packet-loss rate or complete capture of every
+transmission.
+
+Both passive runs retain a **failed** strict capture-integrity assessment:
+MG24 reported 58 aggregate drops initially and 33 in the recheck. The recheck's
+33 occurrences were all RAIL frame errors, with zero FIFO overflow, hold,
+adapter-validation or calibration failures. All 448 delivered MG24 frames in
+that run had valid original FCS, and its accepted-RX count matched delivery;
+portable-ring loss was not observed. RAIL frame errors can cover CRC, decoding
+or illegal-length errors, so these are not all identified as bad CRC. The new
+counters cannot retrospectively classify the earlier 58 occurrences. C6 had
+no reported drops in either capture. Aggregate accounting, queue sizes and the
+harness acceptance rules remain unchanged.
+
+C6 health diagnostics also established USB resets across close/reopen under the
+tested host settings. Three cycles began at 41 ms uptime and remained responsive
+for seven seconds with no watchdog or I/O errors. After a separate five-second
+closed interval, the first reopened sample reported 31 ms uptime and a USB reset
+reason, supporting a reopen-associated reset rather than an immediate close-only
+reset. The exact OS/control-line trigger and original stall cause remain unproven.
+Exclusive ownership and known-idle state are required before opening the port;
+a post-open status check cannot preserve state that opening already reset.
+
+See the [passive/USB verification record](verification/xiao-rx-20261108.json),
+[passive bench procedure](XIAO_RX_BENCH.md) and
+[synthetic RF procedure](XIAO_RF_BENCH.md) for artifacts and evidence limits.
 Gateway control stays disabled. Watchdog, sustained serial/radio load, timing,
 pairing and updater qualification remain open gates. Existing radios, services
-and HA are outside this bring-up's modification scope. No experimental image is included in a
-release or an automatic-update catalog.
+and HA are outside this bring-up's modification scope. No experimental image is
+included in a release or an automatic-update catalog.

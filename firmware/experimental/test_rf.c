@@ -5,7 +5,7 @@
 #include <string.h>
 
 static uint32_t clock_us;
-static unsigned starts, stops, sends, polls;
+static unsigned starts, stops, sends, polls, channel;
 static int start_result, send_result, stop_result, power;
 static const uint8_t *borrowed;
 static size_t borrowed_length;
@@ -21,10 +21,13 @@ static uint32_t now_us(void)
 }
 
 /** @brief Record explicit radio-start requests without producing RF.
+ * @param selected_channel Fixed diagnostic channel selected by the core.
  * @return Injected adapter result; zero means success.
  */
-static int start(void)
+static int start(unsigned selected_channel)
 {
+	assert(selected_channel == 11 || selected_channel == 26);
+	channel = selected_channel;
 	starts++;
 	return start_result;
 }
@@ -87,7 +90,7 @@ static const struct ec_rf_ops ops = {
 static void reset(void)
 {
 	clock_us = 1000000;
-	starts = stops = sends = polls = 0;
+	starts = stops = sends = polls = channel = 0;
 	start_result = send_result = stop_result = power = 0;
 	borrowed = NULL;
 	borrowed_length = 0;
@@ -149,6 +152,8 @@ static void test_command_bounds(void)
 
 	reset();
 	command("RFSTATUS", 1);
+	command("RFHEALTH", 0);
+	assert(strstr(response, "ERR RF_HEALTH_UNSUPPORTED"));
 	command("RFTX 1234abcd 0 39 0 0", 0);
 	for (size_t i = 0; i < sizeof(invalid_start) / sizeof(*invalid_start);
 	     i++)
@@ -309,6 +314,90 @@ static void test_adapter_failures(void)
 	assert(sends == 1);
 }
 
+/** @brief Keep passive switch observation unable to admit any transmission. */
+static void test_passive_window(void)
+{
+	const char *invalid[] = {
+		"RFLISTEN",
+		"RFLISTEN 00000000",
+		"RFLISTEN 1234abc",
+		"RFLISTEN 1234abcd0",
+		"RFLISTEN 1234ABCD",
+		"RFLISTEN 1234abcg",
+		"RFLISTEN 1234abcd 26",
+	};
+	uint8_t packet[39] = { 1, 0x88 };
+
+	reset();
+	command("RFSTATUS", 1);
+	assert(strstr(response, "active=0 channel=26"));
+	assert(strstr(response, "mode=synthetic"));
+	for (size_t i = 0; i < sizeof(invalid) / sizeof(*invalid); i++)
+		command(invalid[i], 0);
+	assert(!starts && !sends);
+	command("RFLISTEN 1234abcd", 1);
+	assert(starts == 1 && channel == 11);
+	command("RFSTATUS", 1);
+	assert(strstr(response, "active=1 channel=11"));
+	assert(strstr(response, "mode=passive"));
+	assert(strstr(response, "auto_ack=0 retries=0"));
+	command("RFSTART abcdef12", 0);
+	command("RFLISTEN abcdef12", 0);
+	assert(starts == 1 && channel == 11);
+	command("RFTX 1234abcd 0 39 0 0", 0);
+	assert(strstr(response, "ERR RF_PASSIVE"));
+	command("RFTX 1234abcd 1 41 1 1", 0);
+	assert(strstr(response, "ERR RF_PASSIVE"));
+	assert(!sends);
+	ec_rf_receive(packet, sizeof(packet), 0, -40, 100, clock_us);
+	assert(ec_rf_event(response, sizeof(response)));
+	assert(strstr(response, "RF RX len=39 fcs=stripped"));
+	command("RFSTOP", 1);
+	command("RFSTATUS", 1);
+	assert(strstr(response, "active=0 channel=11"));
+	assert(strstr(response, "mode=passive"));
+	command("RFTX 1234abcd 2 39 0 0", 0);
+	assert(!sends);
+	/* A separate explicit synthetic window is needed before TX can resume. */
+	command("RFSTART abcdef12", 1);
+	assert(starts == 2 && channel == 26);
+	command("RFTX abcdef12 0 39 0 0", 1);
+	complete(1);
+	assert(sends == 1);
+	command("RFSTOP", 1);
+	command("RFLISTEN 1234abcd", 1);
+	assert(starts == 3 && channel == 11);
+	command("RFSTATUS", 1);
+	assert(strstr(response, "tx_started=0 tx_done=0 tx_failed=0"));
+}
+
+/** @brief Expire passive observation across timer wrap and fence failed setup. */
+static void test_passive_expiry_and_failure(void)
+{
+	reset();
+	clock_us = UINT32_MAX - 1000;
+	command("RFLISTEN 1234abcd", 1);
+	clock_us += 59999999;
+	ec_rf_poll();
+	assert(!stops);
+	clock_us++;
+	ec_rf_poll();
+	assert(stops == 1 && !sends);
+	command("RFSTATUS", 1);
+	assert(strstr(response, "active=0 channel=11"));
+	command("RFTX 1234abcd 0 39 0 0", 0);
+	command("RFLISTEN abcdef12", 1);
+	assert(starts == 2 && !sends);
+	reset();
+	start_result = -1;
+	command("RFLISTEN 1234abcd", 0);
+	assert(starts == 1 && stops == 1 && !sends);
+	start_result = 0;
+	command("RFSTART abcdef12", 0);
+	command("RFLISTEN abcdef12", 0);
+	assert(starts == 1 && !sends);
+}
+
 /** @brief Execute portable RF safety regressions without initializing hardware.
  * @return Zero when all bounded diagnostic invariants hold.
  */
@@ -320,6 +409,8 @@ int main(void)
 	test_budget_and_lease();
 	test_receive_queue();
 	test_adapter_failures();
+	test_passive_window();
+	test_passive_expiry_and_failure();
 	puts("experimental RF bounds and ownership: PASS");
 	return 0;
 }

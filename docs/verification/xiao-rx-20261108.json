@@ -1,0 +1,333 @@
+{
+  "schema": 1,
+  "handoff_date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "status": "Completed bounded passive reception and diagnostics; both target signatures received on both boards; strict capture assessments remain failed due to MG24 frame-error/drop evidence; preservation PASS; experimental only",
+  "scope": "Receive-only channel11 on two new XIAOs; C6 USB diagnostics; no gateway pairing or control",
+  "firmware_version": "0.14",
+  "release_or_catalog_modified": false,
+  "targets": {
+    "46715621": {
+      "gangs": 2,
+      "required_native_suffix": "0002"
+    },
+    "66780945": {
+      "gangs": 1,
+      "required_native_suffix": "0001"
+    }
+  },
+  "initial_capture": {
+    "receipt_sha256": "9776637d33a19ed2b815fada02de18367730a20263906b81d9a5a6f47597896d",
+    "assessment": "failed",
+    "duration_seconds": 30,
+    "window_completed": true,
+    "started_at_utc": "2026-11-07T23:37:34.211190+00:00",
+    "finished_at_utc": "2026-11-07T23:38:04.781984+00:00",
+    "manual_stimulus": false,
+    "channel": 11,
+    "automatic_ack": false,
+    "rf_transmissions": 0,
+    "receivers": {
+      "mg24": {
+        "target_counts": {
+          "46715621": 30,
+          "66780945": 14
+        },
+        "rx_events": 373,
+        "unexpected_tx_events": 0,
+        "invalid_mac_fcs": 0,
+        "wrong_fcs_representation": 0,
+        "hardware_crc_only": 0,
+        "independently_crc_valid": 373,
+        "unmatched_frames": 329
+      },
+      "c6": {
+        "target_counts": {
+          "46715621": 31,
+          "66780945": 14
+        },
+        "rx_events": 325,
+        "unexpected_tx_events": 0,
+        "invalid_mac_fcs": 0,
+        "wrong_fcs_representation": 0,
+        "hardware_crc_only": 325,
+        "independently_crc_valid": 0,
+        "unmatched_frames": 280
+      }
+    },
+    "final": {
+      "mg24": {
+        "active": "0",
+        "channel": "11",
+        "mode": "passive",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "0",
+        "tx_done": "0",
+        "tx_failed": "0",
+        "rx": "373",
+        "dropped": "58",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      },
+      "c6": {
+        "active": "0",
+        "channel": "11",
+        "mode": "passive",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "0",
+        "tx_done": "0",
+        "tx_failed": "0",
+        "rx": "325",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      }
+    },
+    "shared_valid_target_payload_hashes": 44,
+    "drop_interpretation": "MG24 aggregate58 includes hardware/frame/adapter reasons; core received equals delivered373, not evidence of shared-ring overflow; no loss denominator can be inferred"
+  },
+  "c6_usb_health": {
+    "original_three_reopens": {
+      "receipt_sha256": "b1a9f50c9a0fa678430f8ab286f918541a08ca28a4c4a28bcda576752d7287eb",
+      "sessions": 3,
+      "idle_seconds_per_session": 7,
+      "initial_uptime_ms": [
+        41,
+        41,
+        41
+      ],
+      "final_uptime_ms": [
+        7044,
+        7045,
+        7045
+      ],
+      "reset_reason": 11,
+      "reset_reason_name": "ESP_RST_USB",
+      "task_watchdog_events": 0,
+      "io_errors": 0
+    },
+    "five_second_closed_gap": {
+      "receipt_sha256": "8850266a73d4cc6bd38a9ccd1463b4fde23795ab1734f64c8322e62481c02ee4",
+      "gap_seconds": 5,
+      "post_reopen_uptime_ms": 31,
+      "after_seven_second_idle_uptime_ms": 7033,
+      "reset_reason": 11,
+      "task_watchdog_events": 0,
+      "io_errors": 0
+    },
+    "interpretation": "Actual USB reset across close/reopen under tested host settings; five-second closed gap still gives near-zero uptime on reopen. Does not isolate line/kernel/electrical cause, diagnose original stall, or prove long-term stability. No console/stack/watchdog policy workaround.",
+    "kernel_timeline_sha256": "19c4e28b2f54ea8f217db4e622b0a5c758efa7b77ce2dc0394b6d159568c0b2e",
+    "kernel_timeline_interpretation": "Read-only journal query for the test interval returned no entries; it provides no additional kernel event correlation and does not establish absence of USB activity."
+  },
+  "initial_rx_preservation": {
+    "mg24": {
+      "full_sha256": "851d0f3c08ab621b22d9135a79d60df91f893d4d7481d214abb0c962a571d9fe",
+      "bytes": 1572864,
+      "app_matches": true,
+      "outside_pages_unchanged": true
+    },
+    "c6": {
+      "full_sha256": "b7abf700f33423f67964dbcc4df4ba9faf5a1f0bfb6fbf3b87f52e22b2ced44c",
+      "bytes": 4194304,
+      "app_matches": true,
+      "outside_pages_unchanged": true
+    }
+  },
+  "mg24_reason_recheck": {
+    "receipt_sha256": "6c998f4c48576966c1d6af65a7c5168c9b124c8e552a1aa833d963f34d19ed62",
+    "assessment": "failed",
+    "duration_seconds": 30,
+    "window_completed": true,
+    "started_at_utc": "2026-11-07T23:46:31.885028+00:00",
+    "finished_at_utc": "2026-11-07T23:47:02.566648+00:00",
+    "manual_stimulus": false,
+    "channel": 11,
+    "automatic_ack": false,
+    "rf_transmissions": 0,
+    "final": {
+      "mg24": {
+        "active": "0",
+        "channel": "11",
+        "mode": "passive",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "0",
+        "tx_done": "0",
+        "tx_failed": "0",
+        "rx": "448",
+        "dropped": "33",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      },
+      "c6": {
+        "active": "0",
+        "channel": "11",
+        "mode": "passive",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "0",
+        "tx_done": "0",
+        "tx_failed": "0",
+        "rx": "387",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      }
+    },
+    "receivers": {
+      "mg24": {
+        "target_counts": {
+          "46715621": 30,
+          "66780945": 4
+        },
+        "rx_events": 448,
+        "unexpected_tx_events": 0,
+        "invalid_mac_fcs": 0,
+        "wrong_fcs_representation": 0,
+        "hardware_crc_only": 0,
+        "independently_crc_valid": 448,
+        "unmatched_frames": 414
+      },
+      "c6": {
+        "target_counts": {
+          "46715621": 30,
+          "66780945": 4
+        },
+        "rx_events": 387,
+        "unexpected_tx_events": 0,
+        "invalid_mac_fcs": 0,
+        "wrong_fcs_representation": 0,
+        "hardware_crc_only": 387,
+        "independently_crc_valid": 0,
+        "unmatched_frames": 353
+      }
+    },
+    "shared_valid_target_payload_hashes": 34,
+    "same_open_post_stop_health": {
+      "rx_hold_failed": "0",
+      "rx_fifo_overflow": "0",
+      "rx_frame_error": "33",
+      "rx_packet_status_invalid": "0",
+      "rx_packet_length_invalid": "0",
+      "rx_packet_details_failed": "0",
+      "rx_packet_layout_invalid": "0",
+      "rx_calibration_failed": "0",
+      "counter_bits": "32",
+      "scope": "last_start_attempt"
+    },
+    "interpretation": "All33 aggregate drops in this recheck correspond to RAIL frame-error occurrences; no FIFO, hold, adapter or calibration failures reported. Accepted448 equals delivered448, so no shared-ring loss observed. RAIL frame-error category covers CRC, block-decoding and illegal length; cannot assign the earlier58 retrospectively or infer an RF loss denominator. Strict assessment remains failed."
+  },
+  "final_preservation": {
+    "status": "PASS",
+    "boards": {
+      "mg24": {
+        "full_bytes": 1572864,
+        "full_sha256": "308a2a6f13e3d13395a88b2c6776cda09b72d2177b29f876fc1bc1990ade3da1",
+        "application_sha256": "5fbf1df2bb430ed8a4de05ed176213b9169d8386f10e816a5ee156b7194fb80d",
+        "application_exact": true,
+        "outside_app_erase_pages_matches_previous_stage": true,
+        "outside_app_erase_pages_matches_intermediate": true,
+        "erase_start_offset": "0x6000",
+        "erase_end_offset_exclusive": "0x1a000",
+        "high_page_08174000_unchanged": true
+      },
+      "c6": {
+        "full_bytes": 4194304,
+        "full_sha256": "b7abf700f33423f67964dbcc4df4ba9faf5a1f0bfb6fbf3b87f52e22b2ced44c",
+        "application_sha256": "98f3a0826ca749717fff8b919078a6c2fc52712a925077903207fee989f872a2",
+        "application_exact": true,
+        "outside_app_erase_pages_matches_previous_stage": true,
+        "outside_app_erase_pages_matches_intermediate": true,
+        "erase_start_offset": "0x10000",
+        "erase_end_offset_exclusive": "0x40000",
+        "entire_flash_unchanged_since_initial_rx_readback": true
+      }
+    },
+    "idle_receipt_sha256": "1140027aca3443cb23484a293173aa4137071503a5c36d73b5a28c18af2a3d2a",
+    "both_radios_verified_inactive": true,
+    "known_readback_resets": "C6 ROM readback and later serial open reset the C6; MG24 SWD halt/resume preserved stopped session and reason counters."
+  },
+  "limitations": [
+    "Both strict captures remain failed: MG24 initial aggregate58 and recheck33; only the recheck is classified as RAIL frame-error occurrences.",
+    "C6 original USB stall remains unresolved.",
+    "C6 FCS is replaced by SDK metadata; radio CRC evidence is hardware-only.",
+    "Shared payload hashes do not establish timing correlation or complete reception.",
+    "Experimental receive evidence is not full Livolo gateway, updater or sustained-load qualification."
+  ],
+  "boards": {
+    "mg24": {
+      "build": "xiao-rx-2",
+      "application_bytes": 81832,
+      "application_sha256": "5fbf1df2bb430ed8a4de05ed176213b9169d8386f10e816a5ee156b7194fb80d",
+      "initial_rx_application_sha256": "160e15130b9bf42cade5e2116b20119ca647905b647211d2762ab92e1e1b8d8b",
+      "app_address": "0x08006000",
+      "erase_end_exclusive": "0x0801a000",
+      "gateway_ready": false
+    },
+    "c6": {
+      "build": "xiao-rx-1",
+      "application_bytes": 196320,
+      "application_sha256": "98f3a0826ca749717fff8b919078a6c2fc52712a925077903207fee989f872a2",
+      "app_address": "0x00010000",
+      "erase_end_exclusive": "0x00040000",
+      "gateway_ready": false
+    }
+  },
+  "offline_verification": {
+    "core_passive_and_synthetic_regressions": "PASS under ASan/UBSan and warnings as errors",
+    "c6_actual_usb_loop_and_health_regressions": "PASS under ASan/UBSan and warnings as errors",
+    "mg24_reason_counter_tests": "PASS under ASan/UBSan and warnings as errors",
+    "host_readiness_cases": 24,
+    "host_readiness_result": "PASS",
+    "public_bench_tests": 36,
+    "public_bench_result": "PASS",
+    "private_wrapper_gate": "PASS; strict failed assessment preserved, inactive/busy/fault gates and bounded fields checked",
+    "exact_image_and_wrapper_review": "Release Engineering PASS before each install/recheck"
+  },
+  "provenance": {
+    "initial_built_source_archive_sha256": "fd6f5e8769601f7b9fadb86afcab38845870e901baed880d0a1324c453b0c550",
+    "final_mg24_built_source_archive_sha256": "2dbaf675ba573111436a1b6a2396dab30bf836b4d3af12dca5818139ff14c33b",
+    "private_wrapper_sha256": "f6d96ce9599657406849f68489016d8ba5792b19cfce8c99d048997a8fc7905f",
+    "public_rx_harness_sha256": "628c8627b9d0c1dbb287d5c33cd6b04f50575b33046271a0caafac2fdc5b32ef",
+    "shared_rf_harness_sha256": "0cce908131c2a8235e15916c4ad9540bad78a3526aad658b5d33052a302acc35",
+    "decoder_sha256": "480bea8878ded680f5d802727ae86e934887694e108aa33fd748debd05001707"
+  },
+  "existing_setup_preservation": {
+    "verified_at_utc": "2026-11-07T23:49:05.242778+00:00",
+    "running": true,
+    "restarts": 0,
+    "config_matches_protected_backup": true,
+    "catalog_files": 16,
+    "catalog_matches_protected_backup": true,
+    "database_quick_check": "ok",
+    "radio_ready": true,
+    "mqtt_connected": true,
+    "device_count": 0,
+    "ha_accessed": false,
+    "service_mutations": 0,
+    "container_started_at_unchanged": true,
+    "published_image_unchanged": true
+  }
+}

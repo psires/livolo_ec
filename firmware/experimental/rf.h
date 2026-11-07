@@ -14,8 +14,8 @@
 struct ec_rf_ops {
 	/* Monotonic microseconds modulo 2^32; callable from the owning main task. */
 	uint32_t (*now_us)(void);
-	/* Start fixed channel-26 RX/no-ACK at <=0dBm; zero succeeds, nonzero fails. */
-	int (*start)(void);
+	/* Start no-ACK RX on 11 (passive) or 26 (synthetic); reject other channels. */
+	int (*start)(unsigned channel);
 	/* Cancel hardware and quiesce callbacks; nonzero permanently fences restart. */
 	int (*stop)(void);
 	/* Borrow mac[length] through terminal completion; cca is zero/one.
@@ -26,13 +26,15 @@ struct ec_rf_ops {
 	void (*poll)(void);
 	/* Read configured dBm (not measured RF power); positive values reject start. */
 	int (*power_dbm)(void);
+	/* Optional read-only board diagnostics; zero suppresses an incomplete reply. */
+	size_t (*health)(char *out, size_t capacity);
 };
 
 /** @brief Install board operations without initializing or enabling the radio.
  * @param ops Static board adapter; callbacks remain valid for firmware lifetime.
  */
 void ec_rf_setup(const struct ec_rf_ops *ops);
-/** @brief Handle strictly bounded synthetic RF diagnostics, never arbitrary TX.
+/** @brief Handle bounded passive/synthetic diagnostics, never arbitrary TX.
  * @param command Complete command after the numeric request ID.
  * @param out Response body storage, not including the UART RSP prefix.
  * @param capacity Available response bytes including NUL.

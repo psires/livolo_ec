@@ -4,7 +4,9 @@ Status: experimental transport and bounded raw-radio diagnostics, not a supporte
 gateway or updater target. The app shares the
 [experimental parser](../experimental/README.md). RF stays off until an explicit
 `RFSTART` opens a 60-second synthetic channel-26 window, as described in the
-[bench contract](../../docs/XIAO_RF_BENCH.md). Wi-Fi and Bluetooth are not started.
+[bench contract](../../docs/XIAO_RF_BENCH.md). `RFLISTEN` instead opens a fixed
+60-second receive-only channel-11 window with automatic ACKs disabled and RFTX
+rejected in both the core and adapter. Wi-Fi and Bluetooth are not started.
 Production protocol and scheduler integration remain subsequent work. USB writes are bounded
 and retain a pending reply offset across partial writes; a stalled reader cannot
 splice two replies together. Failed reads are retried with a bounded yield.
@@ -75,3 +77,30 @@ hidden ACKs or qualify ACK timing. Both runs ended with RF off. An earlier C6
 USB-unresponsive episode with periodic backtrace hints remains unexplained;
 reinstalling the exact image recovered it, and no console or stack workaround
 is part of the tested source. These short runs do not establish long-term stability.
+
+The `xiao-rx-1` build adds read-only `RFHEALTH`: SDK reset reason, boot-relative
+`uptime_ms`, main-loop and USB read/write counters, pending unsent bytes, main-task
+stack low-water mark in bytes, and task-watchdog report count. All counters and
+uptime are unsigned modulo 2^32; uptime wraps after about 49.7 days. The watchdog
+hook only increments an IRAM-safe atomic counter. It neither feeds the watchdog
+nor changes panic, console, stack-size or reset policy. Counters initialize before
+USB driver installation so startup reports are retained. Watermark/formatting
+instrumentation changes stack use and timing; it is diagnostic evidence, not a
+causal fix. Repeated ROM banners alone do not establish MCU resets: compare
+uptime/reset reason within an open session and across explicit close/reopen.
+
+The passive stage received both known switch signatures in each of two
+30-second channel-11 windows, with 325 and 387 accepted frames respectively,
+matching delivered event counts and no reported C6 drops. These short windows
+do not establish sustained reliability or completeness of RF reception.
+
+Three RF-off close/reopen cycles each restarted uptime near zero and reported
+`ESP_RST_USB`, then progressed for seven seconds without task-watchdog reports
+or I/O errors. One further comparison left the port closed for five seconds;
+uptime was still only 31 ms after reopening and reached 7033 ms in the same open
+session. This demonstrates a USB reset associated with the tested close/reopen
+sequence, not merely replayed ROM text. It does not isolate a specific control
+line, kernel operation or electrical edge, or explain the original stall.
+Serial open is therefore not guaranteed to preserve prior MCU state, even with
+DTR/RTS configured false. See the
+[passive reception receipt](../../docs/verification/xiao-rx-20261108.json).

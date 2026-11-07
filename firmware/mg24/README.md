@@ -3,7 +3,9 @@
 Status: experimental transport and bounded raw-radio diagnostics, not a supported
 gateway or updater target. The application boots with RF off. An explicit
 `RFSTART` opens a 60-second channel-26 synthetic test window; see the
-[bench contract](../../docs/XIAO_RF_BENCH.md). It shares the bounded
+[bench contract](../../docs/XIAO_RF_BENCH.md). `RFLISTEN` opens only a 60-second
+channel-11 receive window, with automatic ACKs disabled and transmission rejected
+by the core and adapter. It shares the bounded
 [experimental parser](../experimental/README.md). Production protocol, peer,
 phase and scheduler support remain subsequent work.
 
@@ -23,6 +25,28 @@ PB4 low/PB5 high selects and enables the onboard antenna. UART RX is interrupt
 buffered; TX and parsing run in the main loop. Held RAIL RX packets are copied
 and released in bounded main-loop batches, retaining original FCS bytes.
 This transport is not yet qualified under sustained radio load.
+
+The `xiao-rx-2` diagnostic build implements read-only `RFHEALTH` with separate
+32-bit modulo occurrence counts for failed packet holds, FIFO overflow, frame
+errors, invalid packet status/length, details lookup failure, invalid packet
+layout and calibration failure. Counts clear while inactive before each adapter
+start attempt (`scope=last_start_attempt`), including failed attempts; STOP and
+health reads preserve them. This instant precedes the shared core's successful
+session counter reset. Simultaneous FIFO/error flags count both reasons but keep
+the existing single aggregate drop, and one frame may produce multiple hardware
+events. These are diagnostic occurrences, not an exact lost-packet denominator.
+The first failed packet predicate determines its adapter reason; release order,
+queue sizes, RX acceptance and aggregate drop policy are unchanged.
+
+Two 30-second passive windows received valid native reports from both the known
+one-gang and two-gang switches. The initial capture had 58 aggregate drops and
+therefore failed the strict bench integrity check. A single instrumented recheck
+received 448 accepted frames, all delivered with independently valid FCS, and
+classified all 33 aggregate drops as RAIL frame-error events. All other reason
+counters were zero. RAIL frame errors can include CRC, block-decoding or illegal
+length errors; this does not establish their RF cause or attribute the earlier
+58 events. The recheck remains a strict failure, with no acceptance relaxation.
+See the [passive reception receipt](../../docs/verification/xiao-rx-20261108.json).
 
 Build with a separate Gecko SDK 4.4.6 checkout, commit
 `59d2160fe448b13730a91c0f019a8b4c53c43eb2`, including Device/EFR32MG24,

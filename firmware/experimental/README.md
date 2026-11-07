@@ -5,7 +5,8 @@ Livolo gateway. It uses UART v3 line framing but implements only PING, VERSION,
 CAPS and STATUS. Without a radio hook, every other command returns
 `ERR UNSUPPORTED`. RF-enabled builds additionally expose strictly bounded
 `RFSTART`, `RFSTATUS`, `RFTX` and `RFSTOP` diagnostics described in the
-[bench contract](../../docs/XIAO_RF_BENCH.md). No production raw-send, network,
+[bench contract](../../docs/XIAO_RF_BENCH.md), plus fixed-channel passive listening
+and optional read-only board health. No production raw-send, network,
 pairing, persistent state, update or request-cache implementation exists.
 It advertises zero peers, ACK mask, lease, session and raw-frame capacity so the
 real daemon refuses readiness before sending NETWORK or ARM. Unknown experimental
@@ -18,6 +19,22 @@ Board/build tokens are bounded and validated, and undersized output storage
 never emits a partial response. Ordinary diagnostic replies are side-effect-free.
 RF commands can start/stop a temporary radio window or admit a single synthetic
 transmission. Requests are not cached: never replay RFTX after a lost response.
+
+`RFLISTEN <nonce>` accepts the same nonzero eight-character lowercase hexadecimal
+nonce as RFSTART, but opens a **60-second channel-11 receive-only window**.
+Automatic ACKs remain disabled; every RFTX is rejected in passive mode, with an
+additional channel-26 guard in each board's send function. RFSTART still opens
+only the channel-26 synthetic window. Stop the current window before changing
+modes. RFSTATUS reports `mode=passive|synthetic` and the last selected channel,
+retaining both after STOP or expiry; startup is inactive with channel 26 selected.
+CAPS identifies the receive-only contract with `rx_diag=passive_v1` and the build
+tokens are `xiao-rx-1` on C6 and `xiao-rx-2` on MG24. Production gateway
+capabilities remain zero.
+
+`RFHEALTH` never starts RF. C6 reports USB, reset and watchdog diagnostics in its
+[board notes](../esp32c6/README.md); MG24 reports receive-discard reason occurrences
+as described in its [board notes](../mg24/README.md). Unsupported adapters return
+`ERR RF_HEALTH_UNSUPPORTED`.
 
 Run the real C parser with address/undefined-behavior sanitizers:
 

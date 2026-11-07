@@ -37,11 +37,12 @@ jobs:
           node --test host/tests/test_web_*.js
       - name: Test gateway UART and peer management
         run: python -m unittest discover -s firmware/gateway/tests -p 'test_*.py'
-      - name: Test experimental diagnostic and USB transports
+      - name: Test experimental transports and radio diagnostics
         timeout-minutes: 2
         run: |
           make -C firmware/experimental test BUILD="$RUNNER_TEMP/experimental-transport"
           make -C firmware/esp32c6/tests test BUILD="$RUNNER_TEMP/esp32c6-usb-transport"
+          make -C firmware/mg24/tests test BUILD="$RUNNER_TEMP/mg24-health"
       - name: Test update authentication and rollback
         run: python -m unittest discover -s firmware/update/tests -p 'test_*.py'
       - name: Test Silicon Labs UART and Nordic clock handling

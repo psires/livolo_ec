@@ -78,7 +78,9 @@ static size_t reply(struct ec_experimental *state, char *out, size_t capacity)
 			"gateway=0 radio_tx=%s%s build=%s",
 			state->baud, state->board,
 			state->radio_command ? "synthetic_only" : "0",
-			state->radio_command ? " rf_diag=synthetic_v1" : "",
+			state->radio_command
+				? " rf_diag=synthetic_v1 rx_diag=passive_v1"
+				: "",
 			state->build);
 		if (length < 0 || (size_t)length >= sizeof(body))
 			return 0;
