@@ -1,6 +1,7 @@
 """Bounded, single-device commissioning using fresh native pairing evidence."""
 
 import asyncio
+from copy import deepcopy
 from dataclasses import replace
 import json
 import sqlite3
@@ -52,7 +53,7 @@ class Commissioning:
             return None
         return dict(
             self.state,
-            observations=[dict(item) for item in self.state.get("observations", [])],
+            observations=deepcopy(self.state.get("observations", [])),
             seconds_remaining=(
                 max(0, int(self.deadline - time.monotonic())) if self.active else 0
             ),
@@ -194,6 +195,22 @@ class Commissioning:
         observations = self.state["observations"]
         old = next(
             (item for item in observations if item["device"] == packet.source), None
+        )
+        # Diagnostic bytes never participate in selection or restored freshness.
+        # Keep the first counter value per signature, avoiding writes on repeats.
+        evidence = list(old.get("pairing_evidence", [])) if old else []
+        truncated = old.get("pairing_evidence_truncated", False) if old else False
+        if not any(
+            f"{item['suffix']}:{item['payload'][:12]}:{item['payload'][14:]}"
+            == profile["signature"]
+            for item in evidence
+        ):
+            if len(evidence) < 2:
+                evidence.append(dict(suffix=packet.suffix, payload=packet.data.hex()))
+            else:
+                truncated = True
+        observation.update(
+            pairing_evidence=evidence, pairing_evidence_truncated=truncated
         )
         if old != observation:
             if old is not None:

@@ -282,7 +282,7 @@ class LivoloOptionsFlow(OptionsFlow):
                 f"{item['device']}: {item['explanation']}"
                 for item in details.get("observations", [])
             )
-            or "None"
+            or "No pairing announcements recorded."
         )
         return self.async_show_form(
             step_id="pairing_status",
@@ -302,7 +302,12 @@ class LivoloOptionsFlow(OptionsFlow):
                 "device": details.get("device") or "Not detected",
                 "outputs": str(details.get("outputs") or "Not detected"),
                 "registered": "Yes" if details.get("registered") else "No",
-                "reason": details.get("reason") or "None",
+                "reason": details.get("reason")
+                or (
+                    "Still in progress; no session error reported."
+                    if manager.active
+                    else "No session error reported."
+                ),
                 "observations": observations,
             },
         )

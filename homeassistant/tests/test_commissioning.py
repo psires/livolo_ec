@@ -1,6 +1,8 @@
 """Real HA gateway controls observe one shared pairing session without automatic retries."""
 
 from copy import deepcopy
+import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -271,6 +273,63 @@ async def test_options_attach_without_second_start_and_preserve_advanced_menu(
         submit.assert_not_called()
 
 
+@pytest.mark.parametrize("status", ["listening", "expired"])
+async def test_options_distinguish_observed_unknown_profile_from_session_outcome(
+    hass, pairing, status
+):
+    """Unknown announcements explain rejection without claiming an active window has failed.
+
+    @param hass Actual HA instance.
+    @param pairing Native commissioning fixture with no registration.
+    @param status Listening observation or its later expired session outcome.
+    """
+    value = session(
+        status=status,
+        error="unsupported_device_seen" if status == "expired" else None,
+        observations=[
+            {
+                "device": "67181844",
+                "outputs": None,
+                "suffix": "0002",
+                "profile": None,
+                "reason": "unknown_pairing_payload",
+            }
+        ],
+    )
+    await pairing.publish(session())
+    with patch.object(pairing.gateway.entry.runtime_data.client, "command") as submit:
+        result = await hass.config_entries.options.async_init(
+            pairing.gateway.entry.entry_id
+        )
+        pairing.data["commissioning"] = value
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "pair_new"}
+        )
+        fields = result["description_placeholders"]
+        assert fields["status"] == status
+        assert fields["registered"] == "No" and fields["outputs"] == "Not detected"
+        assert "Unrecognized pairing signature" in fields["observations"]
+        if status == "listening":
+            assert fields["reason"] == "Still in progress; no session error reported."
+        else:
+            assert fields["reason"].startswith("Only unsupported announcements")
+        strings = json.loads(
+            (
+                Path(__file__).resolve().parents[2]
+                / "custom_components/livolo_ec/strings.json"
+            ).read_text()
+        )
+        description = strings["options"]["step"]["pairing_status"][
+            "description"
+        ].format(**fields)
+        assert "None" not in description and ".." not in description
+        assert (
+            "Session result:" in description
+            and "Observed announcements:" in description
+        )
+        submit.assert_not_called()
+
+
 async def test_options_explicit_start_refresh_and_cancel(hass, pairing):
     """The secondary entry point submits only explicit start and cancel actions.
 
@@ -366,3 +425,94 @@ async def test_unresolved_start_can_be_resolved_by_read_only_result(hass, pairin
         assert submit.await_count == 1
         lookup.assert_awaited_once_with(ident)
         notify.assert_not_called()
+
+
+@pytest.mark.parametrize("include_evidence", [False, True])
+async def test_pairing_evidence_attributes_and_anonymous_download(
+    hass, pairing, include_evidence
+):
+    """Diagnostic evidence survives push without entering the main form or revealing identities.
+
+    @param hass Actual HA instance.
+    @param pairing Native session fixture and actual gateway status sensor.
+    @param include_evidence Legacy observation or newer bounded diagnostic evidence.
+    """
+    from custom_components.livolo_ec.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    observation = {
+        "device": "67181844",
+        "suffix": "0002",
+        "reason": "unknown_pairing_payload",
+        "raw": "secret-frame",
+    }
+    if include_evidence:
+        observation.update(
+            pairing_evidence=[
+                {
+                    "suffix": "0002",
+                    "payload": "0002030534990400",
+                    "raw": "secret-packet",
+                }
+            ],
+            pairing_evidence_truncated=False,
+        )
+    value = session(
+        session_id="private-session", name="Private kitchen", observations=[observation]
+    )
+    await pairing.publish(value)
+    attributes = hass.states.get(pairing.sensor).attributes["observations"][0]
+    download = await async_get_config_entry_diagnostics(hass, pairing.gateway.entry)
+    sanitized = download["commissioning"]["observations"][0]
+    assert download["commissioning"]["status"] == "listening"
+    assert download["commissioning"]["registered"] is False
+    assert (
+        sanitized["outputs"] is None
+        and sanitized["reason"] == "unknown_pairing_payload"
+    )
+    if include_evidence:
+        assert (
+            attributes["pairing_evidence"]
+            == sanitized["pairing_evidence"]
+            == [{"suffix": "0002", "payload": "0002030534990400"}]
+        )
+        assert sanitized["pairing_evidence_truncated"] is False
+    else:
+        assert (
+            "pairing_evidence" not in sanitized and "pairing_evidence" not in attributes
+        )
+    for private in ("67181844", "private-session", "Private kitchen", "secret", "raw"):
+        assert private not in json.dumps(download)
+    result = await hass.config_entries.options.async_init(
+        pairing.gateway.entry.entry_id
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "pair_new"}
+    )
+    assert "0002030534990400" not in str(result["description_placeholders"])
+
+
+async def test_malformed_pairing_evidence_download_fails_closed(hass, pairing):
+    """Invalid evidence is excluded from diagnostic exports without fabricating success.
+
+    @param hass Actual HA instance.
+    @param pairing Session stream carrying untrusted optional metadata.
+    """
+    from custom_components.livolo_ec.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    await pairing.publish(
+        session(
+            observations=[
+                {
+                    "device": "67181844",
+                    "pairing_evidence": [{"suffix": "0002", "payload": "secret"}],
+                }
+            ]
+        )
+    )
+    download = await async_get_config_entry_diagnostics(hass, pairing.gateway.entry)
+    assert download["commissioning"] == {"status": "invalid"}
+    assert "secret" not in json.dumps(download)

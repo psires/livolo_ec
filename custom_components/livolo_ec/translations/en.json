@@ -121,7 +121,7 @@
       },
       "pairing_status": {
         "title": "Pairing session",
-        "description": "Status: **{status}**. {explanation}\n\nSession: {session}. Remaining: {remaining} seconds. Device: **{device}**. Outputs: **{outputs}**. Registered: **{registered}**.\n\nReason: {reason}. Observations: {observations}.\n\nRegistration is not pairing confirmation. Submit to refresh an active session or select Stop to close it. Submit after a terminal result to close this report. Closing this dialog does not stop the daemon session; it expires automatically. The gateway Pairing status updates live.",
+        "description": "Status: **{status}**. {explanation}\n\nSession: {session}. Remaining: {remaining} seconds. Device: **{device}**. Outputs: **{outputs}**. Registered: **{registered}**.\n\nSession result: {reason}\n\nObserved announcements: {observations}\n\nRegistration is not pairing confirmation. Submit to refresh an active session or select Stop to close it. Submit after a terminal result to close this report. Closing this dialog does not stop the daemon session; it expires automatically. The gateway Pairing status updates live.",
         "data": {
           "stop": "Stop this pairing session"
         }

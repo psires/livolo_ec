@@ -219,6 +219,20 @@ selected. `observations` contains at most eight fresh device observations with
 unsupported devices without registering them. Names default to `Livolo <ID>`;
 existing rename and advanced targeted pairing remain available after the session.
 
+New observations optionally include `pairing_evidence`, an array of at most two
+objects containing `suffix` (exactly four lowercase hexadecimal characters) and
+`payload` (exactly sixteen lowercase hexadecimal characters, the eight decoded
+application bytes). The first payload for each of the first two distinct
+`suffix:first-six-bytes:last-byte` signatures is retained; counter-byte-only
+repeats do not replace it. `pairing_evidence_truncated` is true if further distinct
+signatures were seen for that retained observation. The existing eight-observation
+limit still applies. Evidence comes only from checksum-valid, eligible native
+announcements in an explicitly started session; it is diagnostic evidence, not
+device authentication or qualification. It persists with terminal session data
+and never restores freshness or admission eligibility. Older sessions and daemons
+may omit both fields; clients must tolerate their absence. No raw UART capture or
+automatic retry is enabled.
+
 Active statuses are `listening`, `registering`, `pairing`. Terminal statuses are
 `confirmed`, `expired`, `cancelled`, `conflict`, `failed`, `unknown`. The latest
 session persists across reloads/restarts; a process restart converts an active

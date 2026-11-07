@@ -131,3 +131,70 @@ def test_invalid_session_cannot_claim_pairing(changes):
     value.update(changes)
     with pytest.raises(IncompatibleError):
         commissioning_data(value)
+
+
+@pytest.mark.parametrize("include_evidence", [False, True])
+def test_pairing_evidence_preserves_legacy_and_bounded_new_observations(
+    include_evidence,
+):
+    """Additive diagnostics preserve exact bytes while stripping unrelated packet fields.
+
+    @param include_evidence Whether the daemon supports optional bounded payload evidence.
+    """
+    observation = {
+        "device": "67181844",
+        "suffix": "0002",
+        "reason": "unknown_pairing_payload",
+    }
+    if include_evidence:
+        observation.update(
+            pairing_evidence=[
+                {
+                    "suffix": "0002",
+                    "payload": "0002030534990400",
+                    "raw_frame": "secret",
+                },
+                {"suffix": "0001", "payload": "0001010534010500"},
+            ],
+            pairing_evidence_truncated=True,
+        )
+    value = session(observations=[observation])
+    result = commissioning_data(value)["observations"][0]
+    if include_evidence:
+        assert result["pairing_evidence"] == [
+            {"suffix": "0002", "payload": "0002030534990400"},
+            {"suffix": "0001", "payload": "0001010534010500"},
+        ]
+        assert result["pairing_evidence_truncated"] is True
+        assert "secret" not in str(result)
+        assert observation["pairing_evidence"][0]["raw_frame"] == "secret"
+    else:
+        assert "pairing_evidence" not in result
+        assert "pairing_evidence_truncated" not in result
+    assert result["outputs"] is None
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"pairing_evidence": None},
+        {"pairing_evidence": {}},
+        {"pairing_evidence": [{"suffix": "0002", "payload": "0" * 16}] * 3},
+        {"pairing_evidence": [None]},
+        {"pairing_evidence": [{"suffix": "0002"}]},
+        {"pairing_evidence": [{"suffix": "0002", "payload": "0" * 18}]},
+        {"pairing_evidence": [{"suffix": "0002", "payload": "A" * 16}]},
+        {"pairing_evidence": [{"suffix": "00022", "payload": "0" * 16}]},
+        {"pairing_evidence": [{"suffix": 2, "payload": "0" * 16}]},
+        {"pairing_evidence_truncated": 1},
+        {"pairing_evidence_truncated": "false"},
+    ],
+)
+def test_pairing_evidence_rejects_malformed_or_oversized_fields(extra):
+    """Unbounded or malformed diagnostic evidence cannot masquerade as a valid session.
+
+    @param extra Invalid optional evidence fields on an otherwise valid observation.
+    """
+    observation = dict(device="67181844", suffix="0002", **extra)
+    with pytest.raises(IncompatibleError):
+        commissioning_data(session(observations=[observation]))

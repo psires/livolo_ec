@@ -118,6 +118,11 @@ async def test_native_pairing_creates_devices_and_notifies_only_after_confirmati
             await eventually(lambda: hass.states.get(status).state == "pairing")
             await eventually(lambda: len(hass.states.async_all("switch")) == outputs)
             assert service.commissioning.state["registered"]
+            observation = hass.states.get(status).attributes["observations"][0]
+            assert observation["pairing_evidence"] == [
+                {"suffix": f"{outputs:04x}", "payload": decode(raw).data.hex()}
+            ]
+            assert observation["pairing_evidence_truncated"] is False
             await asyncio.sleep(0.1)
             assert service.commissioning.state["status"] == "pairing"
             notify.assert_not_called()

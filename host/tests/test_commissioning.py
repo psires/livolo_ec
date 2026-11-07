@@ -1,6 +1,7 @@
 """Offline commissioning policy and real service-loop reconciliation tests."""
 
 import asyncio
+import binascii
 from dataclasses import replace
 import json
 from pathlib import Path
@@ -151,6 +152,152 @@ class CommissioningTests(unittest.TestCase):
         self.clock.return_value += 1
         self.manager.tick()
         self.assertEqual(self.manager.state["status"], "registering")
+
+    def test_unknown_evidence_survives_expiry_and_reopened_database(self):
+        """Exact unknown bytes survive terminal persistence without becoming a profile."""
+        self.start(seconds=10)
+        payload = "0002030534007f00"
+        self.receive(announcement(suffix="0002", body=payload))
+        observation = self.manager.snapshot()["observations"][0]
+        self.assertEqual(
+            observation["pairing_evidence"],
+            [{"suffix": "0002", "payload": payload}],
+        )
+        self.assertFalse(observation["pairing_evidence_truncated"])
+        self.assertIsNone(observation["outputs"])
+        self.assertIsNone(self.manager.candidate)
+        self.clock.return_value += 10
+        self.manager.tick()
+        self.store.close()
+        reopened = Store(self.config.database, "test")
+        self.addCleanup(reopened.close)
+        restored = Service(self.config, reopened).commissioning
+        self.assertEqual(restored.snapshot()["observations"], [observation])
+        self.assertEqual(restored.state["status"], "expired")
+        self.assertFalse(restored.active)
+        self.assertIsNone(restored.candidate)
+        self.assertFalse(restored.signatures)
+        self.assertFalse(self.service.devices)
+
+    def test_conflicting_evidence_keeps_first_and_second_payload(self):
+        """Both known/unknown arrival orders retain the bytes that caused rejection."""
+        known = "0001010534010400"
+        unknown = "0001010534000400"
+        for index, payloads in enumerate(((known, unknown), (unknown, known))):
+            self.service.submit("commission", {"request_id": f"conflict-{index}"})
+            for payload in payloads:
+                self.receive(announcement(body=payload))
+            observation = self.manager.snapshot()["observations"][0]
+            self.assertEqual(
+                observation["pairing_evidence"],
+                [{"suffix": "0001", "payload": value} for value in payloads],
+            )
+            self.assertEqual(self.manager.state["status"], "conflict")
+            self.assertFalse(self.service.devices)
+            restored = Commissioning(self.service)
+            self.assertEqual(restored.snapshot()["observations"], [observation])
+            self.assertEqual(restored.state["status"], "conflict")
+            self.assertIsNone(restored.candidate)
+
+    def test_active_unknown_evidence_is_history_after_restart(self):
+        """Restored evidence explains interruption but cannot qualify a new window."""
+        self.start()
+        self.receive(announcement(body="0001010534010401"))
+        observations = self.manager.snapshot()["observations"]
+        service = Service(self.config, self.store)
+        restored = service.commissioning
+        self.assertEqual(restored.state["status"], "unknown")
+        self.assertEqual(restored.state["error"], "daemon_restarted")
+        self.assertEqual(restored.snapshot()["observations"], observations)
+        self.assertIsNone(restored.candidate)
+        self.assertFalse(service.devices)
+        service.ready = True
+        service.session = "new-owned-session"
+        service.submit("commission", {"request_id": "new-window"})
+        self.assertEqual(restored.snapshot()["observations"], [])
+        self.assertIsNone(restored.candidate)
+        self.assertFalse(restored.signatures)
+
+    def test_evidence_bounds_and_counter_repeats_do_not_write(self):
+        """Two signatures and eight devices bound evidence; repeats do not amplify writes."""
+        self.start()
+        first = "0001010534000400"
+        self.receive(announcement(body=first))
+        with patch.object(self.manager, "save", wraps=self.manager.save) as save:
+            self.receive(announcement(body="000101053400ff00"))
+            save.assert_not_called()
+        self.receive(announcement(suffix="0003", body=first))
+        self.receive(announcement(suffix="0004", body=first))
+        observation = self.manager.snapshot()["observations"][0]
+        self.assertEqual(
+            observation["pairing_evidence"],
+            [dict(suffix=suffix, payload=first) for suffix in ("0001", "0003")],
+        )
+        self.assertTrue(observation["pairing_evidence_truncated"])
+        with patch.object(self.manager, "save", wraps=self.manager.save) as save:
+            self.receive(announcement(suffix="0004", body=first))
+            save.assert_not_called()
+        for index in range(12):
+            self.receive(announcement(device=f"123456{index:02x}", body=first))
+        observations = self.manager.snapshot()["observations"]
+        self.assertEqual(len(observations), 8)
+        for item in observations:
+            self.assertLessEqual(len(item["pairing_evidence"]), 2)
+            for evidence in item["pairing_evidence"]:
+                self.assertRegex(evidence["suffix"], r"^[0-9a-f]{4}$")
+                self.assertRegex(evidence["payload"], r"^[0-9a-f]{16}$")
+        self.assertIsNone(self.manager.candidate)
+
+    def test_evidence_snapshot_is_detached_and_legacy_session_loads(self):
+        """Nested evidence cannot mutate policy state; old stored summaries stay readable."""
+        self.start()
+        self.receive()
+        snapshot = self.manager.snapshot()
+        snapshot["observations"][0]["pairing_evidence"][0]["payload"] = "bad"
+        snapshot["observations"][0]["pairing_evidence"].clear()
+        self.assertEqual(
+            self.manager.snapshot()["observations"][0]["pairing_evidence"],
+            [dict(suffix="0001", payload="0001010534010400")],
+        )
+        self.manager.finish("cancelled")
+        legacy = self.manager.snapshot()
+        for item in legacy["observations"]:
+            del item["pairing_evidence"]
+            del item["pairing_evidence_truncated"]
+        with self.store.db:
+            self.store.db.execute(
+                "UPDATE meta SET value=? WHERE key='commissioning_session'",
+                (json.dumps(legacy),),
+            )
+        restored = Commissioning(self.service)
+        self.assertEqual(restored.snapshot()["observations"], legacy["observations"])
+        self.assertFalse(restored.active)
+
+    def test_ineligible_packets_never_create_diagnostic_evidence(self):
+        """CRC, envelope, explicit-window and retained/session guards also bound diagnostics."""
+        self.receive()
+        self.start(seconds=10)
+        self.receive(received=99)
+        self.receive(retained=True)
+        self.receive(announcement(tag="a7"))
+        self.receive(announcement(destination="12345678"))
+        self.receive(announcement(opcode=5))
+        corrupt = bytearray(announcement())
+        corrupt[29] ^= 1
+        self.receive(bytes(corrupt))
+        self.receive(announcement()[:-1])
+        self.receive(announcement() + b"\x00")
+        relayed = bytearray(announcement())
+        relayed[23:27] = bytes.fromhex("12345678")
+        relayed[37:] = binascii.crc_hqx(relayed[21:37], 0xFFFF).to_bytes(2, "big")
+        self.receive(bytes(relayed))
+        self.service.session = "another-session"
+        self.receive()
+        self.service.session = "owned"
+        self.clock.return_value += 10
+        self.receive()
+        self.assertEqual(self.manager.snapshot()["observations"], [])
+        self.assertIsNone(self.manager.candidate)
 
     def test_known_then_unknown_conflicts_and_multiple_devices_conflict(self):
         """Conflicting signatures and simultaneous eligible IDs cannot be auto-selected."""
