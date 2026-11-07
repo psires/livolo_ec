@@ -1,5 +1,10 @@
 # Standalone daemon and CLI distribution 0.4.0
 
+Development source now separates daemon package `0.14.0` from radio compatibility
+`0.13`; this is not a newly published 0.4.0 bundle. The instructions below describe
+the immutable published baseline. See the [versioning migration guide](../../docs/VERSIONING.md)
+before testing the next package. New source bundles include `docs/VERSIONING.md`.
+
 Download `livolo-ec-0.4.0-standalone.tar.gz` and `SHA256SUMS` from the
 [standalone 0.4.0 release](https://github.com/psires/livolo_ec/releases/tag/standalone-0.4.0).
 This distribution contains daemon **0.13**, native Python client **0.4.0**, the

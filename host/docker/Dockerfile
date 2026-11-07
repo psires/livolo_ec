@@ -11,7 +11,8 @@ RUN python -m pip install --no-cache-dir --no-deps -r requirements-nordic-build.
     && python -I -m nordicsemi dfu usb-serial --help > /dev/null
 
 FROM ${PYTHON_IMAGE} AS builder
-ARG RELEASE_VERSION=0.13
+ARG RELEASE_VERSION=0.14.0
+ARG FIRMWARE_COMPAT_VERSION=0.13
 WORKDIR /src
 COPY VERSION ./VERSION
 COPY host/pyproject.toml ./host/pyproject.toml
@@ -19,8 +20,7 @@ COPY host/PACKAGE.md ./host/PACKAGE.md
 COPY host/LICENSE ./host/LICENSE
 COPY host/docker/requirements-firmware.txt ./host/docker/requirements-firmware.txt
 COPY host/livolod ./host/livolod
-RUN python -c 'import pathlib, tomllib; from host.livolod import __version__; expected = pathlib.Path("VERSION").read_text().strip(); assert expected == __version__ == tomllib.loads(pathlib.Path("host/pyproject.toml").read_text())["project"]["version"]' \
-    && test "$(cat VERSION)" = "$RELEASE_VERSION" \
+RUN python -c 'import os, pathlib, tomllib; from host.livolod import __version__, FIRMWARE_COMPAT_VERSION; assert __version__ == os.environ["RELEASE_VERSION"] == tomllib.loads(pathlib.Path("host/pyproject.toml").read_text())["project"]["version"]; assert FIRMWARE_COMPAT_VERSION == os.environ["FIRMWARE_COMPAT_VERSION"] == pathlib.Path("VERSION").read_text().strip()' \
     && python -m pip wheel --no-cache-dir --no-deps --wheel-dir /wheels ./host \
     && python -m pip download --no-cache-dir --only-binary=:all: \
        --dest /wheels -r host/docker/requirements-firmware.txt paho-mqtt==2.1.0 \
@@ -29,11 +29,14 @@ RUN python -c 'import pathlib, tomllib; from host.livolod import __version__; ex
     && python -c 'import hashlib, pathlib; p = pathlib.Path("/sources/universal_silabs_flasher-0.0.31.tar.gz"); assert hashlib.sha256(p.read_bytes()).hexdigest() == "7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14"'
 
 FROM ${PYTHON_IMAGE} AS runtime
-ARG RELEASE_VERSION=0.13
+ARG RELEASE_VERSION=0.14.0
+ARG FIRMWARE_COMPAT_VERSION=0.13
 LABEL org.opencontainers.image.title="Livolo EC daemon" \
       org.opencontainers.image.description="Livolo EC UART to MQTT daemon" \
       org.opencontainers.image.licenses="BSD-2-Clause" \
-      org.opencontainers.image.version="${RELEASE_VERSION}"
+      org.opencontainers.image.version="${RELEASE_VERSION}" \
+      net.sfires.livolo.daemon-version="${RELEASE_VERSION}" \
+      net.sfires.livolo.firmware-compat-version="${FIRMWARE_COMPAT_VERSION}"
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 COPY --from=builder /sources /usr/share/livolo-ec/sources
 COPY --from=nordic-helper /sources/nordic /usr/share/livolo-ec/sources/nordic

@@ -453,6 +453,9 @@ def main(argv=None):
     @param argv Optional arguments for isolated tests; None uses the process command line.
     """
     parser = argparse.ArgumentParser(description=__doc__)
+    from .version import add_version_arguments
+
+    add_version_arguments(parser, software_flag=False)
     parser.add_argument("--config")
     commands = parser.add_subparsers(dest="action", required=True)
     install = commands.add_parser("install")
@@ -493,13 +496,16 @@ def main(argv=None):
         parser.error("--config is required for this operation")
     try:
         if args.action == "catalog":
-            from . import __version__
+            from . import FIRMWARE_COMPAT_VERSION
             from .firmware_catalog import provision
 
             print(
                 json.dumps(
                     provision(
-                        args.source, args.destination, __version__, args.manifest_sha256
+                        args.source,
+                        args.destination,
+                        FIRMWARE_COMPAT_VERSION,
+                        args.manifest_sha256,
                     )
                 )
             )
@@ -527,7 +533,7 @@ def main(argv=None):
             return
         config = load(args.config)
         if args.action == "flash":
-            from . import __version__
+            from . import FIRMWARE_COMPAT_VERSION
             from .firmware_artifacts import inspect_artifact
             from .firmware_bundle import BundleError
             from .firmware_preflight import build_report
@@ -547,7 +553,7 @@ def main(argv=None):
                     "artifact_invalid", "Artifact does not match the reviewed SHA-256"
                 )
             if (
-                candidate["version"] != __version__
+                candidate["version"] != FIRMWARE_COMPAT_VERSION
                 or config.serial_baudrate != candidate["app_baudrate"]
             ):
                 raise BundleError(

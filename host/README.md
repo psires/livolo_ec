@@ -9,7 +9,8 @@ authenticated native API. The radio module owns fast acknowledgements; the host 
 pairing, command tracking and reported output state.
 
 The former development Pi is stopped after the Home Assistant handover; see
-[deployment history and rollback](DEPLOYMENT.md). Current source release is 0.12.
+[deployment history and rollback](DEPLOYMENT.md). Current source daemon software
+is `0.14.0`, with exact radio firmware compatibility target `0.13`.
 Output control remains experimental and depends on the selected mode and radio
 capabilities described below; hardware results apply to the tested switch models.
 
@@ -113,7 +114,7 @@ Request IDs accept 1–128 letters, digits, underscores, dots, colons or hyphens
 | `46715621/availability` | retained event | `online` / `offline`; also check bridge state |
 | `bridge/state` | retained event | `online` only when radio table/lease/ACKs are verified; last will `offline` |
 | `bridge/controls` | retained event | `offline` when output controls are disabled; otherwise `online` |
-| `bridge/info` | retained event | API version, gateway/tag, readiness and current pairing window |
+| `bridge/info` | retained event | Daemon software, firmware compatibility, API/UART revisions, gateway/tag, readiness and current pairing window |
 | `bridge/devices` | retained event | Device registry with name, ID, slot, outputs and suffix |
 | `bridge/diagnostics` | retained event | MCU counters/status, host RX gaps, invalid frames and ACK failures |
 | `bridge/discovery` | event | Observed unpaired registration candidate; does not admit it |
@@ -489,25 +490,54 @@ a same-version banner cannot clear a failed/partial transfer. Explicit
 `--retry-interrupted` may replace an interrupted same-board Nordic job; its earlier
 command result remains recorded. No automatic flash retry is performed.
 
-### Existing signed UART command
+### Software and firmware version reporting
 
-Host and application releases use `major.minor` (currently `0.12`). The daemon
-exposes `diagnostics.host_version` and `diagnostics.firmware` in `/api/state`,
-including `running_version`, `target_version`, `update_available`,
-`update_supported`, `boot_version` and `trial`. MQTT `bridge/info` includes
-`host_version` and `firmware_version`; its existing schema version stays `1`.
+Daemon software uses numeric `major.minor.patch` (`0.14.0`); firmware uses bounded
+`major.minor`, with an explicit compatibility target of `0.13`. The two identities
+advance independently. `livolod --version` reports the installed software package
+version, which now has three components. Scripts needing the radio target must
+read `firmware_compat_version` from structured output instead of parsing that flag.
+
+All four installed commands support `--version-info` without a configuration,
+database, API token or radio connection:
+
+```sh
+livolod --version-info
+livolod-commission --version-info
+livolod-firmware-manage --version-info
+livolod-firmware --version-info
+```
+
+Each returns `{"daemon_version":"0.14.0","firmware_compat_version":"0.13",
+"api_version":1,"uart_protocol":3}` (key order is not significant). Software
+`--version` is also available on `livolod`, `livolod-commission` and
+`livolod-firmware`. Maintenance `inspect --version` and `flash --version` retain
+their existing artifact-version meaning.
+
+The daemon exposes these explicit fields in native `/api/v1/info`, Web/native
+snapshot `diagnostics`, and MQTT `bridge/info`. The deprecated `host_version`
+field remains a firmware compatibility alias (`0.13`), not software identity.
+Existing API/MQTT schema versions remain `1`, and UART remains `3`. Firmware
+diagnostics retain `running_version`, `target_version`, `update_available`,
+`update_supported`, `boot_version` and `trial`; MQTT `firmware_version` remains the
+actual installed radio version. Catalog schema 1 keeps its historical
+`host_version` field with the same exact compatibility meaning; reviewed catalog
+bytes, hashes and IDs need no rewrite for a daemon-only upgrade.
 Version comparisons are numeric, so `0.10` is newer than `0.9`. Old firmware
 without version discovery remains usable but reports an unknown running version.
 
+### Existing signed UART command
+
 The signed UART updater applies to the codm CC2652P board with this project's
 dual-slot bootloader. Other boards use their board-specific flash procedures.
-Install the matching host release with its `update` extra before updating the
-MCU. After the one-time bootloader installation, routine updates use UART only:
+Install a daemon whose explicit firmware compatibility target matches the image,
+with its `update` extra, before updating the MCU. After the one-time bootloader
+installation, routine updates use UART only:
 
 ```sh
 sudo /opt/livolod/bin/livolod-firmware \
   --config /etc/livolod/config.json \
-  --package /path/to/ec-gateway-0.12.ecupd \
+  --package /path/to/ec-gateway-0.13.ecupd \
   --public-key /path/to/public.key \
   --service livolod
 ```

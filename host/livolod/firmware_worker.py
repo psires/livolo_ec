@@ -18,7 +18,7 @@ import stat
 import sys
 import time
 
-from . import __version__
+from . import FIRMWARE_COMPAT_VERSION
 from .firmware_backends import install
 from .firmware_bundle import BundleError, load_candidate
 
@@ -173,7 +173,7 @@ def main(argv=None):
             )
             if (
                 candidate["id"] != args.candidate_id
-                or candidate["version"] != __version__
+                or candidate["version"] != FIRMWARE_COMPAT_VERSION
                 or candidate["app_baudrate"] != args.baud
             ):
                 raise BundleError(
@@ -197,7 +197,7 @@ def main(argv=None):
             candidate = load_candidate(
                 args.bundle_dir,
                 args.candidate_id,
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=args.baud,
             )
         if args.operation == "recovery":

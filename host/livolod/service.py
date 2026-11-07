@@ -20,8 +20,8 @@ from .homeassistant import discovery_messages
 from .protocol import decode, frame, heartbeat, key_values, rx_envelope
 from .phase import PhaseClient
 from .scheduler import SchedulerClient
-from . import __version__
-from .version import firmware_info
+from . import FIRMWARE_COMPAT_VERSION
+from .version import firmware_info, version_info
 from .firmware_manager import FirmwareManager, radio_guard
 from .uart import CommandError, Gateway, LinkError
 
@@ -117,6 +117,7 @@ class Service:
         self.pairing = None
         self.schedule = []
         self.diagnostics = {"rx_gaps": 0, "invalid_rx": 0, "ack_failures": 0}
+        self.diagnostics.update(version_info(), host_version=FIRMWARE_COMPAT_VERSION)
         self.diagnostics["output_mode"] = config.output_mode
         self.diagnostics["serial_baudrate"] = config.serial_baudrate
         self.diagnostics["query_timing"] = {
@@ -192,8 +193,8 @@ class Service:
             "bridge/info",
             {
                 "version": 1,
-                "uart_protocol": 3,
-                "host_version": __version__,
+                **version_info(),
+                "host_version": FIRMWARE_COMPAT_VERSION,
                 "firmware_version": self.diagnostics.get("firmware", {}).get(
                     "running_version"
                 ),
@@ -831,7 +832,7 @@ class Service:
             self.diagnostics["firmware"] = firmware_info(caps)
         except ValueError as error:
             raise LinkError("Malformed firmware release version") from error
-        self.diagnostics["host_version"] = __version__
+        self.diagnostics.update(version_info(), host_version=FIRMWARE_COMPAT_VERSION)
         self.firmware_manager.observe(caps)
         if caps.get("fw_version"):
             reported = key_values(await self.gateway.command("VERSION"))
@@ -934,9 +935,9 @@ class Service:
             if update.get("trial") not in ("0", "1"):
                 raise LinkError("Invalid update trial status")
             if update["trial"] == "1":
-                if firmware["running_version"] != __version__:
+                if firmware["running_version"] != FIRMWARE_COMPAT_VERSION:
                     raise LinkError(
-                        "Trial firmware does not match this host release; leaving rollback armed"
+                        "Trial firmware does not match the compatibility target; leaving rollback armed"
                     )
                 await self.gateway.command("UPDATE_CONFIRM")
                 update = key_values(await self.gateway.command("UPDATE_STATUS"))

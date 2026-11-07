@@ -102,7 +102,7 @@ class ReleaseChecks(unittest.TestCase):
 
     def test_manifest_rejects_unpinned_or_foreign_inputs(self):
         """Malformed requests must fail before becoming workflow arguments."""
-        original = prepare.manifest(prepare.ROOT / "host/docker/releases.json")
+        original = json.loads((prepare.ROOT / "host/docker/releases.json").read_text())
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "request.json"
             for field, value in [
@@ -110,11 +110,61 @@ class ReleaseChecks(unittest.TestCase):
                 ("source_commit", "main"),
                 ("previous_image", "ghcr.io/psires/livolod:latest"),
             ]:
+                path.write_text(json.dumps(original))
+                prepare.manifest(path)
                 data = copy.deepcopy(original)
                 data["releases"][0][field] = value
                 path.write_text(json.dumps(data))
                 with self.assertRaises(AssertionError):
                     prepare.manifest(path)
+
+    def test_schema_two_manifest_preserves_explicit_legacy_and_split_entries(self):
+        """A new request can retain old identities while requiring new compatibility metadata."""
+        original = json.loads((prepare.ROOT / "host/docker/releases.json").read_text())
+        original["schema"] = 2
+        original["releases"] = [original["releases"][0]]
+        legacy = original["releases"][0]
+        legacy.update(
+            version_schema=1, firmware_compat_version=legacy["daemon_version"]
+        )
+        current = dict(
+            legacy,
+            version="0.5.0",
+            source_tag="standalone-0.5.0",
+            daemon_version="0.14.0",
+            firmware_compat_version="0.13",
+            version_schema=2,
+        )
+        original["releases"].append(current)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "request.json"
+            path.write_text(json.dumps(original))
+            parsed = prepare.manifest(path)
+            self.assertEqual(
+                parsed["releases"][0]["firmware_compat_version"],
+                legacy["daemon_version"],
+            )
+            self.assertEqual(parsed["releases"][1]["firmware_compat_version"], "0.13")
+            del current["firmware_compat_version"]
+            path.write_text(json.dumps(original))
+            with self.assertRaises(AssertionError):
+                prepare.manifest(path)
+
+    def test_probe_rejects_semver_without_explicit_runtime_compatibility(self):
+        """New package identities cannot use the legacy package-equals-firmware fallback."""
+        runtime = types.ModuleType("livolod")
+        runtime.__version__ = "0.14.0"
+        with (
+            patch.dict("sys.modules", {"livolod": runtime}),
+            patch.object(probe, "version", return_value="0.14.0"),
+        ):
+            with self.assertRaises(AssertionError):
+                probe.installed_versions()
+            runtime.FIRMWARE_COMPAT_VERSION = "0.13"
+            self.assertEqual(
+                probe.installed_versions(),
+                {"daemon_version": "0.14.0", "firmware_compat_version": "0.13"},
+            )
 
     def test_existing_version_cannot_be_replaced(self):
         """A different candidate never overwrites an existing immutable version."""

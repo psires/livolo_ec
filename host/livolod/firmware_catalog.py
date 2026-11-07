@@ -85,7 +85,7 @@ def validate(directory, host_version):
     """Validate every artifact and enforce aggregate bounds without accessing hardware.
 
     @param directory Local source or staged catalog.
-    @param host_version Exact daemon compatibility version.
+    @param host_version Exact radio compatibility target, not the daemon package version.
     @return Validated manifest mapping.
     """
     root, raw, _, before = inventory(directory)
@@ -144,7 +144,7 @@ def provision(source, destination, host_version, manifest_sha256=None):
 
     @param source Local directory containing a reviewed catalog, not an archive.
     @param destination Persistent operator-owned absolute catalog directory.
-    @param host_version Exact daemon compatibility version.
+    @param host_version Exact radio compatibility target, not the daemon package version.
     @param manifest_sha256 Optional expected source manifest digest.
     @return Public publication summary, without file contents or credentials.
     """

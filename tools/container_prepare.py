@@ -12,6 +12,8 @@ import subprocess
 import tarfile
 import tempfile
 
+from release_versions import normalize_metadata, source_versions
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -29,13 +31,13 @@ def manifest(path):
     @param path Tracked JSON release request file.
     """
     data = json.loads(Path(path).read_text())
-    assert data["schema"] == 1
+    assert type(data["schema"]) is int and data["schema"] in (1, 2)
     for key in ("python_image", "buildkit_image", "frontend_image", "broker_image"):
         assert re.fullmatch(r"[a-z0-9./:_-]+@sha256:[0-9a-f]{64}", data[key]), key
     assert re.fullmatch(r"v\d+\.\d+\.\d+", data["buildx_version"])
     seen = set()
     for entry in data["releases"]:
-        assert set(entry) == {
+        fields = {
             "enabled",
             "kind",
             "image",
@@ -45,6 +47,16 @@ def manifest(path):
             "source_commit",
             "previous_image",
         }
+        if data["schema"] == 2:
+            fields.add("firmware_compat_version")
+            if "version_schema" in entry:
+                fields.add("version_schema")
+        assert set(entry) == fields
+        entry.update(
+            normalize_metadata(
+                dict(entry, schema=entry.get("version_schema", data["schema"]))
+            )
+        )
         assert type(entry["enabled"]) is bool
         assert entry["kind"] in ("standalone", "ha")
         assert (
@@ -67,17 +79,21 @@ def manifest(path):
     return data
 
 
-def prepare(data, entry, output):
+def prepare(data, entry, output, candidate=False):
     """Assemble a minimal historical source context plus a recorded external recipe.
 
     @param data Validated manifest containing pinned build tools and images.
     @param entry Validated release identity and historical source reference.
     @param output New directory receiving the assembled build context.
+    @param candidate Skip release-tag matching only for local, non-publishing CI builds.
     """
-    assert (
-        command("git", "rev-parse", "refs/tags/" + entry["source_tag"] + "^{commit}")
-        == entry["source_commit"]
-    )
+    if not candidate:
+        assert (
+            command(
+                "git", "rev-parse", "refs/tags/" + entry["source_tag"] + "^{commit}"
+            )
+            == entry["source_commit"]
+        )
     output = Path(output).resolve()
     output.mkdir(parents=True, exist_ok=False)
     paths = [
@@ -87,6 +103,7 @@ def prepare(data, entry, output):
         "host/pyproject.toml",
         "host/PACKAGE.md",
         "host/LICENSE",
+        "host/release/version.json",
         "host/livolod",
         "host/docker/Dockerfile",
         "host/docker/smoke.py",
@@ -96,11 +113,8 @@ def prepare(data, entry, output):
         "host/docker/build_nordic.py",
         "tools/container_sources.py",
     ]
-    paths += (
-        ["host/release/version.json"]
-        if entry["kind"] == "standalone"
-        else ["homeassistant/app"]
-    )
+    if entry["kind"] == "ha":
+        paths.append("homeassistant/app")
     # PACKAGE.md was introduced after HA 0.2.0; only copy historical files that exist.
     paths = [
         p
@@ -127,7 +141,10 @@ def prepare(data, entry, output):
                 ):
                     raise ValueError("Unexpected source member")
             bundle.extractall(source, filter="data")
-        assert (source / "VERSION").read_text().strip() == entry["daemon_version"]
+        versions = source_versions(source)
+        assert versions["schema"] == entry["schema"]
+        assert versions["daemon_version"] == entry["daemon_version"]
+        assert versions["firmware_compat_version"] == entry["firmware_compat_version"]
         if entry["kind"] == "standalone":
             assert (
                 json.loads((source / "host/release/version.json").read_text())[
@@ -197,6 +214,7 @@ def prepare(data, entry, output):
         )
         metadata = dict(
             entry,
+            candidate=candidate,
             platform="linux/arm64",
             recipe_commit=command("git", "rev-parse", "HEAD"),
             python_image=data["python_image"],
@@ -222,8 +240,28 @@ def main():
     parser.add_argument("--kind", choices=["standalone", "ha"])
     parser.add_argument("--version")
     parser.add_argument("--output")
+    parser.add_argument(
+        "--candidate",
+        action="store_true",
+        help="Stage HEAD for non-publishing local CI validation",
+    )
     args = parser.parse_args()
     data = manifest(ROOT / args.manifest)
+    if args.candidate:
+        if not args.output or not args.kind or args.version:
+            parser.error("--candidate requires --kind and --output, without --version")
+        versions = source_versions(ROOT)
+        entry = dict(
+            schema=versions["schema"],
+            kind=args.kind,
+            version=versions["distribution_version"],
+            daemon_version=versions["daemon_version"],
+            firmware_compat_version=versions["firmware_compat_version"],
+            source_commit=command("git", "rev-parse", "HEAD"),
+            source_tag=None,
+        )
+        prepare(data, entry, args.output, candidate=True)
+        return
     if args.output:
         entry = next(
             e

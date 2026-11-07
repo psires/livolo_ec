@@ -12,9 +12,10 @@ import uuid
 
 from aiohttp import web
 
-from . import __version__
+from . import FIRMWARE_COMPAT_VERSION, NATIVE_API_VERSION
+from .version import version_info
 
-API_VERSION = 1
+API_VERSION = NATIVE_API_VERSION
 ACTIONS = {
     "set",
     "refresh",
@@ -54,6 +55,10 @@ DIAGNOSTIC_FIELDS = {
     "output_mode",
     "serial_baudrate",
     "host_version",
+    "daemon_version",
+    "firmware_compat_version",
+    "api_version",
+    "uart_protocol",
     "heartbeat_owner",
     "query_mode",
 }
@@ -371,14 +376,14 @@ class NativeAPI:
         """Return stable network identity and API compatibility metadata.
 
         @param request Authenticated HTTP request.
-        @return API and host versions with network identity and simulation flag.
+        @return Explicit software/compatibility/wire versions and network identity.
         """
         return web.json_response(
             dict(
-                api_version=API_VERSION,
+                **version_info(),
                 gateway=self.service.config.gateway,
                 tag=self.service.config.tag,
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 simulated=self.service.simulated,
             )
         )

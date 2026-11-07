@@ -1,5 +1,7 @@
 """Small allowlisted diagnostics; never export credentials or command history."""
 
+from ._client import version_data
+
 
 async def async_get_config_entry_diagnostics(hass, entry):
     """Return operational health without wire identities, names or raw payloads.
@@ -17,6 +19,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "controls_enabled": bool(data.get("controls_enabled")),
         "simulated": bool(data.get("simulated")),
         "device_count": len(data.get("devices", [])),
+        "versions": version_data(data.get("diagnostics")),
         "firmware": {
             key: firmware.get(key)
             for key in (

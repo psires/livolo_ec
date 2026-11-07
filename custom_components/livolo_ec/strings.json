@@ -180,6 +180,12 @@
           "invalid": "Invalid pairing status",
           "uncertain": "Start request unresolved"
         }
+      },
+      "daemon_version": {
+        "name": "Daemon software version"
+      },
+      "firmware_compat_version": {
+        "name": "Firmware compatibility target"
       }
     },
     "button": {

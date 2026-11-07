@@ -9,6 +9,8 @@ import urllib.parse
 import urllib.request
 import uuid
 
+from .version import add_version_arguments
+
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -31,6 +33,7 @@ def main(argv=None):
     @return Zero on accepted/read operations, one on refusal or uncertain transport.
     """
     parser = argparse.ArgumentParser(description="Bounded Livolo device commissioning")
+    add_version_arguments(parser)
     parser.add_argument("--url", default="http://127.0.0.1:8090")
     parser.add_argument("--token-env", default="LIVOLO_API_TOKEN")
     commands = parser.add_subparsers(dest="command", required=True)

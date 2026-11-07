@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "livolo-ec-daemon"
-version = "0.13"
+version = "0.14.0"
 description = "Raspberry Pi MQTT daemon for the Livolo EC UART v3 adapter"
 readme = "PACKAGE.md"
 license = "BSD-2-Clause"

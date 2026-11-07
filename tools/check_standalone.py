@@ -11,6 +11,8 @@ import tarfile
 import tempfile
 import venv
 
+from release_versions import normalize_metadata
+
 
 def verify(directory):
     """Reject changed release files before installation or archive extraction.
@@ -33,7 +35,7 @@ def check(assets, distribution):
     """
     assets = Path(assets).resolve()
     verify(assets)
-    metadata = json.loads((assets / "release.json").read_text())
+    metadata = normalize_metadata(json.loads((assets / "release.json").read_text()))
     with tempfile.TemporaryDirectory() as temporary:
         root = Path(temporary)
         with tarfile.open(
@@ -89,7 +91,10 @@ def check(assets, distribution):
             env=env,
             check=True,
         )
-        for command in ("livolod", "livolod-firmware", "livolod-firmware-manage"):
+        commands = ["livolod", "livolod-firmware", "livolod-firmware-manage"]
+        if metadata["schema"] == 2:
+            commands.append("livolod-commission")
+        for command in commands:
             subprocess.run(
                 [command, "--help"],
                 cwd=root,
@@ -97,6 +102,18 @@ def check(assets, distribution):
                 check=True,
                 stdout=subprocess.DEVNULL,
             )
+            if metadata["schema"] == 2:
+                report = json.loads(
+                    subprocess.check_output(
+                        [command, "--version-info"], cwd=root, env=env, text=True
+                    )
+                )
+                assert report == {
+                    "daemon_version": metadata["daemon_version"],
+                    "firmware_compat_version": metadata["firmware_compat_version"],
+                    "api_version": 1,
+                    "uart_protocol": 3,
+                }
         subprocess.run(
             [
                 "livolod",

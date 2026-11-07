@@ -1,0 +1,150 @@
+name: Validate ARM64 containers without publication
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'host/**'
+      - 'tools/**'
+      - 'homeassistant/app/**'
+      - 'VERSION'
+      - '.github/workflows/container-validation.yml'
+  pull_request:
+    paths:
+      - 'host/**'
+      - 'tools/**'
+      - 'homeassistant/app/**'
+      - 'VERSION'
+      - '.github/workflows/container-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: standalone
+            previous: ghcr.io/psires/livolod@sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc
+          - kind: ha
+            previous: ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        name: Stage exact committed candidate without release tags
+        env:
+          KIND: ${{ matrix.kind }}
+        run: |
+          python3 tools/project_version.py
+          python3 tools/container_test.py
+          python3 tools/container_prepare.py --candidate --kind "$KIND" --output build-context
+          mkdir evidence
+          cp build-context/container/release.json evidence/release.json
+          python3 - <<'PY'
+          import json, os
+          metadata = json.load(open('build-context/container/release.json'))
+          request = json.load(open('host/docker/releases.json'))
+          assert metadata['candidate'] is True
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key in ('version', 'daemon_version', 'firmware_compat_version', 'python_image', 'buildx_version', 'buildkit_image'):
+                  output.write(key + '=' + metadata[key] + '\n')
+              output.write('broker_image=' + request['broker_image'] + '\n')
+          PY
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          version: ${{ steps.source.outputs.buildx_version }}
+          driver-opts: image=${{ steps.source.outputs.buildkit_image }}
+      - name: Build candidate into the disposable runner only
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ./build-context
+          file: ./build-context/Dockerfile
+          platforms: linux/arm64
+          load: true
+          push: false
+          tags: livolo-validation:${{ matrix.kind }}
+          build-args: |
+            PYTHON_IMAGE=${{ steps.source.outputs.python_image }}
+            RELEASE_VERSION=${{ steps.source.outputs.daemon_version }}
+            FIRMWARE_COMPAT_VERSION=${{ steps.source.outputs.firmware_compat_version }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.source.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            net.sfires.livolo.daemon-version=${{ steps.source.outputs.daemon_version }}
+            net.sfires.livolo.firmware-compat-version=${{ steps.source.outputs.firmware_compat_version }}
+      - name: Verify installed package and simulated smoke behavior
+        env:
+          KIND: ${{ matrix.kind }}
+          DAEMON: ${{ steps.source.outputs.daemon_version }}
+          COMPAT: ${{ steps.source.outputs.firmware_compat_version }}
+        run: |
+          docker image inspect "livolo-validation:$KIND" > evidence/image.json
+          python3 - <<'PY'
+          import json, os
+          image = json.load(open('evidence/image.json'))[0]
+          assert image['Architecture'] == 'arm64' and image['Os'] == 'linux'
+          labels = image['Config']['Labels']
+          assert labels['net.sfires.livolo.daemon-version'] == os.environ['DAEMON']
+          assert labels['net.sfires.livolo.firmware-compat-version'] == os.environ['COMPAT']
+          PY
+          docker run --rm --network none --entrypoint python "livolo-validation:$KIND" -m pip check
+          docker run --rm --network none --user 10001:10001 --entrypoint python -e LIVOLO_NORDIC_SMOKE=1 -v "$PWD/host/docker/smoke.py:/checks/smoke.py:ro" "livolo-validation:$KIND" /checks/smoke.py
+      - name: Verify upgrade, persistence and restoration from public 0.4.0
+        env:
+          KIND: ${{ matrix.kind }}
+          PREVIOUS: ${{ matrix.previous }}
+          BROKER: ${{ steps.source.outputs.broker_image }}
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/container_check.py --image "livolo-validation:$KIND" --kind "$KIND" --broker-image "$BROKER" --previous-image "$PREVIOUS" 2>&1 | tee evidence/upgrade.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: container-validation-${{ matrix.kind }}
+          path: evidence/
+          if-no-files-found: error
+
+  daemon-upgrade:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Build the candidate wheel and verify the published baseline checksum
+        run: |
+          python -m pip install -r host/release/requirements-build.txt
+          python -m build --no-isolation --outdir candidate host
+          mkdir baseline
+          curl --fail --location --silent --show-error https://github.com/psires/livolo_ec/releases/download/standalone-0.4.0/livolo_ec_daemon-0.13-py3-none-any.whl --output baseline/livolo_ec_daemon-0.13-py3-none-any.whl
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          wheel = Path('baseline/livolo_ec_daemon-0.13-py3-none-any.whl')
+          assert hashlib.sha256(wheel.read_bytes()).hexdigest() == 'ef45c47cc29f12307a04060a6d8530dda3f9bd836debe2c3231e5116df6fe003'
+          PY
+      - name: Install, upgrade and explicitly roll back with persistent simulated state
+        shell: bash
+        run: |
+          set -o pipefail
+          daemon_version=$(python -c 'import json; print(json.load(open("host/release/version.json"))["daemon_version"])')
+          firmware_compat_version=$(python -c 'import json; print(json.load(open("host/release/version.json"))["firmware_compat_version"])')
+          python tools/check_daemon_upgrade.py --previous-wheel baseline/livolo_ec_daemon-0.13-py3-none-any.whl --candidate-wheel "candidate/livolo_ec_daemon-${daemon_version}-py3-none-any.whl" --firmware-compat-version "$firmware_compat_version" --constraints host/docker/requirements-firmware.txt 2>&1 | tee upgrade.log
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: daemon-installed-upgrade
+          path: upgrade.log
+          if-no-files-found: warn

@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from livolod import __version__
+from livolod import FIRMWARE_COMPAT_VERSION
 from livolod.config import load, parse
 from livolod.firmware_bundle import BundleError
 from livolod import firmware_nordic as nordic
@@ -305,7 +305,7 @@ class NordicRestoreTests(unittest.IsolatedAsyncioTestCase):
             request_id="nordic-job",
             candidate_id="fixture:hash",
             board="nordic-pca10059",
-            version=__version__,
+            version=FIRMWARE_COMPAT_VERSION,
             installed_version="0.12",
             backend="nrf52840_usb_dfu_v1",
             baudrate=460800,
@@ -350,10 +350,13 @@ class NordicRestoreTests(unittest.IsolatedAsyncioTestCase):
                 return (
                     await original(text, retries)
                     + " board=nordic-pca10059 fw_version="
-                    + __version__
+                    + FIRMWARE_COMPAT_VERSION
                 )
             if text == "VERSION":
-                return "OK board=nordic-pca10059 proto=3 fw_version=" + __version__
+                return (
+                    "OK board=nordic-pca10059 proto=3 fw_version="
+                    + FIRMWARE_COMPAT_VERSION
+                )
             return await original(text, retries)
 
         gateway.command = command
@@ -372,7 +375,10 @@ class NordicRestoreTests(unittest.IsolatedAsyncioTestCase):
     def test_success_requires_recorded_completion_profile_and_fresh_facts(self):
         """Only a matching successful transfer can clear the durable recovery gate."""
         caps = dict(
-            board="nordic-pca10059", proto="3", fw_version=__version__, baud="460800"
+            board="nordic-pca10059",
+            proto="3",
+            fw_version=FIRMWARE_COMPAT_VERSION,
+            baud="460800",
         )
         self.manager.version_info = dict(caps)
         with patch.object(nordic, "target", return_value=self.config.serial_port):

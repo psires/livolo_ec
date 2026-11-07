@@ -5,6 +5,7 @@ import argparse
 import asyncio
 from importlib.metadata import version
 import json
+import re
 from pathlib import Path
 import socket
 import subprocess
@@ -15,6 +16,23 @@ import urllib.request
 
 TOKEN = "isolated-container-test-token-0000000000000000"
 DEVICE = "10203041"
+
+
+def installed_versions():
+    """Read explicit runtime identities, permitting only known legacy package fallback.
+
+    @return Software/compatibility fields; raises AssertionError on inconsistent installation.
+    """
+    import livolod
+
+    daemon = version("livolo-ec-daemon")
+    assert daemon == livolod.__version__
+    compatibility = getattr(livolod, "FIRMWARE_COMPAT_VERSION", None)
+    if compatibility is None:
+        assert daemon in ("0.12", "0.13"), "Unknown legacy version contract"
+        compatibility = daemon
+    assert re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", compatibility)
+    return {"daemon_version": daemon, "firmware_compat_version": compatibility}
 
 
 def request(url, body=None, headers=None):
@@ -159,6 +177,23 @@ def check(kind, seed, local_catalog=False):
     assert request(base + "/api/v1/snapshot")[0] == 401
     assert snapshot["gateway"] == "10203040" and snapshot["tag"] == "42"
     assert snapshot["simulated"] == (kind == "standalone")
+    versions = installed_versions()
+    code, body = request(base + "/api/v1/info", headers=headers)
+    info = json.loads(body)
+    assert code == 200 and info["host_version"] == versions["firmware_compat_version"]
+    if versions["daemon_version"] not in ("0.12", "0.13"):
+        for key, value in dict(versions, api_version=1, uart_protocol=3).items():
+            assert info[key] == value
+            assert snapshot["diagnostics"][key] == value
+        for name in (
+            "livolod",
+            "livolod-firmware",
+            "livolod-firmware-manage",
+            "livolod-commission",
+        ):
+            assert json.loads(
+                subprocess.check_output([name, "--version-info"], text=True)
+            ) == dict(versions, api_version=1, uart_protocol=3)
     if kind == "ha":
         assert not snapshot["ready"], "Missing radio must not be ready"
     preflight_supported = firmware_preflight(base, headers, snapshot)
@@ -207,7 +242,11 @@ def check(kind, seed, local_catalog=False):
         assert config["web"]["enabled"] is False
         assert config["firmware_bundle_dir"] == "/data/firmware"
         manifest = json.loads(Path("/data/firmware/manifest.json").read_text())
-        assert manifest == {"schema": 1, "host_version": "0.13", "artifacts": []}
+        assert manifest == {
+            "schema": 1,
+            "host_version": versions["firmware_compat_version"],
+            "artifacts": [],
+        }
         assert Path("/data/firmware/persistence-check").read_text() == (
             "isolated-catalog-survives-recreation"
         )

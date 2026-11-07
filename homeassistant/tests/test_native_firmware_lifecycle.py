@@ -19,7 +19,7 @@ from homeassistant.helpers import (
 )
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from livolod import __version__
+from livolod import FIRMWARE_COMPAT_VERSION, __version__ as DAEMON_VERSION
 from livolod.config import load
 from livolod.native_api import NativeAPI
 from livolod.service import Service
@@ -28,6 +28,7 @@ from livolod.storage import Store
 
 from test_end_to_end import eventually
 from custom_components.livolo_ec.firmware_notice import issue_id
+from test_version_reporting import version_sensor
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = pytest.mark.usefixtures("socket_enabled")
@@ -46,12 +47,12 @@ async def lifecycle(hass, tmp_path, monkeypatch):
 
     catalog = tmp_path / "firmware"
     catalog.mkdir()
-    data = gbl(mg21_image(board="zb-gw04-1v2", version=__version__))
+    data = gbl(mg21_image(board="zb-gw04-1v2", version=FIRMWARE_COMPAT_VERSION))
     artifact = dict(
         id="offline-test",
         board="zb-gw04-1v2",
         role="gateway",
-        version=__version__,
+        version=FIRMWARE_COMPAT_VERSION,
         protocol=3,
         backend="mg21_gecko_gbl_v1",
         path="test.gbl",
@@ -69,7 +70,7 @@ async def lifecycle(hass, tmp_path, monkeypatch):
     (catalog / "qualification.md").write_text("Synthetic offline fixture only")
     (catalog / "NOTICE").write_text("Not executable firmware; never deploy")
     manifest = json.dumps(
-        dict(schema=1, host_version=__version__, artifacts=[artifact])
+        dict(schema=1, host_version=FIRMWARE_COMPAT_VERSION, artifacts=[artifact])
     )
     (catalog / "manifest.json").write_text(manifest)
     config = replace(
@@ -108,7 +109,7 @@ async def lifecycle(hass, tmp_path, monkeypatch):
             @param retries Gateway compatibility argument.
             """
             complete = (tmp_path / "transferred").exists()
-            version = __version__ if complete else "0.12"
+            version = FIRMWARE_COMPAT_VERSION if complete else "0.12"
             board = "zb-gw04-1v2"
             if complete and state.scenario == "wrong_board":
                 board = "sonoff-zbdongle-e"
@@ -256,6 +257,11 @@ async def test_native_install_and_reconciliation(hass, lifecycle, scenario):
     @param scenario Successful restoration, mismatched identity, or interrupted restart.
     """
     state = lifecycle
+    assert DAEMON_VERSION != FIRMWARE_COMPAT_VERSION
+    assert version_sensor(hass, "daemon_version").state == DAEMON_VERSION
+    assert (
+        version_sensor(hass, "firmware_compat_version").state == FIRMWARE_COMPAT_VERSION
+    )
     state.scenario = scenario
     initial_session = state.service.session
     task = asyncio.create_task(
@@ -284,7 +290,7 @@ async def test_native_install_and_reconciliation(hass, lifecycle, scenario):
         await state.service.firmware_manager.refresh_catalog()
         active = state.service.firmware_manager.snapshot()
         assert active["request_id"] == ident
-        assert active["latest_version"] == __version__
+        assert active["latest_version"] == FIRMWARE_COMPAT_VERSION
         assert active["candidate_id"] == state.store.firmware_job()["candidate_id"]
         (state.catalog / "manifest.json").write_text(state.manifest)
         if scenario != "success":
@@ -322,7 +328,7 @@ async def test_native_install_and_reconciliation(hass, lifecycle, scenario):
             assert len(state.service.gateway.peers) == len(state.devices)
             assert (
                 hass.states.get(state.entity).attributes["installed_version"]
-                == __version__
+                == FIRMWARE_COMPAT_VERSION
             )
             assert not state.service.firmware_manager.busy
         else:
@@ -369,7 +375,9 @@ async def test_native_catalog_refresh_without_web(hass, lifecycle):
     """
     state = lifecycle
     session = state.service.session
-    empty = json.dumps(dict(schema=1, host_version=__version__, artifacts=[]))
+    empty = json.dumps(
+        dict(schema=1, host_version=FIRMWARE_COMPAT_VERSION, artifacts=[])
+    )
     for content in (None, "invalid", empty, state.manifest):
         path = state.catalog / "manifest.json"
         if content is None:
@@ -390,8 +398,10 @@ async def test_native_catalog_refresh_without_web(hass, lifecycle):
                 else "catalog_unusable" if content == "invalid" else "no_candidate"
             )
         )
-        await eventually(lambda: hass.states.async_all("sensor")[0].state == expected)
-        diagnostic = hass.states.async_all("sensor")[0]
+        await eventually(
+            lambda: version_sensor(hass, "firmware_status").state == expected
+        )
+        diagnostic = version_sensor(hass, "firmware_status")
         assert diagnostic.state == expected
         assert diagnostic.attributes["installed_version"] == "0.12"
         notice = ir.async_get(hass).async_get_issue("livolo_ec", issue_id(state.entry))

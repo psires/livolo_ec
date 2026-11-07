@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 import aiohttp
 
-from livolod import __version__
+from livolod import __version__, FIRMWARE_COMPAT_VERSION
 from livolod.config import load, parse
 from livolod.native_api import NativeAPI, start_api
 from livolod.service import Service
@@ -282,7 +282,7 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
             try:
                 async with self.client.ws_connect(self.base + "/api/v1/events") as ws:
                     await ws.receive_json()
-                    provision(source, catalog, __version__)
+                    provision(source, catalog, FIRMWARE_COMPAT_VERSION)
                     event = await self.next_matching(
                         ws, lambda e: e["data"]["firmware_update"]["update_available"]
                     )
@@ -392,11 +392,22 @@ class NativeAPITests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual((await self.get("/health"))[0], 200)
         _, info = await self.get("/api/v1/info")
-        self.assertEqual(info["host_version"], __version__)
+        self.assertEqual(info["host_version"], FIRMWARE_COMPAT_VERSION)
+        self.assertEqual(info["daemon_version"], __version__)
+        self.assertEqual(info["firmware_compat_version"], FIRMWARE_COMPAT_VERSION)
+        self.assertEqual(info["uart_protocol"], 3)
         self.assertEqual(info["api_version"], 1)
         self.assertTrue(info["simulated"])
         _, envelope = await self.get("/api/v1/snapshot")
         self.assertFalse(envelope["data"]["ready"])
+        for key in (
+            "daemon_version",
+            "firmware_compat_version",
+            "api_version",
+            "uart_protocol",
+            "host_version",
+        ):
+            self.assertEqual(envelope["data"]["diagnostics"][key], info[key])
         self.assertEqual(envelope["data"]["devices"][0]["state"]["bits"], 1)
         self.assertEqual(envelope["data"]["devices"][0]["availability"], "offline")
         encoded = json.dumps(envelope)

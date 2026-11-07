@@ -890,12 +890,31 @@ function renderActivity() {
 }
 /**
  * Show gateway connectivity and diagnostics without closing expanded details.
+ * Keep software identity distinct from radio targets; the legacy host version is not software.
  */
 function renderNetwork() {
   const bridge = snapshot.bridge || snapshot;
+  const diagnostics = snapshot.diagnostics || {};
   const rows = [
     ['Gateway ID', snapshot.gateway],
     ['Network tag', snapshot.tag],
+    [
+      'Daemon software',
+      diagnostics.daemon_version ||
+        (diagnostics.host_version ? 'Unknown (legacy daemon)' : 'Not reported'),
+    ],
+    [
+      'Installed radio firmware',
+      snapshot.firmware_update?.installed_version ||
+        diagnostics.firmware?.running_version ||
+        'Unknown',
+    ],
+    [
+      'Radio compatibility target',
+      diagnostics.firmware_compat_version || diagnostics.firmware?.target_version || 'Not reported',
+    ],
+    ['Native API revision', diagnostics.api_version ?? 'Not reported'],
+    ['UART protocol revision', diagnostics.uart_protocol ?? 'Not reported'],
     [
       'Radio',
       !connected
@@ -1569,7 +1588,7 @@ function firmwareReason(code) {
     artifact_missing: 'No firmware payload is installed for this exact board.',
     artifact_invalid: 'The firmware payload did not pass integrity or signature checks.',
     artifact_unqualified: 'This firmware has not been qualified for installation.',
-    incompatible_host: 'The firmware bundle does not match the installed daemon release.',
+    incompatible_host: 'The firmware bundle does not match the radio compatibility target.',
     incompatible_baudrate: 'The firmware does not support the configured serial rate.',
     unsupported_board: 'Firmware installation is not supported for this board.',
     backend_unavailable: 'The required firmware installation backend is unavailable.',
@@ -1701,8 +1720,8 @@ async function reconcileFirmwareRequest() {
 function firmwareDetails(firmware) {
   return [
     ['Board', firmware.board || 'Unknown'],
-    ['Installed', firmware.installed_version || 'Unknown'],
-    ['Available', firmware.latest_version || 'No verified candidate'],
+    ['Installed radio firmware', firmware.installed_version || 'Unknown'],
+    ['Candidate radio firmware', firmware.latest_version || 'No verified candidate'],
     ['Artifact', firmware.candidate_id || 'None'],
   ]
     .map(([label, value]) => `<dt>${label}</dt><dd>${escapeHTML(value)}</dd>`)

@@ -9,7 +9,7 @@ state; this document defines what counts as a complete release going forward.
 
 | Role | Responsibility |
 | --- | --- |
-| Release engineer | Own all release/version/tag/artifact/channel operations, the release inventory, candidate freeze, build provenance, combined test evidence, publication verification and final completeness decision. Track blockers through closure. |
+| Release engineer | Own all release/version/tag/artifact/channel operations, release code quality, the release inventory, candidate freeze, build provenance, combined test evidence, publication verification and final completeness decision. Track blockers through closure. |
 | Tech Lead / Product Owner (formerly OpenSource coordinator) | Own scope, priorities, technical acceptance and support-policy decisions; resolve cross-component blockers and review release notes. |
 | Unix specialist | Deliver the daemon/CLI and standalone containers; verify installation, upgrade, persistence, firmware-worker packaging and recovery behavior. |
 | Home Assistant specialist | Deliver the assembled integration/client and HA app; verify HA validation, installation channels, upgrade/reload, identities and native API behavior. |
@@ -26,6 +26,32 @@ scope and shared contracts and hands off the reviewed candidate. Route release
 number allocation, tags, artifact publication and update-channel changes through
 the release engineer. In the shared checkout, stage only explicitly owned files
 and coordinate before committing.
+
+## Release code quality gate
+
+The release engineer owns the final code quality gate and records its evidence
+before accepting a candidate. Automated check success is necessary but not a
+substitute for substantive review of the changed code and its contracts.
+
+- Every function and declaration, including private helpers, callbacks and test
+  functions, must document its intent and every parameter. Prefer Doxygen-style
+  comments/docstrings. Describe purpose, units, buffer sizes/ownership and
+  return/error behavior where applicable; merely repeating implementation steps
+  does not satisfy this requirement. A documented public declaration may supply
+  the contract for its matching definition; verify that the two agree.
+- Review edge cases, failure behavior, security/compatibility assumptions and
+  test assertions against the documented intent. Reject missing or misleading
+  contracts even when the documentation checker passes.
+- Enforce precise, consistent style: Linux kernel style for project-owned C,
+  pinned clang-format, Black for Python and Prettier for JavaScript, as specified
+  in [CONTRIBUTING.md](../CONTRIBUTING.md). Preserve third-party notices and
+  justified vendor/protothread exclusions; do not weaken checks to pass a change.
+- Run the existing documentation/style/version checks and relevant behavioral,
+  installed-package and upgrade tests. CI must cover the exact integrated
+  candidate. Record skipped or unavailable required checks as open gates.
+- Coordinate specialist review and resolve findings before final quality
+  acceptance. Distinguish script/unit tests from actual image/runtime evidence;
+  missing Docker execution cannot be reported as a successful container test.
 
 ## Required release contents
 
@@ -66,18 +92,24 @@ requirements separately for each board.
   containers, HA integration/client and HA app. Increment patch for compatible
   fixes, minor for compatible features and major for breaking distribution/API
   changes; record migration requirements explicitly, including during 0.x.
-- Preserve the existing numeric `major.minor` daemon/radio compatibility domain
+- Preserve the numeric `major.minor` radio compatibility domain
   in root `VERSION`. It is currently `0.13`, while the recorded software
   distribution is `0.4.0`. API and UART revisions are separate identifiers.
-- Allocate a fresh daemon/radio version when shipping changed daemon or firmware
-  package content; do not publish different daemon wheels or radio bytes under
-  an existing version. The current TI equality requirement means a compatibility
-  bump requires matched firmware builds and qualification across the matrix.
+- Allocate independent, monotonically increasing `major.minor.patch` daemon
+  package versions for changed software. Development daemon `0.14.0` retains
+  explicit firmware compatibility `0.13`; coordinated distribution versions
+  remain unchanged until release preparation. Do not publish different daemon
+  wheels or radio bytes under an existing identity. Firmware admission and TI
+  trial confirmation compare against the explicit compatibility target, never
+  the daemon package number. A compatibility bump still requires matched firmware
+  builds and qualification across the matrix.
 - Record both domains in release notes and inventory. Validate root propagation
   with `python3 tools/project_version.py`; separately check distribution metadata
   in `host/release/version.json`, client/integration manifests, HA app and channel
-  metadata, and container publication requests. The root check alone does not
-  validate the distribution version.
+  metadata, and container publication requests. Propagation requires explicit
+  `--write software` or `--write radio`. The version check does not replace
+  installation or artifact completeness tests. See the
+  [versioning migration guide](VERSIONING.md).
 - Retain existing channel tag conventions: `standalone-X.Y.Z`, `ha-X.Y.Z`, and
   `X.Y.Z` in the generated integration repository. Never move published tags or
   replace published assets. Corrections get a new version.
@@ -176,9 +208,11 @@ rebuild, publish, deploy or qualify a new release.
 
 ## Pending integrated candidate
 
-Publication is on hold pending the Tech Lead's reviewed candidate. No next
-version has been allocated. The next feature entering implementation is
-one-button automatic pairing across the daemon, Web UI and HA integration.
+Publication remains subject to the complete release gates. No next coordinated
+distribution version has been allocated. One-button automatic pairing was
+accepted at `7a15d627132c515a0537b3b92f7520ac152c3b9e`. The separately authorized
+daemon versioning work allocates development package `0.14.0` with unchanged
+radio compatibility `0.13`; it does not publish a new distribution.
 Current development validation is offline/simulated only; no live deployment or
 radio operations are part of this handoff.
 

@@ -12,7 +12,7 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 
-from livolod import __version__
+from livolod import FIRMWARE_COMPAT_VERSION
 from livolod.config import load
 from livolod.firmware_bundle import BundleError, select_candidate
 from livolod.firmware_catalog import inventory, provision
@@ -29,14 +29,14 @@ def fixture(root, variant=0):
     @return Candidate manifest metadata.
     """
     root.mkdir(exist_ok=True)
-    app = bytearray(mg21_image("zb-gw04-1v2", __version__))
+    app = bytearray(mg21_image("zb-gw04-1v2", FIRMWARE_COMPAT_VERSION))
     app[-1] = variant
     data = gbl(bytes(app))
     entry = dict(
         id="test",
         board="zb-gw04-1v2",
         role="gateway",
-        version=__version__,
+        version=FIRMWARE_COMPAT_VERSION,
         protocol=3,
         backend="mg21_gecko_gbl_v1",
         path="image.gbl",
@@ -54,7 +54,9 @@ def fixture(root, variant=0):
     (root / "qualification.json").write_text('{"synthetic": true}')
     (root / "NOTICE").write_text("Synthetic fixture; never flash")
     (root / "manifest.json").write_text(
-        json.dumps(dict(schema=1, host_version=__version__, artifacts=[entry]))
+        json.dumps(
+            dict(schema=1, host_version=FIRMWARE_COMPAT_VERSION, artifacts=[entry])
+        )
     )
     return entry
 
@@ -104,7 +106,7 @@ class CatalogTests(unittest.IsolatedAsyncioTestCase):
 
     def publish(self):
         """Promote the current source using the real operator provisioning helper."""
-        return provision(self.source, self.catalog, __version__)
+        return provision(self.source, self.catalog, FIRMWARE_COMPAT_VERSION)
 
     async def test_publish_refresh_replace_remove_without_radio_or_database_writes(
         self,
@@ -231,10 +233,10 @@ class CatalogTests(unittest.IsolatedAsyncioTestCase):
             select_candidate(
                 self.catalog,
                 board="zb-gw04-1v2",
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=460800,
             )["version"],
-            __version__,
+            FIRMWARE_COMPAT_VERSION,
         )
 
     def test_recreated_service_sees_persistent_catalog(self):
@@ -251,7 +253,7 @@ class CatalogTests(unittest.IsolatedAsyncioTestCase):
     def test_catalog_links_and_digest_mismatch_rejected(self):
         """Operator mistakes cannot redirect validation or bypass explicit provenance."""
         with self.assertRaises(ValueError):
-            provision(self.source, self.catalog, __version__, "0" * 64)
+            provision(self.source, self.catalog, FIRMWARE_COMPAT_VERSION, "0" * 64)
         (self.source / "NOTICE").unlink()
         (self.source / "NOTICE").symlink_to("/etc/hosts")
         with self.assertRaises(BundleError):
@@ -282,7 +284,7 @@ class CatalogTests(unittest.IsolatedAsyncioTestCase):
             select_candidate(
                 self.catalog,
                 board="zb-gw04-1v2",
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=460800,
             )["id"],
             "test:" + self.entry["sha256"],
@@ -322,7 +324,9 @@ class CatalogTests(unittest.IsolatedAsyncioTestCase):
         """A validated empty catalog preserves prior manifests for operator rollback."""
         self.publish()
         (self.source / "manifest.json").write_text(
-            json.dumps(dict(schema=1, host_version=__version__, artifacts=[]))
+            json.dumps(
+                dict(schema=1, host_version=FIRMWARE_COMPAT_VERSION, artifacts=[])
+            )
         )
         self.assertEqual(self.publish()["artifacts"], 0)
         self.assertTrue(list((self.catalog / "history").glob("*.json")))
@@ -330,6 +334,6 @@ class CatalogTests(unittest.IsolatedAsyncioTestCase):
             select_candidate(
                 self.catalog,
                 board="zb-gw04-1v2",
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=460800,
             )

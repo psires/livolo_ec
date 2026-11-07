@@ -129,7 +129,7 @@ def _manifest(bundle_dir, host_version):
     """Load and check a manifest before selecting any device-specific artifact.
 
     @param bundle_dir Operator-configured local bundle directory.
-    @param host_version Exact installed daemon release in major.minor form.
+    @param host_version Exact radio compatibility target in major.minor form; not the package version.
     @return Resolved root and validated metadata entries.
     """
     try:
@@ -157,7 +157,10 @@ def _manifest(bundle_dir, host_version):
     if type(manifest["schema"]) is not int or manifest["schema"] != 1:
         _fail("Unsupported firmware manifest schema")
     if manifest["host_version"] != host_version:
-        _fail("Bundle does not match this daemon release", "incompatible_host")
+        _fail(
+            "Bundle does not match the firmware compatibility target",
+            "incompatible_host",
+        )
     entries = manifest["artifacts"]
     if not isinstance(entries, list) or len(entries) > 32:
         _fail("Invalid artifact list")
@@ -392,7 +395,7 @@ def select_candidate(bundle_dir, *, board, host_version, app_baudrate):
 
     @param bundle_dir Trusted local bundle directory, never supplied by HTTP clients.
     @param board Live radio board identity, not a guess from the USB bridge.
-    @param host_version Installed daemon release; firmware must match exactly.
+    @param host_version Exact radio compatibility target; firmware must match exactly.
     @param app_baudrate Current application rate, preserved by this update.
     @return Validated candidate dictionary; unavailable cases raise BundleError.
     """
@@ -412,7 +415,7 @@ def load_candidate(bundle_dir, candidate_id, *, host_version, app_baudrate):
 
     @param bundle_dir Trusted local bundle directory.
     @param candidate_id Artifact identity bound to its complete SHA-256 digest.
-    @param host_version Installed daemon release.
+    @param host_version Exact radio compatibility target, independent of the daemon package version.
     @param app_baudrate Application rate that must remain unchanged.
     @return Revalidated private candidate dictionary or BundleError.
     """

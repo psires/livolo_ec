@@ -311,6 +311,16 @@ Preserve a working image and consistent database backup before trying it on hard
 
 ## Device management and state behavior
 
+The gateway diagnostics distinguish **Daemon software version** from
+**Firmware compatibility target**. The radio's **Firmware update** entity
+continues to show the installed firmware and the validated available candidate.
+Upgrading daemon software alone does not offer a radio firmware update.
+Older daemons that omit the explicit version fields show **Unknown** for these
+diagnostics; switch control remains available. The legacy API `host_version`
+field is retained in diagnostic downloads as a compatibility alias, never used
+to infer software identity or feature support. Downloads also include the
+explicit native API and UART revisions when reported.
+
 On the **Livolo EC gateway** device page, press **Pair new device**, then put
 only the intended new switch into physical pairing mode. The daemon listens
 for up to two minutes, selects a fresh supported announcement, saves its

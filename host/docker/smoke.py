@@ -14,7 +14,7 @@ import time
 import urllib.error
 import urllib.request
 
-from livolod import __version__
+from livolod import __version__, FIRMWARE_COMPAT_VERSION
 import livolod
 
 
@@ -65,8 +65,6 @@ def firmware_checks(config_path, root):
     @param config_path Disposable configuration pointing only to a nonexistent radio.
     @param root Temporary directory holding this isolated smoke test's files.
     """
-    if tuple(map(int, __version__.split("."))) < (0, 13):
-        return  # Historical source images predate the unified inspection CLI.
     help_text = subprocess.check_output(
         ["livolod-firmware-manage", "--help"], text=True
     )
@@ -102,7 +100,7 @@ def firmware_checks(config_path, root):
             "--artifact",
             str(invalid),
             "--version",
-            __version__,
+            FIRMWARE_COMPAT_VERSION,
         ],
         stdin=subprocess.DEVNULL,
         capture_output=True,
@@ -115,7 +113,7 @@ def firmware_checks(config_path, root):
     assert str(root) not in inspected.stdout
     source = root / "catalog-source"
     source.mkdir()
-    manifest = {"schema": 1, "host_version": __version__, "artifacts": []}
+    manifest = {"schema": 1, "host_version": FIRMWARE_COMPAT_VERSION, "artifacts": []}
     (source / "manifest.json").write_text(json.dumps(manifest))
     destination = root / "catalog"
     published = subprocess.run(
@@ -146,6 +144,23 @@ def main():
         == __version__
     )
     assert version("paho-mqtt") == "2.1.0"
+    assert version("livolo-ec-daemon") == __version__
+    expected_versions = {
+        "daemon_version": __version__,
+        "firmware_compat_version": FIRMWARE_COMPAT_VERSION,
+        "api_version": 1,
+        "uart_protocol": 3,
+    }
+    for name in (
+        "livolod",
+        "livolod-firmware",
+        "livolod-firmware-manage",
+        "livolod-commission",
+    ):
+        assert (
+            json.loads(subprocess.check_output([name, "--version-info"], text=True))
+            == expected_versions
+        )
     if os.environ.get("LIVOLO_NORDIC_SMOKE") == "1":
         nordic_checks()
     with tempfile.TemporaryDirectory(
@@ -226,6 +241,19 @@ def main():
                     snapshot = json.load(response)
                 assert snapshot["api_version"] == 1
                 assert snapshot["data"]["ready"] and snapshot["data"]["simulated"]
+                diagnostics = snapshot["data"]["diagnostics"]
+                assert diagnostics["host_version"] == FIRMWARE_COMPAT_VERSION
+                for key, value in expected_versions.items():
+                    assert diagnostics[key] == value
+                info_request = urllib.request.Request(
+                    f"http://127.0.0.1:{api_port}/api/v1/info",
+                    headers={"Authorization": "Bearer " + token},
+                )
+                with urllib.request.urlopen(info_request, timeout=2) as response:
+                    info = json.load(response)
+                assert info["host_version"] == FIRMWARE_COMPAT_VERSION
+                for key, value in expected_versions.items():
+                    assert info[key] == value
                 assert "mqtt" not in snapshot["data"]
                 assert state["mqtt"]["enabled"] is False
                 process.send_signal(signal.SIGTERM)

@@ -75,6 +75,122 @@ function withPreflight(
   );
 }
 
+/** Distinct software, compatibility and installed image identities must retain explicit labels. */
+test('network distinguishes daemon software radio target installed image and wire revisions', () => {
+  const ui = harness();
+  ui.snapshot(candidate());
+  ui.context.testSnapshot.diagnostics = {
+    daemon_version: '0.14.0',
+    firmware_compat_version: '0.13',
+    host_version: '0.13',
+    api_version: 1,
+    uart_protocol: 3,
+    firmware: { running_version: '0.12', target_version: '0.13' },
+  };
+  ui.run('renderNetwork()');
+  const details = ui.element('#network-details').innerHTML;
+  assert.match(details, /<dt>Daemon software<\/dt><dd>0\.14\.0<\/dd>/);
+  assert.match(details, /<dt>Installed radio firmware<\/dt><dd>0\.12<\/dd>/);
+  assert.match(details, /<dt>Radio compatibility target<\/dt><dd>0\.13<\/dd>/);
+  assert.match(details, /<dt>Native API revision<\/dt><dd>1<\/dd>/);
+  assert.match(details, /<dt>UART protocol revision<\/dt><dd>3<\/dd>/);
+  assert.match(
+    ui.element('#firmware-details').innerHTML,
+    /Candidate radio firmware<\/dt><dd>0\.13/,
+  );
+});
+
+/** Legacy metadata cannot identify software or substitute a version for an absent capability. */
+test('legacy daemon reports unknown software and only explicitly reported radio identities', () => {
+  const ui = harness();
+  ui.snapshot(null);
+  ui.context.testSnapshot.diagnostics = {
+    host_version: '0.13',
+    firmware: { running_version: '0.12', target_version: '0.13' },
+  };
+  ui.run('renderNetwork()');
+  let details = ui.element('#network-details').innerHTML;
+  assert.match(details, /Daemon software<\/dt><dd>Unknown \(legacy daemon\)/);
+  assert.match(details, /Installed radio firmware<\/dt><dd>0\.12/);
+  assert.match(details, /Radio compatibility target<\/dt><dd>0\.13/);
+  assert.match(details, /Native API revision<\/dt><dd>Not reported/);
+  assert.match(details, /UART protocol revision<\/dt><dd>Not reported/);
+  assert.equal(ui.element('#firmware-review').disabled, true);
+  delete ui.context.testSnapshot.diagnostics.firmware;
+  ui.run('renderNetwork()');
+  details = ui.element('#network-details').innerHTML;
+  assert.match(details, /Radio compatibility target<\/dt><dd>Not reported/);
+  assert.match(details, /Installed radio firmware<\/dt><dd>Unknown/);
+  assert.equal(ui.calls.length, 0);
+});
+
+/** Software-only upgrades must neither create offers nor bypass daemon-owned firmware rejection. */
+test('software version changes never create a firmware offer', () => {
+  const ui = harness();
+  for (const daemonVersion of ['0.14.0', '9.0.0']) {
+    for (const firmware of [
+      { ...candidate(), installed_version: '0.13', update_available: false },
+      { ...candidate(), latest_version: null, candidate_id: null, update_available: false },
+      { ...candidate(), latest_version: '0.14', blocked_reason: 'incompatible_host' },
+    ]) {
+      ui.snapshot(firmware);
+      ui.context.testSnapshot.diagnostics = {
+        daemon_version: daemonVersion,
+        firmware_compat_version: '0.13',
+        host_version: '0.13',
+      };
+      ui.run('renderNetwork()');
+      assert.equal(ui.element('#firmware-review').disabled, true);
+      assert.notEqual(ui.element('#firmware-status').textContent, 'Update available');
+    }
+  }
+  assert.match(ui.element('#firmware-reason').textContent, /radio compatibility target/);
+  assert.equal(ui.calls.length, 0);
+});
+
+/** A real firmware candidate remains reviewable when its version differs from daemon software. */
+test('software-only upgrade preserves the exact eligible candidate and preflight target', async () => {
+  const ui = harness();
+  ui.snapshot(candidate());
+  ui.context.testSnapshot.diagnostics = {
+    daemon_version: '0.14.0',
+    firmware_compat_version: '0.13',
+    host_version: '0.13',
+  };
+  withPreflight(ui);
+  ui.run('renderNetwork()');
+  assert.equal(ui.element('#firmware-status').textContent, 'Update available');
+  await ui.element('#firmware-review').events.click();
+  assert.equal(ui.element('#firmware-install').disabled, false);
+  assert.match(
+    ui.element('#firmware-review-details').innerHTML,
+    /Candidate radio firmware<\/dt><dd>0\.13/,
+  );
+  ui.context.testSnapshot.diagnostics.daemon_version = '9.0.0';
+  ui.run('renderNetwork()');
+  assert.equal(ui.element('#firmware-install').disabled, false);
+  assert.equal(ui.calls.length, 1);
+  assert.match(ui.calls[0].path, /candidate_id=test-artifact/);
+  assert.equal(ui.calls[0].options.method, undefined);
+});
+
+/** Newly displayed identity fields must escape daemon-provided text like existing metadata. */
+test('version labels escape untrusted identity fields', () => {
+  const ui = harness();
+  ui.snapshot(null);
+  ui.context.testSnapshot.diagnostics = {
+    daemon_version: '<img src=x onerror=alert(1)>',
+    firmware_compat_version: '<script>target</script>',
+    api_version: '<svg onload=alert(1)>',
+    uart_protocol: '<iframe>',
+  };
+  ui.run('renderNetwork()');
+  const details = ui.element('#network-details').innerHTML;
+  assert.doesNotMatch(details, /<img|<script|<svg|<iframe/);
+  assert.match(details, /&lt;script&gt;target/);
+  assert.equal(ui.element('#firmware-review').disabled, true);
+});
+
 /** Old daemons and boards without an install path remain viewable without an enabled action. */
 test('missing and unsupported firmware support fails closed', () => {
   const ui = harness();

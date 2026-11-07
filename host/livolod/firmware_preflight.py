@@ -2,7 +2,7 @@
 
 import re
 
-from . import __version__
+from . import FIRMWARE_COMPAT_VERSION
 from .firmware_backends import backend_status
 from .firmware_bundle import BOARDS, BundleError, load_candidate, select_candidate
 from .version import parse_version
@@ -102,14 +102,14 @@ def build_report(
                 candidate = select_candidate(
                     config.firmware_bundle_dir,
                     board=board,
-                    host_version=__version__,
+                    host_version=FIRMWARE_COMPAT_VERSION,
                     app_baudrate=config.serial_baudrate,
                 )
             else:
                 candidate = load_candidate(
                     config.firmware_bundle_dir,
                     candidate_id,
-                    host_version=__version__,
+                    host_version=FIRMWARE_COMPAT_VERSION,
                     app_baudrate=config.serial_baudrate,
                 )
         check("artifact", True, "artifact_invalid")

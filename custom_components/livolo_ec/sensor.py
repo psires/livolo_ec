@@ -5,6 +5,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from ._client import version_data
 from .const import DOMAIN
 from .commissioning import PAIRING_STATES
 
@@ -37,8 +38,59 @@ async def async_setup_entry(hass, entry, async_add_entities):
         [
             LivoloFirmwareStatus(entry.runtime_data),
             LivoloPairingStatus(entry.runtime_data),
+            LivoloVersionSensor(entry.runtime_data, "daemon_version"),
+            LivoloVersionSensor(entry.runtime_data, "firmware_compat_version"),
         ]
     )
+
+
+class LivoloVersionSensor(CoordinatorEntity, SensorEntity):
+    """Display software and radio compatibility as distinct read-only identities."""
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_should_poll = False
+
+    def __init__(self, coordinator, field):
+        """Attach one explicit version field to the existing logical gateway.
+
+        @param coordinator Shared native push coordinator.
+        @param field Daemon software or firmware compatibility field to display.
+        """
+        super().__init__(coordinator)
+        self._field = field
+        self._attr_translation_key = field
+        self._attr_unique_id = f"{coordinator.entry.unique_id}:{field}"
+        self._attr_icon = (
+            "mdi:application-cog" if field == "daemon_version" else "mdi:chip"
+        )
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, coordinator.entry.unique_id)}
+        )
+
+    @property
+    def available(self):
+        """Mark disconnected version metadata unavailable without blocking switch control."""
+        return self.coordinator.connected
+
+    @property
+    def native_value(self):
+        """Leave legacy software identity unknown rather than relabelling its compatibility alias."""
+        return version_data(self.coordinator.data.get("diagnostics"))[self._field]
+
+    @property
+    def extra_state_attributes(self):
+        """Explain the version domain and expose only explicit wire revisions."""
+        versions = version_data(self.coordinator.data.get("diagnostics"))
+        if self._field == "daemon_version":
+            return {
+                "api_version": versions["api_version"],
+                "uart_protocol": versions["uart_protocol"],
+                "explanation": "Daemon software package version. Older daemons may not report it separately. This is not the installed radio firmware version.",
+            }
+        return {
+            "explanation": "Exact radio firmware compatibility target reported by the daemon. This is not an installed version or an available update; see the radio Firmware update entity.",
+        }
 
 
 class LivoloFirmwareStatus(CoordinatorEntity, SensorEntity):

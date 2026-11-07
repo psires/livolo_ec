@@ -33,9 +33,16 @@ def check(image, kind, broker_image, previous=None):
     """
     identity = "livolo-check-" + uuid.uuid4().hex[:10]
     containers = []
-    docker("pull", image)
+    if "@sha256:" in image:
+        docker("pull", image)
+    image = docker("image", "inspect", "--format", "{{.Id}}", image)
     labels = json.loads(docker("image", "inspect", image))[0]["Config"]["Labels"]
     release = tuple(map(int, labels["org.opencontainers.image.version"].split(".")))
+    compatibility = labels.get("net.sfires.livolo.firmware-compat-version")
+    if compatibility is None:
+        # Published pre-split images used the exact daemon/radio identity.
+        compatibility = labels.get("net.sfires.livolo.daemon-version")
+        assert compatibility in ("0.12", "0.13"), "Missing explicit image compatibility"
     phases = [(previous or image, False), (image, False)]
     if kind == "ha" and release >= (0, 4, 0):
         phases += [(image, True), (image, True)]
@@ -149,10 +156,11 @@ def check(image, kind, broker_image, previous=None):
                         "o.update(web_enabled=False,firmware_catalog='local'); "
                         "p.write_text(json.dumps(o)); "
                         "d=Path('/data/firmware'); d.mkdir(mode=0o755); "
-                        "(d/'manifest.json').write_text(json.dumps(dict(schema=1,host_version='0.13',artifacts=[]))); "
+                        f"(d/'manifest.json').write_text(json.dumps(dict(schema=1,host_version={compatibility!r},artifacts=[]))); "
                         "(d/'persistence-check').write_text('isolated-catalog-survives-recreation')",
                     )
-                docker("pull", current)
+                if "@sha256:" in current:
+                    docker("pull", current)
                 name = identity + "-app-" + str(number)
                 containers.append(name)
                 args = [

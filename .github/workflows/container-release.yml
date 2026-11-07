@@ -93,12 +93,14 @@ jobs:
           build-args: |
             PYTHON_IMAGE=${{ matrix.python_image }}
             RELEASE_VERSION=${{ matrix.daemon_version }}
+            FIRMWARE_COMPAT_VERSION=${{ matrix.firmware_compat_version }}
           labels: |
             org.opencontainers.image.source=https://github.com/psires/livolo_ec
             org.opencontainers.image.revision=${{ matrix.source_commit }}
             org.opencontainers.image.version=${{ matrix.version }}
             org.opencontainers.image.licenses=BSD-2-Clause
             net.sfires.livolo.daemon-version=${{ matrix.daemon_version }}
+            net.sfires.livolo.firmware-compat-version=${{ matrix.firmware_compat_version }}
             net.sfires.livolo.recipe-revision=${{ github.sha }}
           sbom: true
           provenance: mode=max
@@ -123,12 +125,19 @@ jobs:
           import json, pathlib, subprocess
           from importlib.metadata import version
           assert version("livolo-ec-daemon") == "${{ matrix.daemon_version }}"
+          import livolod
+          compat = getattr(livolod, "FIRMWARE_COMPAT_VERSION", livolod.__version__)
+          assert compat == "${{ matrix.firmware_compat_version }}"
           subprocess.run(["python", "-m", "pip", "check"], check=True)
           for name in ("livolod", "livolod-firmware", "livolod-firmware-manage"):
               subprocess.run([name, "--help"], check=True, stdout=subprocess.DEVNULL)
+          if hasattr(livolod, "FIRMWARE_COMPAT_VERSION"):
+              subprocess.run(["livolod-commission", "--help"], check=True, stdout=subprocess.DEVNULL)
+              for name in ("livolod", "livolod-firmware", "livolod-firmware-manage", "livolod-commission"):
+                  assert json.loads(subprocess.check_output([name, "--version-info"], text=True)) == dict(daemon_version=livolod.__version__, firmware_compat_version=compat, api_version=1, uart_protocol=3)
           subprocess.run(["python", "-m", "universal_silabs_flasher", "--help"], check=True, stdout=subprocess.DEVNULL)
           subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd="/usr/share/livolo-ec/sources", check=True)
-          if tuple(map(int, version("livolo-ec-daemon").split("."))) >= (0, 13):
+          if tuple(map(int, compat.split("."))) >= (0, 13):
               assert json.loads(pathlib.Path("/opt/nrfutil/livolo-runtime.json").read_text()) == {"python": [3, 10], "nrfutil": "6.1.7", "fixed_port": 1}
               subprocess.run(["/opt/nrfutil/bin/python3.10", "-I", "-m", "nordicsemi", "dfu", "usb-serial", "--help"], check=True, stdout=subprocess.DEVNULL)
               subprocess.run(["sha256sum", "--check", "SHA256SUMS"], cwd="/usr/share/livolo-ec/sources/nordic", check=True)

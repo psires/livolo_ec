@@ -11,7 +11,7 @@ import stat
 import sys
 import time
 
-from . import __version__
+from . import FIRMWARE_COMPAT_VERSION
 from .version import parse_version
 from .uart import LinkError
 from .protocol import key_values
@@ -44,7 +44,7 @@ def scan_catalog(config, board, caps, cached, stamp):
             candidate = select_candidate(
                 config.firmware_bundle_dir,
                 board=board,
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=config.serial_baudrate,
             )
         reason = backend_status(candidate, config.firmware_nordic)
@@ -150,7 +150,7 @@ class FirmwareManager:
             self.candidate = select_candidate(
                 self.service.config.firmware_bundle_dir,
                 board=self.board,
-                host_version=__version__,
+                host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=self.service.config.serial_baudrate,
             )
             self.reason = backend_status(
@@ -326,13 +326,15 @@ class FirmwareManager:
         @param worker_arguments Fixed worker arguments constructed by the offline CLI.
         @return Existing or newly accepted command result; incompatible inputs are rejected.
         """
-        from . import __version__
+        from . import FIRMWARE_COMPAT_VERSION
 
         if (
-            candidate["version"] != __version__
+            candidate["version"] != FIRMWARE_COMPAT_VERSION
             or candidate.get("operation") != "update"
         ):
-            raise ValueError("Local update must match the installed host release")
+            raise ValueError(
+                "Local update must match the firmware compatibility target"
+            )
         previous = self.service.store.previous(
             payload["request_id"],
             dict(action="firmware_update", candidate_id=payload["candidate_id"]),
@@ -502,7 +504,7 @@ class FirmwareManager:
                         candidate = load_candidate(
                             self.service.config.firmware_bundle_dir,
                             payload["candidate_id"],
-                            host_version=__version__,
+                            host_version=FIRMWARE_COMPAT_VERSION,
                             app_baudrate=self.service.config.serial_baudrate,
                         )
                     else:

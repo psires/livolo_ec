@@ -1,7 +1,7 @@
 """Signed UART updates. Optional systemd handoff; never manipulates GPIO.
 
 Use with the daemon stopped, or --service livolod for a managed stop/start.
-The matching host release must already be installed to confirm the trial boot.
+The daemon must explicitly target this firmware compatibility version to confirm the trial boot.
 """
 
 import argparse
@@ -13,7 +13,7 @@ import sqlite3
 import subprocess
 import time
 
-from . import __version__
+from . import FIRMWARE_COMPAT_VERSION
 from .config import load, uart_baudrate
 from .protocol import key_values
 from .update_package import inspect_package, public_key
@@ -241,9 +241,15 @@ def saved_status(database):
     return json.loads(row[0]) if row else {}
 
 
-def main():
-    """Run a signed update with optional service handoff and trial verification."""
+def main(argv=None):
+    """Run a signed update with optional service handoff and trial verification.
+
+    @param argv Optional argument list; None reads the process command line.
+    """
     p = argparse.ArgumentParser(description=__doc__)
+    from .version import add_version_arguments
+
+    add_version_arguments(p)
     p.add_argument("--config", required=True)
     p.add_argument("--package", required=True)
     p.add_argument("--public-key", required=True)
@@ -251,13 +257,13 @@ def main():
         "--service",
         help="Systemd service to stop and restart, e.g. livolod; requires appropriate permissions",
     )
-    a = p.parse_args()
+    a = p.parse_args(argv)
     config = load(a.config)
     data = Path(a.package).read_bytes()
     key = public_key(a.public_key)
     info = inspect_package(data, key)
-    if info["version"] != __version__:
-        p.error("Install the matching host release before updating firmware")
+    if info["version"] != FIRMWARE_COMPAT_VERSION:
+        p.error("Firmware must match the daemon's explicit compatibility target")
     if a.service and not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@-]*", a.service):
         p.error("Invalid service name")
     if (

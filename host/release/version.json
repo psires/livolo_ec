@@ -1,5 +1,7 @@
 {
+  "schema": 2,
   "distribution_version": "0.4.0",
-  "daemon_version": "0.13",
+  "daemon_version": "0.14.0",
+  "firmware_compat_version": "0.13",
   "client_version": "0.4.0"
 }

@@ -12,6 +12,9 @@ import tarfile
 import tempfile
 import zipfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from release_versions import source_versions
+
 
 def package(source, version, commit, output):
     """Assemble installable integration and app sources with provenance and hashes.
@@ -27,6 +30,7 @@ def package(source, version, commit, output):
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("Expected a full source commit")
     source = Path(source).resolve()
+    versions = source_versions(source)
     manifest = json.loads(
         (source / "custom_components/livolo_ec/manifest.json").read_text()
     )
@@ -80,7 +84,9 @@ def package(source, version, commit, output):
         metadata = {
             "integration_version": version,
             "app_version": app_version,
-            "daemon_version": (source / "VERSION").read_text().strip(),
+            "schema": versions["schema"],
+            "daemon_version": versions["daemon_version"],
+            "firmware_compat_version": versions["firmware_compat_version"],
             "source_commit": commit,
             "tag": "ha-" + version,
             "integration_install": "Manual ZIP; extract custom_components into HA config",

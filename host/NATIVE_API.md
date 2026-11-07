@@ -1,7 +1,7 @@
 # Native API v1 implementation contract
 
 This contract coordinates the daemon, Python client, HA integration and app.
-API v1 is separate from UART v3 and the daemon/firmware release version.
+API v1 and UART v3 are independent of daemon software and radio firmware versions.
 
 The machine API is a separate aiohttp listener configured through an `api`
 object: `enabled` (default false), `host` (default `127.0.0.1`), `port` (default
@@ -13,8 +13,25 @@ this machine API. The existing browser API remains separate.
 `GET /api/v1/info` returns:
 
 ```json
-{"api_version":1,"gateway":"2a992b12","tag":"a7","host_version":"0.12","simulated":false}
+{"api_version":1,"uart_protocol":3,"gateway":"2a992b12","tag":"a7","daemon_version":"0.14.0","firmware_compat_version":"0.13","host_version":"0.13","simulated":false}
 ```
+
+`daemon_version` identifies the installed Python package using numeric
+`major.minor.patch`. `firmware_compat_version` is the exact two-component radio
+target admitted by this daemon. API 1's `host_version` is retained as a deprecated
+**firmware compatibility alias**, not a software version. Its value remains
+`0.13` when daemon software is `0.14.0`. `api_version` and `uart_protocol` explicitly
+describe their wire revisions; clients must never infer them from either version.
+
+The same five fields are present in snapshot `data.diagnostics`, even while the
+radio is offline. They are additive and optional for clients connecting to older
+daemons. Missing `daemon_version` means unknown/legacy software identity; do not
+relabel `host_version` as a new software version or use it to infer feature support.
+Firmware update `installed_version` and `latest_version` still describe actual
+radio firmware and a validated artifact. A software-only upgrade cannot create a
+firmware offer by comparing the radio version with the package version. Existing
+schema-1 firmware catalogs likewise retain `host_version` as their exact radio
+compatibility target; no software fields are added to catalog manifests.
 
 `GET /api/v1/snapshot` and the first message on `GET /api/v1/events` (WebSocket)
 return this envelope:

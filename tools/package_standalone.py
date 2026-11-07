@@ -17,6 +17,8 @@ import tarfile
 import tempfile
 import zipfile
 
+from release_versions import source_versions
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -60,13 +62,14 @@ def document_links(text, relative, tag):
     return re.sub(r"(\[[^\]]*\])\(([^)\s]+)\)", replace, text)
 
 
-def inspect_wheel(path, name, expected, license_text):
+def inspect_wheel(path, name, expected, license_text, firmware_compat_version=None):
     """Reject incomplete or incorrectly labelled Python distributions before release.
 
     @param path Built wheel to inspect.
     @param name Expected Python distribution name.
     @param expected Expected component version, independent of bundle version.
     @param license_text Canonical project licence bytes.
+    @param firmware_compat_version Required catalog target for daemon wheels.
     """
     with zipfile.ZipFile(path) as wheel:
         if wheel.testzip() is not None:
@@ -84,6 +87,11 @@ def inspect_wheel(path, name, expected, license_text):
                 if not wheel.read("livolod/static/" + item):
                     raise ValueError("Missing web asset")
             catalog = json.loads(wheel.read("livolod/firmware/manifest.json"))
+            if (
+                catalog.get("host_version") != firmware_compat_version
+                or catalog.get("schema") != 1
+            ):
+                raise ValueError("Wheel firmware catalog compatibility mismatch")
             if catalog["artifacts"]:
                 raise ValueError("This standalone release does not distribute firmware")
 
@@ -135,12 +143,10 @@ def package(commit, output):
                 ):
                     raise ValueError("Unexpected source archive member")
             bundle.extractall(source, filter="data")
-        metadata = json.loads((source / "host/release/version.json").read_text())
+        metadata = source_versions(source)
         release = metadata["distribution_version"]
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", release):
             raise ValueError("Invalid standalone distribution version")
-        if (source / "VERSION").read_text().strip() != metadata["daemon_version"]:
-            raise ValueError("Daemon compatibility version mismatch")
         epoch = subprocess.check_output(
             ["git", "show", "-s", "--format=%ct", commit], cwd=ROOT, text=True
         ).strip()
@@ -162,7 +168,13 @@ def package(commit, output):
                 check=True,
             )
             wheel = next(output.glob(name.replace("-", "_") + "-*.whl"))
-            inspect_wheel(wheel, name, metadata[key], (source / "LICENSE").read_bytes())
+            inspect_wheel(
+                wheel,
+                name,
+                metadata[key],
+                (source / "LICENSE").read_bytes(),
+                metadata["firmware_compat_version"],
+            )
         tag = "standalone-" + release
         metadata.update(
             source_commit=commit,
@@ -218,6 +230,11 @@ def package(commit, output):
             else:
                 shutil.copy2(source / relative, destination)
         stage_pairing_guide(source, staged, tag)
+        migration = source / "docs/VERSIONING.md"
+        if migration.is_file():
+            (staged / "docs/VERSIONING.md").write_text(
+                document_links(migration.read_text(), "docs/VERSIONING.md", tag)
+            )
         (staged / "constraints.txt").write_text(
             (source / "host/docker/requirements-firmware.txt").read_text()
             + "\npaho-mqtt==2.1.0\n"

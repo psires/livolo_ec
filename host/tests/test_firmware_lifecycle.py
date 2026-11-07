@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from livolod import __version__
+from livolod import FIRMWARE_COMPAT_VERSION
 from livolod.config import load
 from livolod.firmware_artifacts import inspect_artifact
 from livolod.firmware_cli import manual_flash
@@ -152,9 +152,9 @@ class LocalLifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_local_update_uses_durable_worker_then_normal_confirmation(self):
         """A local MG21 update reuses job IPC and cannot leak arguments into later jobs."""
         path = Path(self.temp.name) / "application.gbl"
-        path.write_bytes(gbl(mg21_image(version=__version__)))
+        path.write_bytes(gbl(mg21_image(version=FIRMWARE_COMPAT_VERSION)))
         candidate = inspect_artifact(
-            str(path), board="sonoff-zbdongle-e", version=__version__
+            str(path), board="sonoff-zbdongle-e", version=FIRMWARE_COMPAT_VERSION
         )
         store = Store(self.config.database, self.config.gateway + ":" + self.config.tag)
         try:
@@ -178,7 +178,11 @@ class LocalLifecycleTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(manager.job["status"], "pending")
             self.assertIsNone(manager.worker_arguments)
             manager.restored(
-                dict(board=candidate["board"], fw_version=__version__, baud="460800")
+                dict(
+                    board=candidate["board"],
+                    fw_version=FIRMWARE_COMPAT_VERSION,
+                    baud="460800",
+                )
             )
             self.assertEqual(manager.job["status"], "confirmed")
         finally:

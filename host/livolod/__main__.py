@@ -5,7 +5,7 @@ import logging
 import signal
 
 from .config import integer, load
-from . import __version__
+from .version import add_version_arguments
 from .mqtt import Broker
 from .service import Service
 from .simulator import Simulator
@@ -64,10 +64,13 @@ async def run(config, simulate=False):
         store.close()
 
 
-def main():
-    """Validate command-line options and launch the daemon or configuration check."""
+def main(argv=None):
+    """Validate command-line options and launch the daemon or configuration check.
+
+    @param argv Optional argument list; None reads the process command line.
+    """
     parser = argparse.ArgumentParser(description="Livolo EC MQTT daemon (UART v3)")
-    parser.add_argument("--version", action="version", version=__version__)
+    add_version_arguments(parser)
     parser.add_argument("--config", required=True)
     parser.add_argument(
         "--check-config",
@@ -87,7 +90,7 @@ def main():
     parser.add_argument(
         "--log-level", choices=("DEBUG", "INFO", "WARNING", "ERROR"), default="INFO"
     )
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     logging.basicConfig(
         level=args.log_level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )

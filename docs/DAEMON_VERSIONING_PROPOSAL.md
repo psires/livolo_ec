@@ -1,11 +1,13 @@
 # Independent daemon package versioning — proposal
 
 Status: architecture approved by the Tech Lead / PO on **2026-11-07**.
-Implementation is pending a separately scheduled release-preparation task.
-No specific version is allocated, and this approval does not authorize runtime
-changes, publication, deployment or hardware qualification. Inspection baseline:
-`7a15d627132c515a0537b3b92f7520ac152c3b9e`. The accepted pairing implementation
-remains frozen.
+Implementation was subsequently authorized on 2026-11-07 for an offline-tested
+source change. The daemon development version is allocated as **0.14.0**, with
+firmware compatibility **0.13** and coordinated distribution/HA versions unchanged.
+The source implements this separation; acceptance requires the checks below on
+the integrated commit. Publication, deployment and hardware qualification remain
+separate gates. Inspection baseline:
+`7a15d627132c515a0537b3b92f7520ac152c3b9e`. Accepted pairing behavior is unchanged.
 
 ## Approved architecture
 
@@ -26,7 +28,7 @@ Daemon packages use ordinary three-component numeric versions and must increase
 under Python package ordering. A package `0.5.0` would be older than the existing
 daemon `0.13`; do not copy the overall distribution number into it. For example,
 daemon `0.14.0` with firmware compatibility `0.13` would be a valid transition.
-This is illustrative, not an allocated release number. Do not use an epoch or
+This example became the allocated development version on 2026-11-07. Do not use an epoch or
 local-version suffix to conceal version reuse. No existing artifact is relabelled.
 
 Keep root `VERSION` as the radio compatibility/build target for the first
@@ -173,8 +175,9 @@ and catalog schema 1. Every exact TI, signature, board, hash, baud and
 trial-confirmation check must be preserved. Upgrade ordering and tests with
 intentionally different software and compatibility versions are mandatory
 acceptance criteria. Domain specialists may plan against this direction;
-implementation awaits the separately scheduled task. Exact daemon/distribution
-numbers are allocated only at the later release-candidate step.
+the separately authorized source implements this architecture. The daemon
+development number is allocated above; coordinated distribution numbers remain
+for the later release-candidate step.
 
 Architecture approval does not waive the complete-release requirements: firmware
 payload distribution, exact-board qualification, notices and signing readiness

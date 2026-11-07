@@ -5,29 +5,62 @@ import re
 from pathlib import Path
 import tempfile
 import unittest
-from livolod import __version__
+from livolod import __version__, FIRMWARE_COMPAT_VERSION
 from livolod.config import load
 from livolod.service import Service
 from livolod.simulator import Simulator
 from livolod.storage import Store
 from livolod.uart import LinkError
 from livolod.version import parse_version, firmware_info
+from livolod.version import parse_daemon_version, version_info
 
 
 class VersionTests(unittest.TestCase):
     def test_project_and_firmware_release_markers_match(self):
         """Catch application header drift before a firmware flash."""
         root = Path(__file__).resolve().parents[2]
-        self.assertEqual((root / "VERSION").read_text().strip(), __version__)
+        self.assertEqual(
+            (root / "VERSION").read_text().strip(), FIRMWARE_COMPAT_VERSION
+        )
         header = (root / "firmware/version.h").read_text()
         values = [
             re.search(r"#define EC_VERSION_" + part + r" (\d+)", header).group(1)
             for part in ("MAJOR", "MINOR")
         ]
-        self.assertEqual(".".join(values), __version__)
+        self.assertEqual(".".join(values), FIRMWARE_COMPAT_VERSION)
         self.assertIn(
             'version = "' + __version__ + '"',
             (root / "host/pyproject.toml").read_text(),
+        )
+        self.assertNotEqual(__version__, FIRMWARE_COMPAT_VERSION)
+        self.assertEqual(len(parse_daemon_version(__version__)), 3)
+
+    def test_software_and_firmware_parsers_do_not_share_version_domains(self):
+        """Software SemVer never enters firmware's bounded major/minor encoding."""
+        self.assertEqual(parse_daemon_version("0.14.0"), (0, 14, 0))
+        self.assertGreater(
+            parse_daemon_version("0.14.1"), parse_daemon_version("0.14.0")
+        )
+        for value in (
+            "0.13",
+            "01.14.0",
+            "0.14.0-dev",
+            "0.14.0+local",
+            "1!0.14.0",
+            True,
+        ):
+            with self.assertRaises(ValueError):
+                parse_daemon_version(value)
+        with self.assertRaises(ValueError):
+            parse_version(__version__)
+        self.assertEqual(
+            version_info(),
+            dict(
+                daemon_version=__version__,
+                firmware_compat_version=FIRMWARE_COMPAT_VERSION,
+                api_version=1,
+                uart_protocol=3,
+            ),
         )
 
     def test_numeric_major_minor_and_unknown_legacy(self):
@@ -39,12 +72,14 @@ class VersionTests(unittest.TestCase):
         self.assertIsNone(firmware_info({})["running_version"])
         self.assertIsNone(firmware_info({})["update_available"])
         self.assertTrue(firmware_info({"fw_version": "0.1"})["update_available"])
-        self.assertFalse(firmware_info({"fw_version": __version__})["update_available"])
+        self.assertFalse(
+            firmware_info({"fw_version": FIRMWARE_COMPAT_VERSION})["update_available"]
+        )
 
 
 class TrialTests(unittest.IsolatedAsyncioTestCase):
     async def exercise(
-        self, firmware=__version__, bad_confirm=False, initial_trial=True
+        self, firmware=FIRMWARE_COMPAT_VERSION, bad_confirm=False, initial_trial=True
     ):
         """Run startup confirmation with the requested firmware-version behavior.
 
@@ -111,17 +146,21 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
                 "SELECT value FROM meta WHERE key='firmware_status'"
             ).fetchone()[0]
         )
-        self.assertEqual(status["running_version"], __version__)
+        self.assertEqual(status["running_version"], FIRMWARE_COMPAT_VERSION)
         self.assertFalse(status["trial"])
 
     async def test_wrong_release_or_failed_durable_confirmation_is_not_ready(self):
         """Verify wrong release or failed durable confirmation is not ready."""
-        for firmware, bad in [("0.1", False), (__version__, True)]:
+        for firmware, bad in [
+            ("0.1", False),
+            ("0.14", False),
+            (FIRMWARE_COMPAT_VERSION, True),
+        ]:
             service, store, history = await self.exercise(firmware, bad)
             with self.assertRaises(LinkError):
                 await service.restore()
             self.assertFalse(service.ready)
-            if firmware != __version__:
+            if firmware != FIRMWARE_COMPAT_VERSION:
                 self.assertNotIn("UPDATE_CONFIRM", history)
 
     async def test_new_host_restores_confirmed_012_without_flashing(self):
@@ -129,7 +168,7 @@ class TrialTests(unittest.IsolatedAsyncioTestCase):
         service, store, history = await self.exercise("0.12", initial_trial=False)
         await service.restore()
         self.assertTrue(service.ready)
-        self.assertEqual(service.diagnostics["host_version"], __version__)
+        self.assertEqual(service.diagnostics["host_version"], FIRMWARE_COMPAT_VERSION)
         self.assertEqual(service.diagnostics["firmware"]["running_version"], "0.12")
         self.assertTrue(any(command.startswith("ARM ") for command in history))
         self.assertFalse(

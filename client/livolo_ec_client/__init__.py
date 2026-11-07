@@ -136,6 +136,38 @@ def snapshot_data(envelope: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def version_data(value):
+    """Allowlist optional version identities without inferring capabilities or update offers.
+
+    @param value Native info response or snapshot diagnostics, including older mappings.
+    @return Explicit versions and wire revisions; absent or malformed fields remain None.
+    """
+    source = value if isinstance(value, dict) else {}
+    result = {}
+    for key, components in (
+        ("daemon_version", 3),
+        ("firmware_compat_version", 2),
+        ("host_version", 2),
+    ):
+        item = source.get(key)
+        valid = (
+            isinstance(item, str)
+            and len(item) <= 32
+            and re.fullmatch(r"(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*))+", item)
+        )
+        parts = item.split(".") if valid else []
+        result[key] = (
+            item
+            if len(parts) == components
+            and (components == 3 or all(int(part) <= 65535 for part in parts))
+            else None
+        )
+    for key in ("api_version", "uart_protocol"):
+        item = source.get(key)
+        result[key] = item if type(item) is int and 0 < item <= 65535 else None
+    return result
+
+
 def commissioning_data(value):
     """Validate optional session metadata without treating registration as paired.
 
