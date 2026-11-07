@@ -5,6 +5,11 @@ Reviewed 2026-11-05 for the exact four images listed in
 packaging findings and unresolved release conditions; it does not change the
 project license or establish hardware qualification.
 
+The [public distribution decisions](../docs/FIRMWARE_DISTRIBUTION.md), reviewed
+2026-11-07, give the follow-up paths for MG21 permission, Nordic USB identity
+and TI release-key provisioning. They do not retroactively approve these 0.13
+trial artifacts or their updater eligibility.
+
 ## Inputs and collected evidence
 
 The private build record `.local/release-0.13/build-inputs.json` hashes 675
