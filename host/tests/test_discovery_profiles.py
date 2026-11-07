@@ -175,6 +175,25 @@ class DiscoveryProfileTests(unittest.TestCase):
         self.assertEqual(self.profile()["token"], token)
         self.assertEqual(self.profile()["status"], "detected")
 
+    def test_empirical_variant_counter_is_stable_but_old_layout_conflicts(self):
+        """The exact additional two-output signature does not merge distinct profile evidence."""
+        bodies = ("000203042e003000", "0002030534010400")
+        for first, second in (bodies, bodies[::-1]):
+            self.service.session = first
+            self.observe(announcement(suffix="0002", body=first))
+            request = self.request()
+            self.assertEqual(self.profile()["outputs"], 2)
+            counter_variant = first[:12] + "ff" + first[14:]
+            self.observe(announcement(suffix="0002", body=counter_variant))
+            self.assertEqual(self.profile()["token"], request["profile_token"])
+            self.clock.return_value += 0.1
+            self.observe(announcement(suffix="0002", body=second))
+            self.observe(announcement(suffix="0002", body=first))
+            self.assertEqual(self.profile()["status"], "ambiguous")
+            self.assertIsNone(self.profile()["token"])
+            self.assertEqual(self.service.submit("add", request)["status"], "rejected")
+            self.assertFalse(self.service.devices)
+
     def test_conflicting_payload_inside_publish_throttle_blocks_add(self):
         """A rapid same-suffix contradiction is processed before the five-second throttle."""
         self.observe()

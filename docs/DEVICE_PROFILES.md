@@ -20,13 +20,16 @@ subject suffix and the following eight-byte registration payload:
 | --- | --- | --- | --- |
 | `livolo-ec-suffix-0001` | `0001` | `00 01 01 05 34 01 CC 00` | 1 |
 | `livolo-ec-suffix-0002` | `0002` | `00 02 03 05 34 01 CC 00` | 2 |
+| `livolo-ec-suffix-0002` (additional observed variant) | `0002` | `00 02 03 04 2e 00 CC 00` | 2 |
 
 `CC` is the changing byte at payload offset 6; its precise semantics are not
 required for classification. It varies between retransmission groups and is
 excluded from the profile signature. The other bytes must match the observed
 layout exactly. A known suffix with an unfamiliar payload is unknown, not a
-successful detection. This intentionally leaves untested firmware variants to
-manual configuration.
+successful detection. Only the listed exact prefixes are accepted; other
+variants remain unknown. In particular, bytes 3–5 are not treated as arbitrary
+version fields, and the additional two-gang prefix does not authorize an
+analogous one-gang prefix.
 
 The raw captures inspected for this change contain:
 
@@ -55,6 +58,46 @@ EC switch `75710834` also uses suffix `0001` in its control capture, which
 corroborates the suffix association but supplies no additional pairing layout.
 These repeated frames are observations of two paired test units, not hundreds
 of independent device validations.
+
+### Additional two-gang observation, November 7, 2026
+
+After the diagnostic retention change, the owner's commissioning attempt for
+the physically confirmed two-gang switch `67181844` retained suffix `0002` and
+exact payload `00 02 03 04 2e 00 30 00`. This is evidence from a checksum-validated,
+eligible native pairing observation in the explicit session, not a recovered
+pcap frame. The session expired with `unsupported_device_seen`; the switch
+remained unregistered. One distinct signature was retained, with truncation
+false. Neither a full raw frame nor a repetition count was retained. The exact
+source/destination envelope cannot be reconstructed from these diagnostics.
+
+The additional allowlist entry changes only the fixed prefix from
+`00 02 03 05 34 01` to the separately observed `00 02 03 04 2e 00`. The meanings
+of the differing bytes remain unknown; a hardware/firmware generation difference
+is a hypothesis, not a decoded field. The retained byte 6 is `30`. Ignoring
+that position uses the existing retransmission rule established by the earlier
+captures; this new record alone does not demonstrate its variation.
+
+Historical original-EC traffic independently supports the two-output control
+layout for this same switch. In
+`captured/development/original-ec-live-20261025-nrf52840.pcapng`, command/report
+pairs 1254→1256, 1260→1265 and 1457→1463 use masks `02`, `03` and `01` with the
+existing `8c/02` and `9e/05` formats. Frames 1953→1955 command and report output 2
+ON with mask/state `02/02`. Separate historical native reports include complete
+state `03`. These observations and the owner's physical identification support
+two outputs; a suffix or a partial state mask alone would not suffice.
+
+A scan of all 64 retained pcaps found no earlier native pairing request from
+this ID and no `04 2e 00` payload sequence. Thus the exact new pairing payload
+comes only from the retained November 7 commissioning evidence. Regression
+frames derived from it use synthetic envelopes and checksums, and counter-byte
+variants in tests are synthetic too. They must not be described as captured
+full frames. Matching uses the payload layout, never the example device ID.
+
+See the [investigation record](verification/pairing-67181844-20261107.md) for
+session provenance and limits. Successful local admission and control of this
+variant remain unverified. All existing freshness, ambiguity and locally
+addressed state-report confirmation requirements still apply; neither a matching
+profile nor an offline lifecycle test establishes physical pairing success.
 
 ## Evidence that must not determine output count
 
@@ -104,6 +147,8 @@ aggregation and validates the selected observation again when adding a device:
 
 The aggregation signature includes suffix, payload bytes 0–5 and byte 7. It
 excludes byte 6 so routine counter changes do not create false conflicts.
+The two accepted two-gang prefixes remain distinct signatures: seeing both
+for one identity in the same cohort is a conflict, despite their shared output count.
 Unknown and ambiguous outcomes must remain visible with a manual fallback.
 
 ## Pairing procedure and limits

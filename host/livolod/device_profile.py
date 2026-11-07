@@ -1,4 +1,4 @@
-"""Experimental profiles from the two physically verified EC pairing layouts.
+"""Experimental profiles from reviewed EC pairing and physical-output evidence.
 
 This is a passive classifier, not a Zigbee endpoint interview or a universal
 model decoder. Callers must pass checksum-validated Packet values and aggregate
@@ -6,8 +6,10 @@ current-session observations with freshness/conflict checks before auto-add.
 """
 
 PROFILES = {
-    "0001": (1, bytes.fromhex("000101053401")),
-    "0002": (2, bytes.fromhex("000203053401")),
+    "0001": (1, (bytes.fromhex("000101053401"),)),
+    # The second prefix is an empirical two-output variant observed on 2026-11-07.
+    # Bytes 3..5 have no established semantic meaning; do not mask them generally.
+    "0002": (2, (bytes.fromhex("000203053401"), bytes.fromhex("000203042e00"))),
 }
 
 
@@ -28,7 +30,7 @@ def pairing_profile(packet, *, gateway):
     ):
         return None
 
-    # Byte six varies across retransmission groups in both captured layouts.
+    # Byte six varies across retransmission groups in the original captured layouts.
     # Its value does not strengthen profile evidence or create a new profile.
     signature = f"{packet.suffix}:{packet.data[:6].hex()}:{packet.data[7:].hex()}"
     result = {
@@ -44,8 +46,8 @@ def pairing_profile(packet, *, gateway):
     known = PROFILES.get(packet.suffix)
     if known is None:
         return result
-    outputs, prefix = known
-    if len(packet.data) != 8 or packet.data[:6] != prefix or packet.data[7] != 0:
+    outputs, prefixes = known
+    if len(packet.data) != 8 or packet.data[:6] not in prefixes or packet.data[7] != 0:
         result["reason"] = "unknown_pairing_payload"
         return result
     result.update(
