@@ -63,9 +63,10 @@ const uint16_t *tud_descriptor_string_cb(uint8_t index, uint16_t langid)
 	}
 	if (langid != 0x0409)
 		return NULL;
-	int written = snprintf(serial, sizeof(serial), EC_USB_SERIAL_PREFIX "%08lx%08lx",
-		 (unsigned long)NRF_FICR->DEVICEID[1],
-		 (unsigned long)NRF_FICR->DEVICEID[0]);
+	int written = snprintf(serial, sizeof(serial),
+			       EC_USB_SERIAL_PREFIX "%08lx%08lx",
+			       (unsigned long)NRF_FICR->DEVICEID[1],
+			       (unsigned long)NRF_FICR->DEVICEID[0]);
 	if (written < 0 || (size_t)written >= sizeof(serial))
 		return NULL;
 	switch (index) {
