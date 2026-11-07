@@ -30,9 +30,9 @@ jobs:
       matrix:
         include:
           - kind: standalone
-            previous: ghcr.io/psires/livolod@sha256:245b0479b853237cf76d5c4c0c2b6d1b97be626a4132f50e8cc67015fae228dc
+            previous: ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f
           - kind: ha
-            previous: ghcr.io/psires/livolo-ec-ha-app@sha256:b739d17d344f1b4006b1f87d0057b36e0c769a5dc8f0dd206929dd5bae75e3a2
+            previous: ghcr.io/psires/livolo-ec-ha-app@sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d92820a4b34e725854a351f6d
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -110,7 +110,7 @@ jobs:
               verify_installed("/usr/share/livolo-ec/firmware-release", pathlib.Path(livolod.__file__).parent / "firmware", inventory_sha256=firmware["inventory_sha256"], source_commit=firmware["source_commit"], version=firmware["version"])
           '
           docker run --rm --network none --user 10001:10001 --entrypoint python -e LIVOLO_NORDIC_SMOKE=1 -v "$PWD/host/docker/smoke.py:/checks/smoke.py:ro" "livolo-validation:$KIND" /checks/smoke.py
-      - name: Verify upgrade, persistence and restoration from public 0.4.0
+      - name: Verify upgrade, persistence and restoration from public 0.5.0
         env:
           KIND: ${{ matrix.kind }}
           PREVIOUS: ${{ matrix.previous }}
@@ -141,12 +141,12 @@ jobs:
           python -m pip install -r host/release/requirements-build.txt
           python -m build --no-isolation --outdir candidate host
           mkdir baseline
-          curl --fail --location --silent --show-error https://github.com/psires/livolo_ec/releases/download/standalone-0.4.0/livolo_ec_daemon-0.13-py3-none-any.whl --output baseline/livolo_ec_daemon-0.13-py3-none-any.whl
+          curl --fail --location --silent --show-error https://github.com/psires/livolo_ec/releases/download/standalone-0.5.0/livolo_ec_daemon-0.14.0-py3-none-any.whl --output baseline/livolo_ec_daemon-0.14.0-py3-none-any.whl
           python - <<'PY'
           import hashlib
           from pathlib import Path
-          wheel = Path('baseline/livolo_ec_daemon-0.13-py3-none-any.whl')
-          assert hashlib.sha256(wheel.read_bytes()).hexdigest() == 'ef45c47cc29f12307a04060a6d8530dda3f9bd836debe2c3231e5116df6fe003'
+          wheel = Path('baseline/livolo_ec_daemon-0.14.0-py3-none-any.whl')
+          assert hashlib.sha256(wheel.read_bytes()).hexdigest() == '0e3c92a361a443af0255e5a3256a84025c7bf5d50bcc9d7bc0545ea12c93efb5'
           PY
       - name: Install, upgrade and explicitly roll back with persistent simulated state
         shell: bash
@@ -154,7 +154,7 @@ jobs:
           set -o pipefail
           daemon_version=$(python -c 'import json; print(json.load(open("host/release/version.json"))["daemon_version"])')
           firmware_compat_version=$(python -c 'import json; print(json.load(open("host/release/version.json"))["firmware_compat_version"])')
-          python tools/check_daemon_upgrade.py --previous-wheel baseline/livolo_ec_daemon-0.13-py3-none-any.whl --candidate-wheel "candidate/livolo_ec_daemon-${daemon_version}-py3-none-any.whl" --previous-firmware-compat-version 0.13 --firmware-compat-version "$firmware_compat_version" --constraints host/docker/requirements-firmware.txt 2>&1 | tee upgrade.log
+          python tools/check_daemon_upgrade.py --previous-wheel baseline/livolo_ec_daemon-0.14.0-py3-none-any.whl --candidate-wheel "candidate/livolo_ec_daemon-${daemon_version}-py3-none-any.whl" --previous-firmware-compat-version 0.13 --firmware-compat-version "$firmware_compat_version" --constraints host/docker/requirements-firmware.txt 2>&1 | tee upgrade.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
