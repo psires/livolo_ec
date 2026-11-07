@@ -25,6 +25,23 @@ def numeric_version(value, components):
     return parts
 
 
+def app_config_version(config, version):
+    """Give an isolated app build its source version without promoting the public listing.
+
+    @param config Supervisor descriptor text containing one numeric version scalar.
+    @param version Validated distribution version of the source being built.
+    @return Descriptor text with only its version scalar replaced.
+    """
+    numeric_version(version, 3)
+    pattern = r"^version:[ \t]*(?P<quote>[\"']?)[0-9]+\.[0-9]+\.[0-9]+(?P=quote)[ \t]*$"
+    if len(re.findall(r"^version:", config, re.M)) != 1:
+        raise ValueError("App descriptor must have exactly one version")
+    result, count = re.subn(pattern, f'version: "{version}"', config, flags=re.M)
+    if count != 1:
+        raise ValueError("App descriptor version must be a numeric scalar")
+    return result
+
+
 def normalize_metadata(metadata):
     """Resolve legacy equal versions or require explicit schema-2 compatibility.
 

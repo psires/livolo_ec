@@ -118,6 +118,37 @@ class ReleaseChecks(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     prepare.manifest(path)
 
+    def test_candidate_app_uses_source_version_but_release_rejects_listing_mismatch(
+        self,
+    ):
+        """An independent stable listing cannot relabel a candidate or a historical release."""
+        data = prepare.manifest(prepare.ROOT / "host/docker/releases.json")
+        entry = next(e for e in reversed(data["releases"]) if e["kind"] == "ha")
+        original_versions = prepare.source_versions
+
+        def stable_listing(source):
+            """Model an exported checkout whose public app listing trails its source.
+
+            @param source Isolated export used by the real container assembler.
+            @return Actual source package and compatibility identities.
+            """
+            path = source / "homeassistant/app/config.yaml"
+            path.write_text(prepare.app_config_version(path.read_text(), "0.0.1"))
+            return original_versions(source)
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.object(prepare, "source_versions", side_effect=stable_listing),
+        ):
+            output = Path(directory) / "candidate"
+            metadata = prepare.prepare(data, entry, output, candidate=True)
+            self.assertTrue(metadata["candidate"])
+            self.assertIn(
+                f'version: "{entry["version"]}"', (output / "config.yaml").read_text()
+            )
+            with self.assertRaises(AssertionError):
+                prepare.prepare(data, entry, Path(directory) / "release")
+
     def test_schema_two_manifest_preserves_explicit_legacy_and_split_entries(self):
         """A new request can retain old identities while requiring new compatibility metadata."""
         original = json.loads((prepare.ROOT / "host/docker/releases.json").read_text())

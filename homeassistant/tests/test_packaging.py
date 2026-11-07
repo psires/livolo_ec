@@ -25,6 +25,7 @@ def test_release_bundles_client_and_license(tmp_path):
 
     @param tmp_path Isolated output directory for the existing release builder.
     """
+    public_config = (ROOT / "homeassistant/app/config.yaml").read_bytes()
     subprocess.run(
         [
             sys.executable,
@@ -47,6 +48,11 @@ def test_release_bundles_client_and_license(tmp_path):
             == (ROOT / "client/livolo_ec_client/__init__.py").read_bytes()
         )
     context = tmp_path / "ha-addons/livolo_ec"
+    distribution = json.loads((ROOT / "host/release/version.json").read_text())[
+        "distribution_version"
+    ]
+    assert f'version: "{distribution}"' in (context / "config.yaml").read_text()
+    assert (ROOT / "homeassistant/app/config.yaml").read_bytes() == public_config
     assert (context / "CANDIDATE-NOT-FOR-RELEASE.txt").is_file()
     with zipfile.ZipFile(archive) as bundle:
         for name in ("button.py", "commissioning.py"):

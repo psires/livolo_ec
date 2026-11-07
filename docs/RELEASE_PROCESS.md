@@ -184,6 +184,27 @@ gate are implemented; it does not claim that CI currently enforces completeness.
 
 ## Next release: required firmware closure
 
+### Explicit software-only 0.5.1 maintenance exception
+
+On 2026-11-07 the owner explicitly requested publishing the pairing fix while
+waiting for the dedicated ZB-GW04, leaving radio firmware unchanged. This
+authorizes distribution/client/integration/app 0.5.1 and daemon 0.14.1 from the
+published 0.5.0 maintenance line, with compatibility 0.13, API 1 and UART 3.
+The scope is the reviewed diagnostics/profile fix, version/release metadata and
+necessary CI runner configuration. It excludes the 0.6.0/Nordic USB/firmware
+0.14 candidate changes. The distributed catalog remains empty and existing
+operator-owned local catalogs must survive software replacement.
+
+This is a one-release scope exception, not completion of the all-board project
+release. The maintenance source predates the all-board bundle gate; its
+historical-source packaging path remains unchanged. The current
+`firmware-policy.json` threshold is not relaxed, and the 0.6.0 release still
+requires qualified firmware. Publication does not authorize live deployment,
+HA restart, pairing operations or radio flashing. Promote stable app metadata
+only after the exact new image passes its public artifact/runtime gates.
+
+### Firmware-bearing release remains gated
+
 The owner requested resolution of the firmware qualification and redistribution
 blockers so the next release includes every supported radio. The tracked
 `host/release/firmware-policy.json` therefore requires the approved four-board

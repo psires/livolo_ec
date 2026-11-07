@@ -12,6 +12,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from firmware_release import stage_for_source
+from release_versions import app_config_version, source_versions
 
 
 def stage_integration(destination):
@@ -72,6 +73,13 @@ def main():
             app,
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
+        if args.candidate:
+            config = app / "config.yaml"
+            config.write_text(
+                app_config_version(
+                    config.read_text(), source_versions(ROOT)["distribution_version"]
+                )
+            )
         for relative in (
             "LICENSE",
             "VERSION",

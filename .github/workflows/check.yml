@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   offline:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -44,7 +44,7 @@ jobs:
           python -m unittest discover -s firmware/mg21/tests -p 'test_*.py'
           python -m unittest discover -s firmware/nrf52840/tests -p 'test_*.py'
   wireshark:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

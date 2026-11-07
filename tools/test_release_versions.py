@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from project_version import synchronize
-from release_versions import normalize_metadata, source_versions
+from release_versions import app_config_version, normalize_metadata, source_versions
 
 
 def source_fixture(root):
@@ -42,6 +42,25 @@ def source_fixture(root):
 
 class VersionDomainsTests(unittest.TestCase):
     """Exercise failure boundaries using unequal software and radio identities."""
+
+    def test_app_build_version_preserves_the_rest_of_the_public_descriptor(self):
+        """A candidate version changes only its isolated descriptor's top-level scalar."""
+        for scalar in ('"0.5.0"', "'0.5.0'", "0.5.0"):
+            config = f"name: Livolo EC\nversion: {scalar}\noptions:\n  version: keep\n"
+            self.assertEqual(
+                app_config_version(config, "0.6.0"),
+                'name: Livolo EC\nversion: "0.6.0"\noptions:\n  version: keep\n',
+            )
+        for config in (
+            "name: missing\n",
+            "version: 0.5.0\nversion: 0.6.0\n",
+            "version: latest\n",
+            "version: '0.5.0\"\n",
+        ):
+            with self.subTest(config=config), self.assertRaises(ValueError):
+                app_config_version(config, "0.6.0")
+        with self.assertRaises(ValueError):
+            app_config_version("version: 0.5.0\n", "0.14")
 
     def test_legacy_requires_two_components_and_matching_compatibility(self):
         """Only the old unambiguous equal-version contract may omit compatibility."""

@@ -13,7 +13,7 @@ import tarfile
 import tempfile
 
 from firmware_release import stage_for_source
-from release_versions import normalize_metadata, source_versions
+from release_versions import app_config_version, normalize_metadata, source_versions
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -86,7 +86,7 @@ def prepare(data, entry, output, candidate=False, firmware_bundle=None):
     @param data Validated manifest containing pinned build tools and images.
     @param entry Validated release identity and historical source reference.
     @param output New directory receiving the assembled build context.
-    @param candidate Skip release-tag matching only for local, non-publishing CI builds.
+    @param candidate Build non-publishing source with its own app version instead of the public listing.
     @param firmware_bundle Optional local copy of the source-pinned firmware inventory.
     """
     if not candidate:
@@ -159,7 +159,12 @@ def prepare(data, entry, output, candidate=False, firmware_bundle=None):
             )
         else:
             # The exact release config uses a quoted scalar version, not arbitrary YAML execution.
-            config = (source / "homeassistant/app/config.yaml").read_text()
+            config_path = source / "homeassistant/app/config.yaml"
+            config = config_path.read_text()
+            if candidate:
+                assert versions["distribution_version"] == entry["version"]
+                config = app_config_version(config, versions["distribution_version"])
+                config_path.write_text(config)
             assert re.search(
                 r'^version:\s*["\']?' + re.escape(entry["version"]) + r'["\']?\s*$',
                 config,
