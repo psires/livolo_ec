@@ -239,7 +239,7 @@
       "latest_version": "0.5.1",
       "update_entity_state": "on"
     },
-    "resolved_limitation": "Marketplace still offers a redundant update; deployment is healthy, but tracking reconciliation is not complete.",
+    "resolved_limitation": "After the manual install Marketplace temporarily offered a redundant update; the authenticated exact-version installation reconciled tracking.",
     "reconciliation_method": "Existing authenticated Safari admin session; Marketplace Livolo EC update dialog selected exact official 0.5.1, then Update. UI displayed Up-to-date and installed 0.5.1. No warning prompt appeared for this previously accepted user session.",
     "after": {
       "installed_version": "0.5.1",
