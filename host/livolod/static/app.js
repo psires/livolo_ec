@@ -1590,7 +1590,7 @@ function firmwareReason(code) {
     artifact_unqualified: 'This firmware has not been qualified for installation.',
     incompatible_host: 'The firmware bundle does not match the radio compatibility target.',
     incompatible_baudrate: 'The firmware does not support the configured serial rate.',
-    unsupported_board: 'Firmware installation is not supported for this board.',
+    unsupported_board: 'Firmware installation through this UI is not supported for this board.',
     backend_unavailable: 'The required firmware installation backend is unavailable.',
     bootloader_install_required: 'This radio needs its one-time bootloader installation first.',
     signing_key_mismatch: 'The firmware signing key does not match the trusted key.',
@@ -1624,7 +1624,7 @@ function firmwareBlockedReason() {
   if (commissioningActive(snapshot?.commissioning))
     return 'Finish or cancel pairing before updating firmware.';
   if (firmware.preflight_supported !== true)
-    return 'Update the daemon to enable firmware preflight and installation.';
+    return 'This daemon does not report firmware preflight support. Check daemon and board support.';
   if (firmware.blocked_reason) {
     return firmwareReason(firmware.blocked_reason);
   }
@@ -1937,7 +1937,7 @@ function renderFirmwarePreflight() {
           ? `<p>${escapeHTML(firmwareReason(report.blocked_reason))}</p>`
           : '') +
         (report.requires_manual_action
-          ? '<p>Manual preparation or recovery is required before this update can run.</p>'
+          ? '<p>Manual preparation or recovery is required. Follow the documented procedure for this exact board.</p>'
           : '')
       : '');
   $('#firmware-preflight-report').innerHTML = markup;

@@ -4,6 +4,10 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { harness, Element } = require('./web_harness');
 
+// Offline identity fixtures only; these names do not grant updater or radio support.
+// Ready snapshots model the future control contract, not today's transport-only bring-up.
+const XIAO_TEST_BOARDS = ['seeed-xiao-mg24', 'seeed-xiao-esp32c6'];
+
 /** Return an eligible mock artifact; it cannot identify or invoke a real payload. */
 function candidate() {
   return {
@@ -504,7 +508,10 @@ test('missing preflight capability disables checks and installation without HTTP
   await ui.element('#firmware-review').events.click();
   await ui.element('#firmware-preflight').events.click();
   assert.equal(ui.calls.length, 0);
-  assert.match(ui.element('#firmware-reason').textContent, /Update the daemon/);
+  assert.match(
+    ui.element('#firmware-reason').textContent,
+    /does not report firmware preflight support/,
+  );
 });
 
 /** Nordic eligibility follows backend capability and a matching report, never the board name alone. */
@@ -594,48 +601,150 @@ test('installed candidate is distinguished from missing or non-newer firmware', 
   assert.match(ui.element('#firmware-reason').textContent, /No verified firmware candidate/);
 });
 
-/** Jobs started through HA expose transfer progress without claiming overall completion. */
-test('external transfer completion remains updating until daemon confirmation', () => {
-  const ui = harness();
-  const job = {
-    ...candidate(),
-    request_id: 'ha-firmware-job',
-    status: 'pending',
-    in_progress: true,
-    progress_percent: null,
-  };
-  for (const percent of [0, 42, 100]) {
-    ui.snapshot({ ...job, stage: 'transfer', transfer_percent: percent });
+for (const board of ['codm-cc2652p', ...XIAO_TEST_BOARDS]) {
+  /** Jobs started through HA expose transfer progress without claiming overall completion. */
+  test(`${board}: external transfer completion waits for daemon confirmation`, () => {
+    const ui = harness();
+    const job = {
+      ...candidate(),
+      board,
+      request_id: 'ha-firmware-job',
+      status: 'pending',
+      in_progress: true,
+      progress_percent: null,
+    };
+    for (const percent of [0, 42, 100]) {
+      ui.snapshot({ ...job, stage: 'transfer', transfer_percent: percent });
+      ui.run('renderFirmware()');
+      assert.match(ui.element('#firmware-stage').textContent, new RegExp(`Transfer: ${percent}%`));
+      assert.equal(ui.element('#firmware-progress').value, null);
+      assert.equal(ui.element('#firmware-status').textContent, 'Updating');
+      assert.equal(ui.element('#firmware-review').disabled, true);
+    }
+    for (const percent of [undefined, null, '100', -1, 101]) {
+      ui.snapshot({ ...job, stage: 'transferring', transfer_percent: percent });
+      ui.run('renderFirmware()');
+      assert.doesNotMatch(ui.element('#firmware-stage').textContent, /%/);
+      assert.equal(ui.element('#firmware-progress').value, null);
+    }
+    ui.snapshot({ ...job, stage: 'restoring', transfer_percent: 100 });
     ui.run('renderFirmware()');
-    assert.match(ui.element('#firmware-stage').textContent, new RegExp(`Transfer: ${percent}%`));
-    assert.equal(ui.element('#firmware-progress').value, null);
+    assert.match(ui.element('#firmware-stage').textContent, /verifying/);
+    assert.doesNotMatch(ui.element('#firmware-stage').textContent, /100%/);
     assert.equal(ui.element('#firmware-status').textContent, 'Updating');
-    assert.equal(ui.element('#firmware-review').disabled, true);
-  }
-  for (const percent of [undefined, null, '100', -1, 101]) {
-    ui.snapshot({ ...job, stage: 'transferring', transfer_percent: percent });
+    ui.snapshot({
+      ...job,
+      stage: 'confirmed',
+      status: 'confirmed',
+      in_progress: false,
+      installed_version: '0.13',
+      update_available: false,
+    });
     ui.run('renderFirmware()');
-    assert.doesNotMatch(ui.element('#firmware-stage').textContent, /%/);
-    assert.equal(ui.element('#firmware-progress').value, null);
-  }
-  ui.snapshot({ ...job, stage: 'restoring', transfer_percent: 100 });
-  ui.run('renderFirmware()');
-  assert.match(ui.element('#firmware-stage').textContent, /verifying/);
-  assert.doesNotMatch(ui.element('#firmware-stage').textContent, /100%/);
-  assert.equal(ui.element('#firmware-status').textContent, 'Updating');
-  ui.snapshot({
-    ...job,
-    stage: 'confirmed',
-    status: 'confirmed',
-    in_progress: false,
-    installed_version: '0.13',
-    update_available: false,
+    assert.equal(ui.element('#firmware-status').textContent, 'Verified');
+    assert.equal(ui.element('#firmware-progress').hidden, true);
+    assert.equal(ui.calls.length, 0);
   });
-  ui.run('renderFirmware()');
-  assert.equal(ui.element('#firmware-status').textContent, 'Verified');
-  assert.equal(ui.element('#firmware-progress').hidden, true);
-  assert.equal(ui.calls.length, 0);
-});
+}
+
+for (const board of XIAO_TEST_BOARDS) {
+  /** Updater limitations cannot disable otherwise ready control or grant install by board identity. */
+  test(`${board}: blocked updates preserve control and distinguish missing support or payload`, () => {
+    const ui = harness();
+    for (const [reason, explanation] of [
+      ['unsupported_board', /installation through this UI is not supported/],
+      ['backend_unavailable', /installation backend is unavailable/],
+      ['bundle_missing', /No firmware bundle/],
+      ['artifact_missing', /No firmware payload.*exact board/],
+    ]) {
+      ui.snapshot({
+        ...candidate(),
+        board,
+        candidate_id: null,
+        latest_version: null,
+        install_supported: false,
+        update_available: false,
+        blocked_reason: reason,
+        rollback_supported: false,
+      });
+      ui.context.testSnapshot.commissioning_supported = true;
+      ui.context.testSnapshot.devices = [
+        {
+          id: '12345678',
+          name: 'Test switch',
+          outputs: 1,
+          availability: 'online',
+          state: { state_bits: 0 },
+        },
+      ];
+      ui.run('render()');
+      assert.match(ui.element('#firmware-details').innerHTML, new RegExp(board));
+      assert.match(ui.element('#firmware-reason').textContent, explanation);
+      assert.equal(ui.element('#firmware-review').disabled, true);
+      assert.equal(ui.element('#maintenance-banner').hidden, true);
+      assert.equal(ui.element('#add-device').disabled, false);
+      assert.equal(ui.element('#pair-new-device').disabled, false);
+      assert.match(ui.element('#device-list').innerHTML, /data-output="0"/);
+      assert.doesNotMatch(ui.element('#device-list').innerHTML, / disabled/);
+    }
+    ui.context.testSnapshot.ready = false;
+    ui.run('render()');
+    assert.equal(ui.element('#pair-new-device').disabled, true);
+    assert.match(ui.element('#device-list').innerHTML, /data-output="0"[^>]* disabled/);
+    // An identity and advertised version alone are insufficient when capability fields are absent.
+    ui.snapshot({
+      ...candidate(),
+      board,
+      install_supported: undefined,
+      preflight_supported: undefined,
+    });
+    ui.run('renderFirmware()');
+    assert.equal(ui.element('#firmware-review').disabled, true);
+    assert.equal(ui.element('#firmware-preflight').disabled, true);
+    assert.equal(ui.calls.length, 0);
+  });
+
+  /** Manual-only reports remain advisory and never promise an automatic installation path. */
+  test(`${board}: manual-only preflight is read-only and leaves installation disabled`, async () => {
+    const ui = harness();
+    ui.snapshot({
+      ...candidate(),
+      board,
+      candidate_id: null,
+      latest_version: null,
+      install_supported: false,
+      update_available: false,
+      blocked_reason: 'unsupported_board',
+      rollback_supported: false,
+    });
+    ui.network(() =>
+      preflight({
+        board,
+        candidate_id: null,
+        target_version: null,
+        compatible: false,
+        executable: false,
+        requires_manual_action: true,
+        blocked_reason: 'unsupported_board',
+        rollback_supported: false,
+        checks: [{ id: 'artifact', status: 'fail', code: 'unsupported_board' }],
+      }),
+    );
+    await ui.element('#firmware-preflight').events.click();
+    assert.equal(ui.calls.length, 1);
+    assert.equal(ui.calls[0].path, '/api/firmware/preflight');
+    assert.equal(ui.calls[0].options.method, undefined);
+    assert.equal(ui.element('#firmware-review').disabled, true);
+    await ui.element('#firmware-review').events.click();
+    assert.equal(ui.element('#firmware-dialog').open, false);
+    await ui.element('#firmware-form').events.submit({ preventDefault() {} });
+    assert.equal(ui.calls.length, 1);
+    const report = ui.element('#firmware-preflight-report').innerHTML;
+    assert.match(report, /Manual preparation or recovery is required/);
+    assert.match(report, /documented procedure for this exact board/);
+    assert.doesNotMatch(report, /before this update can run/);
+  });
+}
 
 /** Shared catalog removal or changed eligibility revokes a previously reviewed installation. */
 test('catalog refresh invalidates review even without a radio reconnect', async () => {
