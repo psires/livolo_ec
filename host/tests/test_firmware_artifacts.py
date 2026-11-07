@@ -8,11 +8,12 @@ from pathlib import Path
 import struct
 import tempfile
 import unittest
+from unittest.mock import patch
 import warnings
 import zipfile
 
 from livolod.firmware_artifacts import inspect_artifact, inspect_artifact_bytes
-from livolod.firmware_bundle import BundleError
+from livolod.firmware_bundle import BOARDS, BundleError
 from livolod.nrf_dfu import inspect_package
 from test_firmware_bundle import gbl, mg21_image, ti_package
 
@@ -147,6 +148,74 @@ class ArtifactTests(unittest.TestCase):
                 inspect_artifact_bytes(
                     data, board=board, version=version, public_key=key
                 )
+
+    def test_container_formats_cannot_be_substituted(self):
+        """A valid container for another backend never selects that backend implicitly."""
+        ti, public = ti_package()
+        packages = {
+            "codm-cc2652p": ti,
+            "sonoff-zbdongle-e": gbl(mg21_image()),
+            "nordic-pca10059": nrf_zip(),
+        }
+        for source, data in packages.items():
+            for board in packages:
+                if source == board:
+                    continue
+                with self.subTest(source=source, board=board):
+                    with self.assertRaises(BundleError) as raised:
+                        inspect_artifact_bytes(
+                            data, board=board, version="0.12", public_key=public
+                        )
+                    self.assertIn(
+                        raised.exception.code, ("artifact_invalid", "bundle_invalid")
+                    )
+
+    def test_unimplemented_boards_reject_before_paths_or_parsers(self):
+        """Unknown and registry-only boards cannot inherit the MG21 validator."""
+        boards = (
+            "seeed-xiao-mg24",
+            "seeed-xiao-esp32c6",
+            "future-board",
+            None,
+            [],
+        )
+        # This temporary fixture registration is deliberately not production support.
+        with patch.dict(BOARDS, {"future-board": BOARDS["sonoff-zbdongle-e"]}):
+            with patch("livolod.firmware_artifacts.Path") as path:
+                with patch("livolod.firmware_artifacts._gbl") as parser:
+                    for board in boards:
+                        with self.subTest(board=board):
+                            for operation in ("update", "recovery"):
+                                with self.assertRaises(BundleError) as raised:
+                                    inspect_artifact(
+                                        "/nonexistent/application.gbl",
+                                        board=board,
+                                        version="0.12",
+                                        public_key="/nonexistent/key",
+                                        operation=operation,
+                                    )
+                                self.assertEqual(
+                                    raised.exception.code, "unsupported_board"
+                                )
+                            with self.assertRaises(BundleError) as raised:
+                                inspect_artifact_bytes(
+                                    gbl(mg21_image()), board=board, version="0.12"
+                                )
+                            self.assertEqual(raised.exception.code, "unsupported_board")
+                    path.assert_not_called()
+                    parser.assert_not_called()
+
+    def test_registered_backend_or_layout_change_requires_validator_review(self):
+        """Even known board names cannot silently reuse a parser after layout drift."""
+        for board, (backend, layout) in tuple(BOARDS.items()):
+            for changed in (("future_backend", layout), (backend, "future-layout")):
+                with self.subTest(board=board, changed=changed):
+                    with patch.dict(BOARDS, {board: changed}):
+                        with self.assertRaises(BundleError) as raised:
+                            inspect_artifact_bytes(
+                                bytes(512), board=board, version="0.12"
+                            )
+                        self.assertEqual(raised.exception.code, "unsupported_board")
 
     def test_nordic_init_cannot_write_other_images_or_ignore_integrity(self):
         """Init type, hardware, SoftDevice, sizes, version, debug and hash must match."""
