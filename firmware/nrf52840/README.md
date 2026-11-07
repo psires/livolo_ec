@@ -106,6 +106,19 @@ deployment responsibility.
 USB uses TinyUSB's development VID/PID `cafe:4001`, a project label and a stable
 FICR-derived serial. Obtain an appropriate VID/PID allocation before distributing
 a product. The bootloader's serial string may differ; select each mode explicitly.
+Build inputs `USB_VID`, `USB_PID` and `USB_RELEASE` select the application
+identity. Developer defaults preserve the existing descriptor bytes. A release
+build must set `USB_RELEASE=1` and explicit permitted IDs; compilation rejects
+the development vendor ID, invalid numeric values and the factory DFU identity.
+Changing these inputs rebuilds the objects even in a reused build directory.
+
+These checks do not establish a right to use a USB identifier. The shared
+`16c0:27dd` CDC identity is also rejected until its required owner-qualified
+serial namespace is implemented and approved. Do not substitute an invented ID.
+Changing the application identity also requires a coordinated host USB-profile
+migration: current host discovery explicitly expects `cafe:4001`. The factory
+DFU identity must remain unchanged. No allocated release identity is selected by
+this source change.
 The port boots unconfigured/disarmed. Never run this adapter and another gateway
 with the same network identity armed together during qualification.
 

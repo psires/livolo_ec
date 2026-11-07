@@ -1,10 +1,11 @@
 #include "tusb.h"
 #include "nrf.h"
 #include "../version.h"
+#include "usb-identity.h"
 #include <stdio.h>
 #include <string.h>
 
-/* TinyUSB development VID/PID; obtain a project allocation before shipping. */
+/* Development defaults remain available; release builds require explicit IDs. */
 static const tusb_desc_device_t device = {
 	.bLength = sizeof(tusb_desc_device_t),
 	.bDescriptorType = TUSB_DESC_DEVICE,
@@ -13,8 +14,8 @@ static const tusb_desc_device_t device = {
 	.bDeviceSubClass = MISC_SUBCLASS_COMMON,
 	.bDeviceProtocol = MISC_PROTOCOL_IAD,
 	.bMaxPacketSize0 = CFG_TUD_ENDPOINT0_SIZE,
-	.idVendor = 0xcafe,
-	.idProduct = 0x4001,
+	.idVendor = EC_USB_VID,
+	.idProduct = EC_USB_PID,
 	.bcdDevice = ((EC_VERSION_MAJOR / 10) << 12) |
 		     ((EC_VERSION_MAJOR % 10) << 8) |
 		     ((EC_VERSION_MINOR / 10) << 4) | (EC_VERSION_MINOR % 10),
