@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "status": "runtime_verified_marketplace_tracking_pending",
+  "verified_at_utc": "2026-11-07T21:24:36.518673+00:00",
+  "scope": "Official software-only 0.5.1 deployment replacing temporary 0.5.0 patches; radio firmware unchanged",
+  "authorization": "Owner explicitly requested official 0.5.1 installation, preservation of paired devices, and no radio firmware changes; HA specialist sole live operator, Release Engineer acceptance reviewer.",
+  "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+  "versions": {
+    "app": "0.5.1",
+    "integration_loaded": "0.5.1",
+    "daemon": "0.14.1",
+    "firmware_running": "0.13",
+    "firmware_compatibility": "0.13",
+    "home_assistant_core": "2026.11.0",
+    "api": 1,
+    "uart": 3
+  },
+  "artifacts": {
+    "image": {
+      "image": "ghcr.io/psires/livolo-ec-ha-app:0.5.1",
+      "index_digest": "sha256:a493530d6e7ea712b21ce9f8b1e5cb0c0cf0cbaad822a02a2df3d37d35a73927",
+      "platform_digest": "sha256:3f39bf4c058cc455932aa94e7b774655d1f2dd2e1d15822773e92b91a75e2426",
+      "config_digest": "sha256:8ded3663a6769734090dfe9a63d5c8c2a31ef49c55b528e7c5388ad7a6e008e0",
+      "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+      "recipe_commit": "9caebc23c579e90d122ca4aacf437d969dd899bc",
+      "daemon_version": "0.14.1",
+      "firmware_compat_version": "0.13",
+      "attestation_digests": [
+        "sha256:9204d533da22c648fcb20a81cd7a7ded597f2137b793f45bc1e2d2ff1c55be49"
+      ],
+      "predicate_types": [
+        "https://slsa.dev/provenance/v1",
+        "https://spdx.dev/Document"
+      ],
+      "anonymous_registry_verification": true
+    },
+    "integration_zip_sha256": "d4b2b44ab7a46ef694cafab91e9f940dc1d8588feec0e0792c3c10e741061add",
+    "integration_files_verified": 19,
+    "daemon_files_verified": 40,
+    "daemon_wheel_sha256": "991cb0186e3958770df129994094c1fda03624014472a0fcd0c05bc9f5cfd592"
+  },
+  "baseline": {
+    "app": "0.5.0",
+    "daemon": "0.14.0",
+    "temporary_diagnostic_and_profile_overlays": true,
+    "paired_devices": 4,
+    "outputs": 7,
+    "ha_entities": 14,
+    "ha_devices_including_gateway": 5,
+    "new_pair_included": "67181844",
+    "all_online": true
+  },
+  "backup": {
+    "consistent_sqlite_integrity": "ok",
+    "new_pair_included": true,
+    "patched_rollback_image_id": "sha256:0b029b09931dbc1f260d561412e4fe49013faeb590255fae5d188e4b19eada6f",
+    "patched_image_archive_bytes": 279198720,
+    "saved_components": [
+      "patched app image",
+      "consistent database including newest pair",
+      "config and options",
+      "firmware catalog and app data",
+      "HA storage and identity registries",
+      "patched integration directory"
+    ],
+    "private_raw_evidence_retained": true,
+    "supervisor_backup": {
+      "slug": "af18534d",
+      "created_at_utc": "2026-11-07T21:20:10.864078+00:00",
+      "type": "partial",
+      "size_bytes": 1125918720,
+      "includes_home_assistant": true,
+      "includes_app_version": "0.5.0",
+      "password_encrypted": false,
+      "file_mode": "0600"
+    },
+    "rollback_exercised_live": false
+  },
+  "deployment": {
+    "app_method": "Supported Supervisor update of existing app after refreshing store and asserting latest version exactly 0.5.1",
+    "integration_method": "Verified official ZIP staged and installed atomically using documented manual integration route",
+    "app_started_at_utc": "2026-11-07T21:21:28.379790036Z",
+    "core_started_at_utc": "2026-11-07T21:23:46.284511425Z",
+    "official_image_config_digest": "sha256:8ded3663a6769734090dfe9a63d5c8c2a31ef49c55b528e7c5388ad7a6e008e0",
+    "temporary_daemon_overlay_absent": true,
+    "old_patched_integration_retained_privately": true
+  },
+  "verification": {
+    "raw_checks": {
+      "official_image_config": true,
+      "official_daemon_40_files": true,
+      "official_integration_19_files": true,
+      "app_version": true,
+      "daemon_version": true,
+      "radio_unchanged": true,
+      "compatibility_unchanged": true,
+      "entry_preserved": true,
+      "entities_preserved": true,
+      "devices_preserved": true,
+      "areas_preserved": true,
+      "config_catalog_bytes_preserved": true,
+      "registry_rows_preserved": true,
+      "removed_devices_preserved": true,
+      "command_rows_preserved": true,
+      "meta_preserved": false,
+      "switch_states_preserved": true,
+      "all_devices_online": true,
+      "new_device_preserved": true,
+      "firmware_job_preserved": true,
+      "commissioning_preserved": true,
+      "ha_daemon_version_sensor": true,
+      "loaded_integration_version": true,
+      "loaded_coordinator_connected": true,
+      "loaded_coordinator_ready": true,
+      "no_daemon_package_overlay": true
+    },
+    "raw_failed_checks": [
+      "meta_preserved"
+    ],
+    "expected_metadata_exception": {
+      "table": "meta",
+      "key": "firmware_status",
+      "changed_fields": [
+        "session",
+        "verified_at"
+      ],
+      "reason": "Daemon startup reconnect records current transport session and verification time.",
+      "all_other_firmware_status_fields_unchanged": true,
+      "network_firmware_job_commissioning_unchanged": true,
+      "evidence": "HA specialist compared private baseline and post-update snapshots; service.py firmware-status persistence confirms expected behavior."
+    },
+    "runtime_acceptance": "pass",
+    "paired_devices_after": 4,
+    "outputs_after": 7,
+    "ha_entities_after": 14,
+    "ha_devices_after": 5,
+    "all_devices_online": true,
+    "switch_states_preserved": true,
+    "names_areas_options_and_ids_preserved": true
+  },
+  "marketplace": {
+    "status": "pending_supported_tracking_reconciliation",
+    "initial_attempt": "Exact-version update.livolo_ec service returned HTTP 500 before modifying integration files.",
+    "reason": "Open the Marketplace and read the warning first, installing and updating work once it is accepted",
+    "context": "Supervisor service context had not accepted Marketplace warning.",
+    "manual_install_loaded_version": "0.5.1",
+    "tracked_installed_version": "0.5.0",
+    "latest_version": "0.5.1",
+    "update_entity_state": "on",
+    "limitation": "Marketplace still offers a redundant update; deployment is healthy, but tracking reconciliation is not complete.",
+    "warning_auth_or_tracking_storage_edited": false,
+    "next_step": "Use supported existing authenticated UI installation/reconciliation if available; do not forge acceptance or edit tracking storage."
+  },
+  "operation_limits": {
+    "radio_firmware_operations": false,
+    "bootloader_or_usb_changes": false,
+    "new_pairing_requested": false,
+    "output_commands_requested": false,
+    "firmware_job_unchanged": true,
+    "no_live_writes_by_release_engineer": true
+  },
+  "private_evidence_sha256": {
+    "verification-summary.json": "eb9f0d6e15c9b7f9603119e4100603a5c20885252d7a6708a07a43e27680042d",
+    "backup-result.json": "d35971fe624df279190d1f0ad0435c63cab2933730b8968f9dd1ce3da112b521",
+    "manual-result.json": "dfbb8099727ad4555120c25cf4a8afcf3bc984e2c7093929147deb6b12c567cd",
+    "supervisor-backup-info.json": "7205f59efa4ecb94773137e77fbe81d8e34280a9429c20466da88869653eeab6",
+    "verify-body.py": "1076cc5fca4a6d43e68048ce1eeb0ec66e692a726d77816d163e66b4b6c42fe2"
+  }
+}
