@@ -38,6 +38,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r tools/requirements-firmware-release.txt
       - id: source
         name: Stage exact committed candidate without release tags
         env:
@@ -96,6 +100,15 @@ jobs:
           assert labels['net.sfires.livolo.firmware-compat-version'] == os.environ['COMPAT']
           PY
           docker run --rm --network none --entrypoint python "livolo-validation:$KIND" -m pip check
+          docker run --rm --network none --volume "$PWD/tools:/release-tools:ro" --entrypoint python "livolo-validation:$KIND" -c '
+          import json, pathlib, sys, livolod
+          release = json.loads(pathlib.Path("/usr/share/livolo-ec/release.json").read_text())
+          firmware = release.get("firmware_release")
+          if firmware:
+              sys.path.insert(0, "/release-tools")
+              from firmware_release import verify_installed
+              verify_installed("/usr/share/livolo-ec/firmware-release", pathlib.Path(livolod.__file__).parent / "firmware", inventory_sha256=firmware["inventory_sha256"], source_commit=firmware["source_commit"], version=firmware["version"])
+          '
           docker run --rm --network none --user 10001:10001 --entrypoint python -e LIVOLO_NORDIC_SMOKE=1 -v "$PWD/host/docker/smoke.py:/checks/smoke.py:ro" "livolo-validation:$KIND" /checks/smoke.py
       - name: Verify upgrade, persistence and restoration from public 0.4.0
         env:
@@ -148,3 +161,57 @@ jobs:
           name: daemon-installed-upgrade
           path: upgrade.log
           if-no-files-found: warn
+
+  firmware-delivery:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r host/release/requirements-build.txt
+      - name: Build non-flashable four-board package fixtures
+        run: python tools/check_firmware_delivery.py --output fixture
+      - id: parameters
+        run: |
+          python - <<'PY'
+          import json, os
+          data = json.load(open('fixture/fixture.json'))
+          assert data['fixture_only'] and not data['physical_qualification']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name in ('buildx_version', 'buildkit_image', 'python_image', 'daemon_version', 'firmware_compat_version'):
+                  output.write(name + '=' + data[name] + '\n')
+          PY
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: ${{ steps.parameters.outputs.buildx_version }}
+          driver-opts: image=${{ steps.parameters.outputs.buildkit_image }}
+      - name: Verify both installed fixture images without publication or radio devices
+        env:
+          PYTHON_IMAGE: ${{ steps.parameters.outputs.python_image }}
+          DAEMON_VERSION: ${{ steps.parameters.outputs.daemon_version }}
+          FIRMWARE_VERSION: ${{ steps.parameters.outputs.firmware_compat_version }}
+        run: |
+          for kind in standalone ha; do
+            docker buildx build --platform linux/arm64 --load \
+              --build-arg PYTHON_IMAGE="$PYTHON_IMAGE" \
+              --build-arg RELEASE_VERSION="$DAEMON_VERSION" \
+              --build-arg FIRMWARE_COMPAT_VERSION="$FIRMWARE_VERSION" \
+              --tag "livolo-firmware-fixture:$kind" "fixture/$kind-context"
+            docker run --rm --network none --read-only \
+              --volume "$PWD/tools:/release-tools:ro" \
+              --entrypoint python "livolo-firmware-fixture:$kind" -c '
+          import json, pathlib, sys, livolod
+          sys.path.insert(0, "/release-tools")
+          from firmware_release import verify_installed
+          release = json.loads(pathlib.Path("/usr/share/livolo-ec/release.json").read_text())
+          firmware = release["firmware_release"]
+          assert firmware["board_count"] == 4 and firmware["updater_board_count"] == 1
+          verify_installed("/usr/share/livolo-ec/firmware-release", pathlib.Path(livolod.__file__).parent / "firmware", inventory_sha256=firmware["inventory_sha256"], source_commit=firmware["source_commit"], version=firmware["version"])
+          print("PASS: non-flashable four-board fixture inventory and installed updater catalog")
+          '
+          done

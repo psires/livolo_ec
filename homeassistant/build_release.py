@@ -5,10 +5,13 @@ import argparse
 import json
 from pathlib import Path
 import shutil
+import sys
 import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from firmware_release import stage_for_source
 
 
 def stage_integration(destination):
@@ -38,6 +41,12 @@ def main():
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
     parser.add_argument(
         "--app", action="store_true", help="Also stage a local HA app build context"
+    )
+    parser.add_argument("--firmware-bundle", type=Path)
+    parser.add_argument(
+        "--candidate",
+        action="store_true",
+        help="Non-publishing app qualification build; may omit pending public firmware",
     )
     args = parser.parse_args()
     version = json.loads(
@@ -84,10 +93,44 @@ def main():
             app / "host/livolod",
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
+        if (ROOT / "host/release/version.json").exists():
+            (app / "host/release").mkdir(parents=True, exist_ok=True)
+            for name in ("version.json", "firmware.json", "firmware-policy.json"):
+                origin = ROOT / "host/release" / name
+                if origin.exists():
+                    shutil.copy2(origin, app / "host/release" / name)
+        firmware = stage_for_source(app, args.firmware_bundle, candidate=args.candidate)
         (app / "Dockerfile").write_text(
             (ROOT / "host/docker/Dockerfile").read_text()
             + (app / "Dockerfile.wrapper").read_text()
         )
+        if args.candidate:
+            (app / "CANDIDATE-NOT-FOR-RELEASE.txt").write_text(
+                "Qualification candidate only; not a complete public firmware release.\n"
+            )
+        if firmware:
+            recipe = app / "Dockerfile"
+            if firmware["updater_board_count"]:
+                marker = "COPY host/LICENSE ./host/LICENSE\n"
+                original = recipe.read_text()
+                if original.count(marker) != 1:
+                    raise ValueError(
+                        "App build needs a reviewed firmware licence copy step"
+                    )
+                recipe.write_text(
+                    original.replace(
+                        marker,
+                        marker
+                        + "COPY host/FIRMWARE-LICENSES.txt ./host/FIRMWARE-LICENSES.txt\n",
+                    )
+                )
+            recipe.write_text(
+                recipe.read_text()
+                + '\nCOPY firmware-release /usr/share/livolo-ec/firmware-release\nLABEL org.opencontainers.image.licenses="BSD-2-Clause AND LicenseRef-Livolo-Firmware-Mixed"\n'
+            )
+            (app / "firmware-release.json").write_text(
+                json.dumps(firmware, indent=2) + "\n"
+            )
         print(app)
 
 

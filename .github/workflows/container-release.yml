@@ -25,6 +25,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r tools/requirements-firmware-release.txt
       - id: plan
         run: |
           python3 tools/container_test.py
@@ -59,6 +63,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r tools/requirements-firmware-release.txt
       - id: prepare
         name: Assemble exact source and external release recipe
         run: |
@@ -67,6 +75,12 @@ jobs:
           cp build-context/container/release.json evidence/release.json
           cp build-context/Dockerfile evidence/Dockerfile
           cp host/docker/releases.json evidence/request.json
+          python3 - <<'PYCODE'
+          import json, os
+          release = json.load(open('build-context/container/release.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('license_label=' + release['license_label'] + '\n')
+          PYCODE
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
@@ -98,7 +112,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/psires/livolo_ec
             org.opencontainers.image.revision=${{ matrix.source_commit }}
             org.opencontainers.image.version=${{ matrix.version }}
-            org.opencontainers.image.licenses=BSD-2-Clause
+            org.opencontainers.image.licenses=${{ steps.prepare.outputs.license_label }}
             net.sfires.livolo.daemon-version=${{ matrix.daemon_version }}
             net.sfires.livolo.firmware-compat-version=${{ matrix.firmware_compat_version }}
             net.sfires.livolo.recipe-revision=${{ github.sha }}
@@ -121,11 +135,17 @@ jobs:
           index = json.load(open('evidence/index.json'))
           assert any(m.get('annotations', {}).get('vnd.docker.reference.type') == 'attestation-manifest' for m in index['manifests'])
           PY
-          docker run --rm --network none --entrypoint python "$IMAGE@$DIGEST" -c '
+          docker run --rm --network none --volume "$PWD/tools:/release-tools:ro" --entrypoint python "$IMAGE@$DIGEST" -c '
           import json, pathlib, subprocess
           from importlib.metadata import version
           assert version("livolo-ec-daemon") == "${{ matrix.daemon_version }}"
-          import livolod
+          import livolod, sys
+          release = json.loads(pathlib.Path("/usr/share/livolo-ec/release.json").read_text())
+          firmware = release.get("firmware_release")
+          if firmware:
+              sys.path.insert(0, "/release-tools")
+              from firmware_release import verify_installed
+              verify_installed("/usr/share/livolo-ec/firmware-release", pathlib.Path(livolod.__file__).parent / "firmware", inventory_sha256=firmware["inventory_sha256"], source_commit=firmware["source_commit"], version=firmware["version"])
           compat = getattr(livolod, "FIRMWARE_COMPAT_VERSION", livolod.__version__)
           assert compat == "${{ matrix.firmware_compat_version }}"
           subprocess.run(["python", "-m", "pip", "check"], check=True)

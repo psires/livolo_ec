@@ -1,0 +1,2 @@
+# Verify TI signatures in the reviewed public firmware bundle.
+cryptography==46.0.7

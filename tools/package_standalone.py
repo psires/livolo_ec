@@ -18,6 +18,7 @@ import tempfile
 import zipfile
 
 from release_versions import source_versions
+from firmware_release import stage_for_source
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -62,7 +63,14 @@ def document_links(text, relative, tag):
     return re.sub(r"(\[[^\]]*\])\(([^)\s]+)\)", replace, text)
 
 
-def inspect_wheel(path, name, expected, license_text, firmware_compat_version=None):
+def inspect_wheel(
+    path,
+    name,
+    expected,
+    license_text,
+    firmware_compat_version=None,
+    firmware_files=None,
+):
     """Reject incomplete or incorrectly labelled Python distributions before release.
 
     @param path Built wheel to inspect.
@@ -70,6 +78,7 @@ def inspect_wheel(path, name, expected, license_text, firmware_compat_version=No
     @param expected Expected component version, independent of bundle version.
     @param license_text Canonical project licence bytes.
     @param firmware_compat_version Required catalog target for daemon wheels.
+    @param firmware_files Optional exact catalog files from the pinned public bundle.
     """
     with zipfile.ZipFile(path) as wheel:
         if wheel.testzip() is not None:
@@ -92,8 +101,44 @@ def inspect_wheel(path, name, expected, license_text, firmware_compat_version=No
                 or catalog.get("schema") != 1
             ):
                 raise ValueError("Wheel firmware catalog compatibility mismatch")
+            expected_license = (
+                "BSD-2-Clause AND LicenseRef-Livolo-Firmware-Mixed"
+                if catalog["artifacts"]
+                else "BSD-2-Clause"
+            )
+            if fields.get("License-Expression") != expected_license:
+                raise ValueError(
+                    "Daemon wheel licence expression does not match its firmware contents"
+                )
             if catalog["artifacts"]:
-                raise ValueError("This standalone release does not distribute firmware")
+                mapping = next(
+                    (
+                        item
+                        for item in names
+                        if item.endswith("/licenses/FIRMWARE-LICENSES.txt")
+                    ),
+                    None,
+                )
+                if mapping is None or wheel.read(mapping) != (firmware_files or {}).get(
+                    "FIRMWARE-LICENSES.txt"
+                ):
+                    raise ValueError(
+                        "Daemon wheel is missing its exact firmware licence mapping"
+                    )
+            if firmware_files is None:
+                if catalog["artifacts"]:
+                    raise ValueError("Firmware payloads require a reviewed source pin")
+            else:
+                prefix = "livolod/firmware/"
+                actual = {
+                    name[len(prefix) :]: wheel.read(name)
+                    for name in names
+                    if name.startswith(prefix) and not name.endswith("/")
+                }
+                if actual != firmware_files:
+                    raise ValueError(
+                        "Wheel firmware differs from the pinned public catalog"
+                    )
 
 
 def stage_pairing_guide(source, staged, tag):
@@ -111,11 +156,12 @@ def stage_pairing_guide(source, staged, tag):
         destination.write_text(document_links(origin.read_text(), relative, tag))
 
 
-def package(commit, output):
+def package(commit, output, firmware_bundle=None):
     """Assemble installable packages and service instructions from one exact commit.
 
     @param commit Full Git commit identifying the reviewed source and bundle version.
     @param output New output directory receiving release assets and checksums.
+    @param firmware_bundle Optional local copy of the source-pinned public firmware bundle.
     @return Generated release metadata.
     """
     if not re.fullmatch(r"[0-9a-f]{40}", commit):
@@ -144,6 +190,15 @@ def package(commit, output):
                     raise ValueError("Unexpected source archive member")
             bundle.extractall(source, filter="data")
         metadata = source_versions(source)
+        firmware = stage_for_source(source, firmware_bundle)
+        firmware_files = None
+        if firmware:
+            catalog_root = source / "host/livolod/firmware"
+            firmware_files = {
+                p.relative_to(catalog_root).as_posix(): p.read_bytes()
+                for p in catalog_root.rglob("*")
+                if p.is_file()
+            }
         release = metadata["distribution_version"]
         if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", release):
             raise ValueError("Invalid standalone distribution version")
@@ -174,6 +229,7 @@ def package(commit, output):
                 metadata[key],
                 (source / "LICENSE").read_bytes(),
                 metadata["firmware_compat_version"],
+                firmware_files,
             )
         tag = "standalone-" + release
         metadata.update(
@@ -182,7 +238,8 @@ def package(commit, output):
             native_api_revision=1,
             uart_revision=3,
             validation_python="3.13",
-            radio_firmware_payloads=False,
+            radio_firmware_payloads=firmware is not None,
+            firmware_release=firmware,
             dependencies="Installed separately from PyPI; network access required",
             build_tools={
                 name: version(name)
@@ -239,6 +296,8 @@ def package(commit, output):
             (source / "host/docker/requirements-firmware.txt").read_text()
             + "\npaho-mqtt==2.1.0\n"
         )
+        if firmware:
+            shutil.copytree(source / "firmware-release", staged / "firmware-release")
         checksums(staged)
         with tarfile.open(output / (staged.name + ".tar.gz"), "w:gz") as bundle:
             bundle.add(staged, arcname=staged.name)
@@ -251,8 +310,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--firmware-bundle", type=Path)
     args = parser.parse_args()
-    print(json.dumps(package(args.commit, args.output), indent=2))
+    print(json.dumps(package(args.commit, args.output, args.firmware_bundle), indent=2))
 
 
 if __name__ == "__main__":

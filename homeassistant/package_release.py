@@ -14,15 +14,17 @@ import zipfile
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from release_versions import source_versions
+from firmware_release import verify
 
 
-def package(source, version, commit, output):
+def package(source, version, commit, output, firmware_bundle=None):
     """Assemble installable integration and app sources with provenance and hashes.
 
     @param source Clean checkout or archive of the reviewed release commit.
     @param version Exact HA integration version, independent of daemon/app versions.
     @param commit Full source commit identity recorded with the release assets.
     @param output New directory receiving only inspected release assets.
+    @param firmware_bundle Optional local copy of the source-pinned public firmware bundle.
     @return Paths of the generated assets, including SHA256SUMS.
     """
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
@@ -50,6 +52,11 @@ def package(source, version, commit, output):
                 "--app",
                 "--output",
                 str(staged),
+                *(
+                    ["--firmware-bundle", str(firmware_bundle)]
+                    if firmware_bundle
+                    else []
+                ),
             ],
             check=True,
             cwd=source,
@@ -73,11 +80,27 @@ def package(source, version, commit, output):
         target = output / archive.name
         target.write_bytes(archive.read_bytes())
         app = staged / "ha-addons/livolo_ec"
+        if (app / "CANDIDATE-NOT-FOR-RELEASE.txt").exists():
+            raise ValueError(
+                "A non-publishing app candidate cannot become a release archive"
+            )
         app_version = re.search(
             r'^version:\s*["\']?([^"\'\s]+)',
             (app / "config.yaml").read_text(),
             re.MULTILINE,
         ).group(1)
+        firmware = None
+        if (source / "host/release/firmware.json").exists():
+            pin = json.loads((source / "host/release/firmware.json").read_text())
+            verify(
+                app / "firmware-release",
+                inventory_sha256=pin["inventory_sha256"],
+                source_commit=pin["source_commit"],
+                version=versions["firmware_compat_version"],
+            )
+            firmware = json.loads((app / "firmware-release.json").read_text())
+        elif firmware_bundle is not None:
+            raise ValueError("Source has not approved a public firmware bundle")
         app_archive = output / f"livolo-ec-ha-app-{app_version}-source.tar.gz"
         with tarfile.open(app_archive, "w:gz") as bundle:
             bundle.add(app, arcname="livolo_ec")
@@ -91,7 +114,8 @@ def package(source, version, commit, output):
             "tag": "ha-" + version,
             "integration_install": "Manual ZIP; extract custom_components into HA config",
             "app_delivery": "Source build context for aarch64; not a prebuilt image",
-            "radio_firmware_payloads": False,
+            "radio_firmware_payloads": firmware is not None,
+            "firmware_release": firmware,
             "qualified_ha_core": "2026.10.4",
         }
         metadata_path = output / "release.json"
@@ -114,8 +138,11 @@ def main():
     parser.add_argument("--version", required=True)
     parser.add_argument("--commit", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--firmware-bundle", type=Path)
     args = parser.parse_args()
-    for path in package(args.source, args.version, args.commit, args.output):
+    for path in package(
+        args.source, args.version, args.commit, args.output, args.firmware_bundle
+    ):
         print(path)
 
 

@@ -94,7 +94,7 @@ requirements separately for each board.
   changes; record migration requirements explicitly, including during 0.x.
 - Preserve the numeric `major.minor` radio compatibility domain
   in root `VERSION`. It is currently `0.13`, while the recorded software
-  distribution is `0.4.0`. API and UART revisions are separate identifiers.
+  distribution is `0.5.0`. API and UART revisions are separate identifiers.
 - Allocate independent, monotonically increasing `major.minor.patch` daemon
   package versions for changed software. Development daemon `0.14.0` retains
   explicit firmware compatibility `0.13`; coordinated distribution versions
@@ -180,6 +180,22 @@ Maintain a release record under `docs/verification/` containing:
 The existing workflows publish components independently. This checklist is a
 manual project-level gate until a combined inventory validator and publication
 gate are implemented; it does not claim that CI currently enforces completeness.
+
+## Next release: required firmware closure
+
+The owner requested resolution of the firmware qualification and redistribution
+blockers so the next release includes every supported radio. The tracked
+`host/release/firmware-policy.json` therefore requires the approved four-board
+bundle for any distribution newer than 0.5.0. See the
+[public bundle gate](FIRMWARE_RELEASE_BUNDLE.md) for the separately reviewed TI
+bootstrap, exact-byte inventory, package delivery and installed-catalog checks.
+
+The [distribution decisions](FIRMWARE_DISTRIBUTION.md) and
+[physical qualification plan](FIRMWARE_QUALIFICATION_PLAN.md) identify remaining
+owner/operator dependencies. Public manual downloads and automatic updater
+eligibility remain separate approvals. Tooling, synthetic CI payloads and
+structural inspections must never be recorded as real hardware qualification.
+No next version is published or qualified by these readiness changes.
 
 ## Published software-only release 0.5.0 — 2026-11-07
 

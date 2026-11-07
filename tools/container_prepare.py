@@ -12,6 +12,7 @@ import subprocess
 import tarfile
 import tempfile
 
+from firmware_release import stage_for_source
 from release_versions import normalize_metadata, source_versions
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,13 +80,14 @@ def manifest(path):
     return data
 
 
-def prepare(data, entry, output, candidate=False):
+def prepare(data, entry, output, candidate=False, firmware_bundle=None):
     """Assemble a minimal historical source context plus a recorded external recipe.
 
     @param data Validated manifest containing pinned build tools and images.
     @param entry Validated release identity and historical source reference.
     @param output New directory receiving the assembled build context.
     @param candidate Skip release-tag matching only for local, non-publishing CI builds.
+    @param firmware_bundle Optional local copy of the source-pinned firmware inventory.
     """
     if not candidate:
         assert (
@@ -104,6 +106,8 @@ def prepare(data, entry, output, candidate=False):
         "host/PACKAGE.md",
         "host/LICENSE",
         "host/release/version.json",
+        "host/release/firmware.json",
+        "host/release/firmware-policy.json",
         "host/livolod",
         "host/docker/Dockerfile",
         "host/docker/smoke.py",
@@ -142,6 +146,7 @@ def prepare(data, entry, output, candidate=False):
                     raise ValueError("Unexpected source member")
             bundle.extractall(source, filter="data")
         versions = source_versions(source)
+        firmware = stage_for_source(source, firmware_bundle, candidate=candidate)
         assert versions["schema"] == entry["schema"]
         assert versions["daemon_version"] == entry["daemon_version"]
         assert versions["firmware_compat_version"] == entry["firmware_compat_version"]
@@ -164,6 +169,7 @@ def prepare(data, entry, output, candidate=False):
             "VERSION",
             "LICENSE",
             "THIRD_PARTY_NOTICES.md",
+            "firmware-release",
             "host",
             "tools",
         ):
@@ -176,6 +182,17 @@ def prepare(data, entry, output, candidate=False):
                 shutil.copy2(origin, output / relative)
         original = (source / "host/docker/Dockerfile").read_text()
         recipe = original
+        if firmware and firmware["updater_board_count"]:
+            marker = "COPY host/LICENSE ./host/LICENSE\n"
+            if recipe.count(marker) != 1:
+                raise ValueError(
+                    "Docker build needs a reviewed firmware licence copy step"
+                )
+            recipe = recipe.replace(
+                marker,
+                marker
+                + "COPY host/FIRMWARE-LICENSES.txt ./host/FIRMWARE-LICENSES.txt\n",
+            )
         # Reproducibility/inventory overlay; application sources remain byte-identical.
         recipe = re.sub(
             r"^# syntax=.*$",
@@ -200,6 +217,8 @@ def prepare(data, entry, output, candidate=False):
                     shutil.copy2(origin, output / origin.name)
             recipe += (source / "homeassistant/app/Dockerfile.wrapper").read_text()
         recipe += "\nUSER root\nCOPY container/release.json /usr/share/livolo-ec/release.json\nCOPY LICENSE THIRD_PARTY_NOTICES.md /usr/share/licenses/livolo-ec/\nRUN dpkg-query -W > /usr/share/livolo-ec/debian-packages.txt\n"
+        if firmware:
+            recipe += 'COPY firmware-release /usr/share/livolo-ec/firmware-release\nLABEL org.opencontainers.image.licenses="BSD-2-Clause AND LicenseRef-Livolo-Firmware-Mixed"\n'
         if entry["kind"] == "standalone":
             recipe += "USER 10001:10001\n"
         (output / "Dockerfile").write_text(recipe)
@@ -215,6 +234,12 @@ def prepare(data, entry, output, candidate=False):
         metadata = dict(
             entry,
             candidate=candidate,
+            firmware_release=firmware,
+            license_label=(
+                "BSD-2-Clause AND LicenseRef-Livolo-Firmware-Mixed"
+                if firmware
+                else "BSD-2-Clause"
+            ),
             platform="linux/arm64",
             recipe_commit=command("git", "rev-parse", "HEAD"),
             python_image=data["python_image"],
@@ -240,6 +265,7 @@ def main():
     parser.add_argument("--kind", choices=["standalone", "ha"])
     parser.add_argument("--version")
     parser.add_argument("--output")
+    parser.add_argument("--firmware-bundle", type=Path)
     parser.add_argument(
         "--candidate",
         action="store_true",
@@ -260,7 +286,13 @@ def main():
             source_commit=command("git", "rev-parse", "HEAD"),
             source_tag=None,
         )
-        prepare(data, entry, args.output, candidate=True)
+        prepare(
+            data,
+            entry,
+            args.output,
+            candidate=True,
+            firmware_bundle=args.firmware_bundle,
+        )
         return
     if args.output:
         entry = next(
@@ -268,7 +300,7 @@ def main():
             for e in data["releases"]
             if e["kind"] == args.kind and e["version"] == args.version
         )
-        prepare(data, entry, args.output)
+        prepare(data, entry, args.output, firmware_bundle=args.firmware_bundle)
     else:
         print(
             json.dumps(
