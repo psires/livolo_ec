@@ -244,6 +244,29 @@ def commissioning_data(value):
         if count is not None and (type(count) is not int or count not in (1, 2)):
             raise IncompatibleError("Invalid observed output count")
         safe["outputs"] = count
+        if "pairing_evidence" in observation:
+            evidence = observation["pairing_evidence"]
+            if not isinstance(evidence, list) or len(evidence) > 2:
+                raise IncompatibleError("Invalid pairing evidence list")
+            safe["pairing_evidence"] = []
+            for item in evidence:
+                if not isinstance(item, dict) or any(
+                    not isinstance(item.get(key), str)
+                    or not re.fullmatch(pattern, item[key])
+                    for key, pattern in (
+                        ("suffix", r"[0-9a-f]{4}"),
+                        ("payload", r"[0-9a-f]{16}"),
+                    )
+                ):
+                    raise IncompatibleError("Invalid pairing evidence fields")
+                safe["pairing_evidence"].append(
+                    {key: item[key] for key in ("suffix", "payload")}
+                )
+        if "pairing_evidence_truncated" in observation:
+            truncated = observation["pairing_evidence_truncated"]
+            if type(truncated) is not bool:
+                raise IncompatibleError("Invalid pairing evidence truncation flag")
+            safe["pairing_evidence_truncated"] = truncated
         result["observations"].append(safe)
     return result
 
