@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "status": "runtime_verified_marketplace_tracking_pending",
-  "verified_at_utc": "2026-11-07T21:24:36.518673+00:00",
+  "status": "complete",
+  "verified_at_utc": "2026-11-07T21:32:37.627772+00:00",
   "scope": "Official software-only 0.5.1 deployment replacing temporary 0.5.0 patches; radio firmware unchanged",
   "authorization": "Owner explicitly requested official 0.5.1 installation, preservation of paired devices, and no radio firmware changes; HA specialist sole live operator, Release Engineer acceptance reviewer.",
   "source_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
@@ -74,19 +74,47 @@
       "password_encrypted": false,
       "file_mode": "0600"
     },
-    "rollback_exercised_live": false
+    "rollback_exercised_live": false,
+    "verified_permissions": {
+      "supervisor_archive": "0600",
+      "protected_backup_directory": "0700",
+      "patched_image_archive": "0600",
+      "consistent_sqlite": "0600"
+    }
   },
   "deployment": {
     "app_method": "Supported Supervisor update of existing app after refreshing store and asserting latest version exactly 0.5.1",
-    "integration_method": "Verified official ZIP staged and installed atomically using documented manual integration route",
+    "integration_method": "Verified official ZIP installed atomically using documented manual route, followed by exact 0.5.1 installation through existing authenticated Marketplace UI to reconcile tracking.",
     "app_started_at_utc": "2026-11-07T21:21:28.379790036Z",
-    "core_started_at_utc": "2026-11-07T21:23:46.284511425Z",
+    "core_started_at_utc": "2026-11-07T21:30:41.279973312Z",
     "official_image_config_digest": "sha256:8ded3663a6769734090dfe9a63d5c8c2a31ef49c55b528e7c5388ad7a6e008e0",
     "temporary_daemon_overlay_absent": true,
-    "old_patched_integration_retained_privately": true
+    "old_patched_integration_retained_privately": true,
+    "initial_core_started_at_utc": "2026-11-07T21:23:46.284511425Z",
+    "authorized_core_restarts": 2
   },
   "verification": {
-    "raw_checks": {
+    "expected_metadata_exception": {
+      "table": "meta",
+      "key": "firmware_status",
+      "changed_fields": [
+        "session",
+        "verified_at"
+      ],
+      "reason": "Daemon startup reconnect records current transport session and verification time.",
+      "all_other_firmware_status_fields_unchanged": true,
+      "network_firmware_job_commissioning_unchanged": true,
+      "evidence": "HA specialist compared private baseline and post-update snapshots; service.py firmware-status persistence confirms expected behavior."
+    },
+    "runtime_acceptance": "pass",
+    "paired_devices_after": 4,
+    "outputs_after": 7,
+    "ha_entities_after": 14,
+    "ha_devices_after": 5,
+    "all_devices_online": true,
+    "switch_states_preserved": true,
+    "names_areas_options_and_ids_preserved": true,
+    "initial_raw_checks": {
       "official_image_config": true,
       "official_daemon_40_files": true,
       "official_integration_19_files": true,
@@ -114,42 +142,119 @@
       "loaded_coordinator_ready": true,
       "no_daemon_package_overlay": true
     },
-    "raw_failed_checks": [
+    "initial_raw_failed_checks": [
       "meta_preserved"
     ],
-    "expected_metadata_exception": {
-      "table": "meta",
-      "key": "firmware_status",
-      "changed_fields": [
-        "session",
-        "verified_at"
-      ],
-      "reason": "Daemon startup reconnect records current transport session and verification time.",
-      "all_other_firmware_status_fields_unchanged": true,
-      "network_firmware_job_commissioning_unchanged": true,
-      "evidence": "HA specialist compared private baseline and post-update snapshots; service.py firmware-status persistence confirms expected behavior."
+    "final_raw_checks": {
+      "official_image_config": true,
+      "official_daemon_40_files": true,
+      "official_integration_19_files": true,
+      "app_version": true,
+      "daemon_version": true,
+      "radio_unchanged": true,
+      "compatibility_unchanged": true,
+      "entry_preserved": true,
+      "entities_preserved": true,
+      "devices_preserved": true,
+      "areas_preserved": true,
+      "config_catalog_bytes_preserved": true,
+      "registry_rows_preserved": true,
+      "removed_devices_preserved": true,
+      "command_rows_preserved": true,
+      "persistent_meta_preserved": true,
+      "firmware_status_preserved_except_reconnect": true,
+      "tokens_preserved": true,
+      "switch_states_preserved": true,
+      "all_devices_online": true,
+      "new_device_preserved": true,
+      "firmware_job_preserved": true,
+      "commissioning_preserved": true,
+      "ha_daemon_version_sensor": true,
+      "loaded_integration_version": true,
+      "loaded_coordinator_connected": true,
+      "loaded_coordinator_ready": true,
+      "marketplace_tracking_correct": true,
+      "no_livolo_restart_repair": false,
+      "no_daemon_package_overlay": true
     },
-    "runtime_acceptance": "pass",
-    "paired_devices_after": 4,
-    "outputs_after": 7,
-    "ha_entities_after": 14,
-    "ha_devices_after": 5,
-    "all_devices_online": true,
-    "switch_states_preserved": true,
-    "names_areas_options_and_ids_preserved": true
+    "final_raw_failed_checks": [
+      "no_livolo_restart_repair"
+    ],
+    "final_acceptance_checks": {
+      "official_image_config": true,
+      "official_daemon_40_files": true,
+      "official_integration_19_files": true,
+      "app_version": true,
+      "daemon_version": true,
+      "radio_unchanged": true,
+      "compatibility_unchanged": true,
+      "entry_preserved": true,
+      "entities_preserved": true,
+      "devices_preserved": true,
+      "areas_preserved": true,
+      "config_catalog_bytes_preserved": true,
+      "registry_rows_preserved": true,
+      "removed_devices_preserved": true,
+      "command_rows_preserved": true,
+      "persistent_meta_preserved": true,
+      "firmware_status_preserved_except_reconnect": true,
+      "tokens_preserved": true,
+      "switch_states_preserved": true,
+      "all_devices_online": true,
+      "new_device_preserved": true,
+      "firmware_job_preserved": true,
+      "commissioning_preserved": true,
+      "ha_daemon_version_sensor": true,
+      "loaded_integration_version": true,
+      "loaded_coordinator_connected": true,
+      "loaded_coordinator_ready": true,
+      "marketplace_tracking_correct": true,
+      "no_daemon_package_overlay": true
+    },
+    "active_restart_notice_absent": true,
+    "restart_probe_exception": {
+      "storage_probe_result": false,
+      "storage_probe_limitation": "Presence of a retained non-persistent issue in .storage is not evidence that it is active. Original probe result retained unchanged.",
+      "retained_record": {
+        "domain": "marketplace",
+        "issue_id": "restart_required_1447434369_tags/0.5.1",
+        "is_persistent": false,
+        "created": "2026-11-07T21:29:41.393121+00:00"
+      },
+      "source_semantics": "HA 2026.11.0 helpers/issue_registry.py _async_load restores non-persistent records with active=False.",
+      "live_ui_observation": "After final restart, authenticated Settings \u2192 Repairs listed exactly one unrelated Supervisor repair (installed app removed from repository, three weeks old). No Livolo or Marketplace restart repair. Marketplace page showed Version 0.5.1 installed and Livolo EC is installed and set up.",
+      "active_livolo_restart_repair": false
+    },
+    "overall_acceptance": "pass"
   },
   "marketplace": {
-    "status": "pending_supported_tracking_reconciliation",
+    "status": "complete",
     "initial_attempt": "Exact-version update.livolo_ec service returned HTTP 500 before modifying integration files.",
     "reason": "Open the Marketplace and read the warning first, installing and updating work once it is accepted",
     "context": "Supervisor service context had not accepted Marketplace warning.",
     "manual_install_loaded_version": "0.5.1",
-    "tracked_installed_version": "0.5.0",
-    "latest_version": "0.5.1",
-    "update_entity_state": "on",
-    "limitation": "Marketplace still offers a redundant update; deployment is healthy, but tracking reconciliation is not complete.",
     "warning_auth_or_tracking_storage_edited": false,
-    "next_step": "Use supported existing authenticated UI installation/reconciliation if available; do not forge acceptance or edit tracking storage."
+    "initial_manual_install_tracking": {
+      "installed_version": "0.5.0",
+      "latest_version": "0.5.1",
+      "update_entity_state": "on"
+    },
+    "resolved_limitation": "Marketplace still offers a redundant update; deployment is healthy, but tracking reconciliation is not complete.",
+    "reconciliation_method": "Existing authenticated Safari admin session; Marketplace Livolo EC update dialog selected exact official 0.5.1, then Update. UI displayed Up-to-date and installed 0.5.1. No warning prompt appeared for this previously accepted user session.",
+    "after": {
+      "installed_version": "0.5.1",
+      "latest_version": "0.5.1",
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.5.1",
+      "update_state": "off"
+    },
+    "existing_session_and_authorization": {
+      "existing_session_used": true,
+      "tokens_created": false,
+      "impersonation": false,
+      "warning_acceptance_forged_or_edited": false,
+      "tracking_storage_hand_edited": false
+    },
+    "active_restart_notice": false
   },
   "operation_limits": {
     "radio_firmware_operations": false,
@@ -164,6 +269,23 @@
     "backup-result.json": "d35971fe624df279190d1f0ad0435c63cab2933730b8968f9dd1ce3da112b521",
     "manual-result.json": "dfbb8099727ad4555120c25cf4a8afcf3bc984e2c7093929147deb6b12c567cd",
     "supervisor-backup-info.json": "7205f59efa4ecb94773137e77fbe81d8e34280a9429c20466da88869653eeab6",
-    "verify-body.py": "1076cc5fca4a6d43e68048ce1eeb0ec66e692a726d77816d163e66b4b6c42fe2"
+    "verify-body.py": "1076cc5fca4a6d43e68048ce1eeb0ec66e692a726d77816d163e66b4b6c42fe2",
+    "final-verification-summary.json": "8f04aa1a587196ade0c1685064772a4e596b2d8f0f59a5dd6dc3e39da1423166",
+    "post-ui-check.json": "a2c17f47096bfaa4d78a7a761c106c80cc4432170032eeef32af95a29a1360db",
+    "core-restart.json": "fefb6baf53d5ec1be9d6ed49f1c9cb242279ef9f29f9b76bcb8f11284bfc2cc8",
+    "final-core-restart.json": "fefb6baf53d5ec1be9d6ed49f1c9cb242279ef9f29f9b76bcb8f11284bfc2cc8",
+    "backup-permissions.txt": "7e66e8fce82d913436c19fb972bc57acd0be2226887317560da63858575fab15",
+    "marketplace-reconciliation-receipt.json": "3a33c10ce5740c13c027b9008147eb76f610a01e40d337531e479521b27dfd96",
+    "final-verify.py": "1040bcc468e73da6741e0b7479fc6f013e3ff9ef97e57383252dc56589bbed19"
+  },
+  "limitations": [
+    "No output command or new pairing/firmware install was performed; observed current readiness and state, not an output/endurance trial."
+  ],
+  "release_engineer_review": {
+    "official_expected_inventory_independently_verified": true,
+    "final_verification_script_reviewed": true,
+    "private_evidence_hashes_verified": true,
+    "ha_issue_registry_nonpersistent_load_semantics_verified": true,
+    "live_operations_performed_by": "HA specialist only"
   }
 }
