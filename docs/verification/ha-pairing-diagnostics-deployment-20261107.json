@@ -5,13 +5,11 @@
   "patch_commit": "92aaba8d17007bd92bf05ebc6c63f90cf56a54ee",
   "image": "ghcr.io/psires/livolo-ec-ha-app:0.5.0",
   "image_id": "sha256:f0cca0732895704ee817df35419798ec97a1719bb1f7f607f1fb12e97b939480",
-  "container_id": "b0918565c66204bb047cb8f7b9ea2dbd27ddd6f692f82a3c184420ec7c2429df",
   "app_started_at": "2026-11-07T15:49:04.205567004Z",
   "core_started_at": "2026-11-07T15:50:06.984137936Z",
   "daemon_module_sha256": "e122edd6c1b01b5484040adb6897058395193fd67bf08c507d6be18860fedeca",
   "integration_zip_sha256": "60aa7eb234037ca9c94ed0bf67ca2270e100ec63514805d961a3af3c44f39417",
   "integration_files_match_inventory": true,
-  "identity_sha256": "2363ee967bc05f74c2c0b2cb1c029ae3b77d0206ddad023767a9b54003f4b179",
   "preserved": {
     "config_entry_data_options": true,
     "entry_count": 1,
@@ -26,7 +24,6 @@
   "historical_pairing_outcome": "expired, not registered",
   "new_pairing_or_firmware_job_requested": false,
   "outputs_commanded": false,
-  "backup_root": "/share/livolo-pairing-diag-92aaba8-20261107/backup",
   "limitation": "Daemon module overlay is lost on app container recreation or update. Published 0.5.0 image/tag is unchanged. No new pairing trial performed.",
   "schema": 1,
   "final_post_core_checks": {
@@ -44,5 +41,7 @@
     "note": "207 initial full-run successes; seven historical channel failures caused by missing Git history in source export. After adding local history, all eight channel tests passed (one overlap). No source changes needed."
   },
   "patch_sha256": "d5fd3253a107494b0c2dba862f14c5aeff854976497b06adf56df215edd2cb6d",
-  "documentation": "Private temporary diagnostic overlay, not a public release or a firmware qualification result"
+  "documentation": "Private temporary diagnostic overlay, not a public release or a firmware qualification result",
+  "same_container_preserved": true,
+  "recoverable_backups_retained_privately": true
 }

@@ -65,9 +65,9 @@ def state_check(environment, root, expected, compatibility, seed=False):
     @param environment Isolated venv containing the wheel currently under test.
     @param root Shared disposable configuration, database and catalog directory.
     @param expected Expected installed software version.
-    @param compatibility Exact radio compatibility alias preserved through all phases.
+    @param compatibility Exact radio compatibility target for this installed phase.
     @param seed Whether this first phase must create the one simulated device.
-    @return None; fails if identity, durable request history or persistent state changes.
+    @return Exact stored network, registry and request rows for cross-phase comparison.
     """
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -164,21 +164,83 @@ def state_check(environment, root, expected, compatibility, seed=False):
                 process.wait()
     with sqlite3.connect(root / "state.sqlite3.simulated") as database:
         assert database.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        return {
+            "network": database.execute(
+                "SELECT key, value FROM meta WHERE key='network'"
+            ).fetchall(),
+            "devices": database.execute(
+                "SELECT id, value FROM devices ORDER BY id"
+            ).fetchall(),
+            "request": database.execute(
+                "SELECT id, request, result, updated FROM commands WHERE id='versioning-add'"
+            ).fetchall(),
+        }
 
 
-def check(previous, candidate, compatibility, constraints=None):
+def catalog_check(environment, root, compatibility):
+    """Check the unchanged catalog using the installed wheel's actual compatibility rules.
+
+    @param environment Isolated environment holding the phase's installed wheel.
+    @param root Shared persistent simulator state directory.
+    @param compatibility Expected compatibility target for this installed phase.
+    @return Actual rejection code for the empty old catalog; never a hardware qualification.
+    """
+    catalog_version = json.loads((root / "catalog/manifest.json").read_bytes())[
+        "host_version"
+    ]
+    expected = (
+        "artifact_missing" if catalog_version == compatibility else "incompatible_host"
+    )
+    script = """
+import json, sys, livolod
+from livolod.firmware_bundle import BundleError, select_candidate
+target = getattr(livolod, 'FIRMWARE_COMPAT_VERSION', livolod.__version__)
+assert target == sys.argv[2]
+try:
+    select_candidate(sys.argv[1], board='zb-gw04-1v2', host_version=target, app_baudrate=460800)
+except BundleError as error:
+    print(json.dumps({'reason': error.code}))
+else:
+    raise AssertionError('The persistent empty catalog unexpectedly offered an artifact')
+"""
+    result = json.loads(
+        subprocess.check_output(
+            [
+                str(environment / "bin/python"),
+                "-I",
+                "-c",
+                script,
+                str(root / "catalog"),
+                compatibility,
+            ],
+            cwd=root,
+            text=True,
+        )
+    )
+    assert result == {"reason": expected}, result
+    return result["reason"]
+
+
+def check(
+    previous, candidate, compatibility, constraints=None, *, previous_compatibility=None
+):
     """Verify real pip upgrade ordering and deliberate rollback without physical radios.
 
     @param previous Previously released daemon wheel, installed before the candidate.
     @param candidate New daemon wheel with strictly greater package version.
-    @param compatibility Unchanged two-component firmware compatibility target.
+    @param compatibility Candidate's two-component firmware compatibility target.
     @param constraints Optional pinned dependency constraints for the initial install.
+    @param previous_compatibility Previous and rollback target; defaults to candidate target for old callers.
     @return Evidence dictionary after all installation and persistence phases pass.
     """
     previous, candidate = Path(previous).resolve(), Path(candidate).resolve()
     old_version, new_version = wheel_version(previous), wheel_version(candidate)
     if not Version(new_version) > Version(old_version):
         raise ValueError("Candidate must sort above the installed daemon version")
+    previous_compatibility = (
+        compatibility if previous_compatibility is None else previous_compatibility
+    )
+    evidence = []
     with tempfile.TemporaryDirectory(prefix="livolo-version-upgrade-") as temporary:
         root = Path(temporary)
         environment = root / "venv"
@@ -210,15 +272,18 @@ def check(previous, candidate, compatibility, constraints=None):
         (state / "catalog").mkdir(parents=True)
         manifest = state / "catalog/manifest.json"
         manifest.write_text(
-            json.dumps({"schema": 1, "host_version": compatibility, "artifacts": []})
+            json.dumps(
+                {"schema": 1, "host_version": previous_compatibility, "artifacts": []}
+            )
         )
         catalog_bytes = manifest.read_bytes()
         phases = [
-            ("previous", old_version),
-            ("upgrade", new_version),
-            ("rollback", old_version),
+            ("previous", old_version, previous_compatibility),
+            ("upgrade", new_version, compatibility),
+            ("rollback", old_version, previous_compatibility),
         ]
-        for phase, expected in phases:
+        preserved = None
+        for phase, expected, phase_compatibility in phases:
             if phase == "upgrade":
                 subprocess.run(
                     pip
@@ -284,14 +349,35 @@ def check(previous, candidate, compatibility, constraints=None):
                         api_version=1,
                         uart_protocol=3,
                     )
-            state_check(
-                environment, state, expected, compatibility, seed=phase == "previous"
+            current = state_check(
+                environment,
+                state,
+                expected,
+                phase_compatibility,
+                seed=phase == "previous",
             )
+            if phase == "previous":
+                preserved = current
+            else:
+                assert (
+                    current == preserved
+                ), "Persistent registry/network/request bytes changed"
+            reason = catalog_check(environment, state, phase_compatibility)
             assert manifest.read_bytes() == catalog_bytes
+            evidence.append(
+                dict(
+                    phase=phase,
+                    daemon_version=expected,
+                    firmware_compat_version=phase_compatibility,
+                    catalog_reason=reason,
+                )
+            )
     return dict(
         previous_version=old_version,
         daemon_version=new_version,
         firmware_compat_version=compatibility,
+        previous_firmware_compat_version=previous_compatibility,
+        phases=evidence,
         upgrade=True,
         rollback=True,
         registry_and_request_history_preserved=True,
@@ -306,6 +392,10 @@ def main():
     parser.add_argument("--previous-wheel", required=True, type=Path)
     parser.add_argument("--candidate-wheel", required=True, type=Path)
     parser.add_argument("--firmware-compat-version", required=True)
+    parser.add_argument(
+        "--previous-firmware-compat-version",
+        help="Previous/rollback target; defaults to candidate compatibility",
+    )
     parser.add_argument("--constraints", type=Path)
     args = parser.parse_args()
     print(
@@ -315,6 +405,7 @@ def main():
                 args.candidate_wheel,
                 args.firmware_compat_version,
                 args.constraints,
+                previous_compatibility=args.previous_firmware_compat_version,
             ),
             sort_keys=True,
         )

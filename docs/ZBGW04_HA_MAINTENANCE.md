@@ -22,7 +22,7 @@ final candidate, compatibility target, hashes and acceptance record.
 | HA identity | November 7 stored registry: integration 0.5.0, 12 enabled entities and four devices; only Bedroom device has an assigned area | Preserve private exact-ID export; verify live loaded HA state separately |
 | Old deployment | November 7: `local_livolo_ec` 0.1.0 stopped, manual boot, watchdog/automatic updates disabled | Confirm it cannot restart and compete for this UART |
 | Catalog | November 7: persistent `firmware_catalog=local`, `/data/firmware`, schema 1 compatibility 0.13 | Recheck manifest/payload hashes, backup and recreation behavior |
-| Access to device | No current physical operator or button mapping confirmed | Named operator, accessible board, verified BOOT/RESET identification and recovery instructions |
+| Access to device | Owner confirmed they can operate the radios and both isolated one- and two-gang test switches are available | Verify this board's physical BOOT/RESET mapping, recovery instructions and agreed window |
 
 Sources: [HA migration](verification/ha-app-migration-0.3.0-20261105.json),
 [preflight](verification/ha-zbgw04-0.13-preflight-20261105.json),
@@ -275,5 +275,6 @@ manual recovery evidence from actual HA updater evidence in the release matrix.
 Before scheduling, the HA specialist must verify fresh recoverable backups,
 live HA state and exclusive UART ownership; the operator must confirm physical recovery access; Release
 Engineer must freeze the candidate/return artifacts and compatible host pair.
-The owner must approve the downtime, bench-host changes, permitted switch tests
+The owner has confirmed operator and test-switch availability. They must still
+approve the downtime, bench-host changes, permitted switch tests
 and recovery budget. None of those execution approvals is implied by this plan.

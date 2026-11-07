@@ -154,7 +154,7 @@ jobs:
           set -o pipefail
           daemon_version=$(python -c 'import json; print(json.load(open("host/release/version.json"))["daemon_version"])')
           firmware_compat_version=$(python -c 'import json; print(json.load(open("host/release/version.json"))["firmware_compat_version"])')
-          python tools/check_daemon_upgrade.py --previous-wheel baseline/livolo_ec_daemon-0.13-py3-none-any.whl --candidate-wheel "candidate/livolo_ec_daemon-${daemon_version}-py3-none-any.whl" --firmware-compat-version "$firmware_compat_version" --constraints host/docker/requirements-firmware.txt 2>&1 | tee upgrade.log
+          python tools/check_daemon_upgrade.py --previous-wheel baseline/livolo_ec_daemon-0.13-py3-none-any.whl --candidate-wheel "candidate/livolo_ec_daemon-${daemon_version}-py3-none-any.whl" --previous-firmware-compat-version 0.13 --firmware-compat-version "$firmware_compat_version" --constraints host/docker/requirements-firmware.txt 2>&1 | tee upgrade.log
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:

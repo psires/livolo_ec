@@ -21,7 +21,9 @@ service changed, GPIO driven, firmware flashed or switch operated by this audit.
 The bench Pi has GNU Arm GCC 14.2.1 and the existing pinned SDK trees. Builds
 can run in fresh temporary directories without owning a radio. The local Mac
 has a native C compiler but no ARM cross-compiler or container runtime on PATH.
-The physical operator's availability has not been established.
+The owner confirmed they can operate the radios and both isolated one- and
+two-gang test switches are available. Scheduling, board-specific recovery
+access and authorization for each live maintenance operation remain pending.
 
 The initial inventory above was passive. A subsequent
 [TI read-only baseline](verification/ti-readonly-baseline-20261107.json) used
