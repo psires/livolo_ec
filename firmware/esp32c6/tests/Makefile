@@ -5,9 +5,10 @@ SOURCES = ../main/main.c ../../experimental/transport.c test_usb_transport.c
 HEADERS = $(wildcard stubs/*.h stubs/*/*.h) ../../experimental/transport.h ../../version.h
 
 .PHONY: test clean
-test: $(BUILD)/test_usb_transport $(BUILD)/test_rf_usb
+test: $(BUILD)/test_usb_transport $(BUILD)/test_rf_usb $(BUILD)/test_output_scheduler
 	$(BUILD)/test_usb_transport
 	$(BUILD)/test_rf_usb
+	$(BUILD)/test_output_scheduler
 
 $(BUILD)/test_usb_transport: $(SOURCES) $(HEADERS) Makefile
 	mkdir -p $(BUILD)
@@ -20,3 +21,8 @@ $(BUILD)/test_rf_usb: ../main/main.c ../main/health.c ../main/health.h ../../exp
 
 clean:
 	rm -rf $(BUILD)
+
+$(BUILD)/test_output_scheduler: ../main/main.c ../main/health.c ../main/health.h ../../experimental/transport.c ../../experimental/rf.c ../../experimental/rf.h test_output_scheduler.c $(HEADERS) Makefile
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -DEC_RF_DIAGNOSTICS=1 -Istubs -I../main -I../../experimental -I../.. \
+	 ../main/main.c ../main/health.c ../../experimental/transport.c ../../experimental/rf.c test_output_scheduler.c -o $@

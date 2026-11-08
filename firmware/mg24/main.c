@@ -98,7 +98,7 @@ int main(void)
 #ifdef EC_RF_DIAGNOSTICS
 	ec_rf_setup(&ec_mg24_rf_ops);
 	parser.radio_command = ec_rf_command;
-	parser.build = "xiao-rx-2";
+	parser.build = "xiao-queue-1";
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 	parser.radio_command = ec_mg24_reject_command;
 	parser.build = "xiao-reject-1";

@@ -150,7 +150,7 @@ void vTaskDelay(uint32_t ticks)
 		bytes_at_delay = flood_bytes;
 		flood_delays++;
 	}
-	clock_us += ticks * 1000;
+	clock_us += ticks * 10000;
 	assert(clock_us < 1000000);
 	if (kind == STALLED && stops) {
 		assert(starts == 1 && sends == 1);
@@ -221,7 +221,7 @@ int usb_serial_jtag_read_bytes(void *buffer, size_t length, uint32_t ticks)
 		assert(starts == 1 && !stops);
 		longjmp(finished, 1);
 	}
-	clock_us += ticks * 1000;
+	clock_us += ticks * 10000;
 	return 0;
 }
 

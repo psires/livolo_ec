@@ -2,7 +2,7 @@
 #ifndef TEST_FREERTOS_H
 #define TEST_FREERTOS_H
 
-/* Test ticks represent milliseconds; no scheduler or hardware is instantiated. */
-#define pdMS_TO_TICKS(value) (value)
+/* Match target CONFIG_FREERTOS_HZ=100; no scheduler or hardware is instantiated. */
+#define pdMS_TO_TICKS(value) ((value) / 10)
 
 #endif

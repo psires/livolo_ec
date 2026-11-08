@@ -35,6 +35,14 @@ struct ec_rf_ops {
  */
 void ec_rf_setup(const struct ec_rf_ops *ops);
 /** @brief Handle bounded passive/synthetic diagnostics, never arbitrary TX.
+ * RFQUEUE snapshots counters only after verified stop and complete event drain,
+ * including fault-latched windows whose adapter stop succeeded. Counts wrap at
+ * 32 bits and reset at setup or a successful start. High-water is the producer's
+ * admitted occupancy snapshot, including the incoming record, not hardware FIFO
+ * usage. Maximum age runs from adapter ticks to successful event formatting; it
+ * excludes pending serial output and is modulo 2^32 us, not pure ring dwell.
+ * Age requires adapter ticks and now_us to share a clock and less than one full
+ * timer wrap between the timestamp and dequeue. Reading does not clear evidence.
  * @param command Complete command after the numeric request ID.
  * @param out Response body storage, not including the UART RSP prefix.
  * @param capacity Available response bytes including NUL.
@@ -49,6 +57,12 @@ int ec_rf_diagnostic_idle(void);
 #endif
 /** @brief Service callbacks, expiry and timeout before every USB/UART iteration. */
 void ec_rf_poll(void);
+/** @brief Hint that the main task should service pending RF output promptly.
+ * @return Nonzero for RX records, a TX event or a published TX completion.
+ * Main-task-only, non-consuming and side-effect-free: no radio or clock access.
+ * A callback may publish after a zero result; callers must retain bounded waits.
+ */
+int ec_rf_events_pending(void);
 /** @brief Retrieve one complete event without blocking or partial consumption.
  * @param out Event output buffer, including newline.
  * @param capacity Buffer size; insufficient storage leaves the event queued.
@@ -61,7 +75,9 @@ size_t ec_rf_event(char *out, size_t capacity);
  * @param included Nonzero when two original FCS bytes follow the MAC bytes.
  * @param rssi Received signal strength in dBm.
  * @param lqi Link quality supplied by the radio.
- * @param ticks Callback timestamp in microseconds, modulo 2^32.
+ * @param ticks Adapter timestamp in microseconds, modulo 2^32, from now_us's
+ * clock domain. The single producer may be an ISR or the owning main task;
+ * this function never calls the clock or another board operation.
  */
 void EC_RF_ISR_ATTR ec_rf_receive(const uint8_t *data, size_t length,
 				  unsigned included, int rssi, unsigned lqi,

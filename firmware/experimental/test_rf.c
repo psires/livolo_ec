@@ -279,6 +279,143 @@ static void test_receive_queue(void)
 	assert(strstr(response, "dropped=5"));
 }
 
+/** @brief Distinguish ring admission failures from other drops and preserve evidence. */
+static void test_queue_diagnostics(void)
+{
+	uint8_t packet[39];
+	char snapshot[1024], expected[24];
+	unsigned prior_polls;
+	uint32_t first_ticks;
+
+	memset(packet, 0xa5, sizeof(packet));
+	reset();
+	prior_polls = polls;
+	assert(!ec_rf_events_pending() && polls == prior_polls);
+	command("RFQUEUE", 1);
+	assert(strstr(response, "rx_queue_full=0 rx_enqueued=0 rx_dequeued=0"));
+	assert(strstr(response, "rx_high_water=0 rx_max_age_us=0"));
+	assert(strstr(response, "queue_capacity=7 counter_bits=32"));
+	assert(strstr(response, "counter_mode=wrapping"));
+	assert(strstr(response, "scope=last_successful_start"));
+	assert(strstr(response, "age_basis=adapter_timestamp age_clock=mod32"));
+	assert(!starts && !stops && !sends);
+	command("RFLISTEN 1234abcd", 1);
+	command("RFQUEUE", 0);
+	assert(strstr(response, "ERR RF_QUEUE_NOT_IDLE"));
+	first_ticks = clock_us;
+	for (unsigned i = 0; i < 10; i++) {
+		packet[0] = i;
+		ec_rf_receive(packet, sizeof(packet), 0, -40, 100, clock_us++);
+	}
+	/* Malformed records and adapter drops never masquerade as queue-full. */
+	ec_rf_receive(packet, 0, 0, -40, 100, clock_us);
+	ec_rf_drop();
+	command("RFSTATUS", 1);
+	assert(strstr(response, "rx=10 dropped=5 queued=7"));
+	assert(ec_rf_events_pending());
+	assert(!ec_rf_event(response, 4));
+	command("RFSTOP", 1);
+	command("RFQUEUE", 0);
+	command("RFSTART abcdef12", 0);
+	assert(starts == 1);
+	/* A stopped callback must not change the saved window's queue evidence. */
+	ec_rf_receive(packet, sizeof(packet), 0, -40, 100, clock_us);
+	clock_us = first_ticks + 500;
+	for (unsigned i = 0; i < 7; i++) {
+		assert(ec_rf_events_pending());
+		assert(ec_rf_event(response, sizeof(response)));
+		snprintf(expected, sizeof(expected), "data=%02xa5", i);
+		assert(strstr(response, expected));
+	}
+	assert(!ec_rf_events_pending());
+	assert(!ec_rf_event(response, sizeof(response)));
+	command("RFQUEUE", 1);
+	assert(strstr(response, "rx_queue_full=3 rx_enqueued=7 rx_dequeued=7"));
+	assert(strstr(response, "rx_high_water=7 rx_max_age_us=500"));
+	strcpy(snapshot, response);
+	assert(!ec_rf_command("RFQUEUE", response, 4));
+	command("RFQUEUE extra", 0);
+	command("RFQUEUE", 1);
+	assert(!strcmp(snapshot, response));
+	/* A failed start retains the previous successful window's evidence. */
+	start_result = -1;
+	command("RFSTART abcdef12", 0);
+	command("RFQUEUE", 1);
+	assert(!strcmp(snapshot, response));
+}
+
+/** @brief Reset diagnostics on successful start and handle ring and timer wrap. */
+static void test_queue_reset_and_wrap(void)
+{
+	uint8_t packet[39] = { 1, 0x88 };
+
+	reset();
+	clock_us = UINT32_MAX - 1000;
+	command("RFSTART 1234abcd", 1);
+	clock_us = UINT32_MAX - 10;
+	ec_rf_receive(packet, sizeof(packet), 0, -40, 100, clock_us);
+	clock_us = 20;
+	assert(ec_rf_event(response, sizeof(response)));
+	/* Repeated enqueue/drain crosses the physical ring index boundary. */
+	for (unsigned i = 0; i < 70; i++) {
+		ec_rf_receive(packet, sizeof(packet), 0, -40, 100, clock_us);
+		assert(ec_rf_event(response, sizeof(response)));
+	}
+	command("RFSTOP", 1);
+	command("RFQUEUE", 1);
+	assert(strstr(response,
+		      "rx_queue_full=0 rx_enqueued=71 rx_dequeued=71"));
+	assert(strstr(response, "rx_high_water=1 rx_max_age_us=31"));
+	command("RFLISTEN abcdef12", 1);
+	command("RFSTOP", 1);
+	command("RFQUEUE", 1);
+	assert(strstr(response, "rx_queue_full=0 rx_enqueued=0 rx_dequeued=0"));
+	assert(strstr(response, "rx_high_water=0 rx_max_age_us=0"));
+}
+
+/** @brief Hint completion without consuming it and read faults only after safe drain. */
+static void test_queue_completion_and_faults(void)
+{
+	unsigned prior_polls;
+
+	reset();
+	command("RFSTART 1234abcd", 1);
+	command("RFTX 1234abcd 1 39 0 0", 1);
+	assert(!ec_rf_events_pending());
+	borrowed = NULL;
+	ec_rf_tx_complete(1);
+	prior_polls = polls;
+	assert(ec_rf_events_pending() && polls == prior_polls);
+	ec_rf_poll();
+	assert(ec_rf_events_pending());
+	assert(!ec_rf_event(response, 4));
+	assert(ec_rf_events_pending());
+	assert(ec_rf_event(response, sizeof(response)));
+	assert(strstr(response, "status=done"));
+	assert(!ec_rf_events_pending());
+	clock_us += 100000;
+	command("RFTX 1234abcd 2 39 0 0", 1);
+	command("RFSTOP", 1);
+	command("RFQUEUE", 0);
+	assert(ec_rf_event(response, sizeof(response)));
+	assert(strstr(response, "status=timeout"));
+	command("RFSTATUS", 1);
+	assert(strstr(response, "fault=1"));
+	command("RFQUEUE", 1);
+	command("RFSTART abcdef12", 0);
+	/* A failed adapter stop is not a safe snapshot, even with empty queues. */
+	reset();
+	command("RFSTART 1234abcd", 1);
+	stop_result = -1;
+	command("RFSTOP", 0);
+	assert(!ec_rf_events_pending());
+	command("RFQUEUE", 0);
+	assert(strstr(response, "ERR RF_QUEUE_NOT_IDLE"));
+	stop_result = 0;
+	command("RFSTOP", 1);
+	command("RFQUEUE", 1);
+}
+
 /** @brief Reject failed or overpowered initialization and distinguish TX rejection. */
 static void test_adapter_failures(void)
 {
@@ -408,6 +545,9 @@ int main(void)
 	test_timeout_fault();
 	test_budget_and_lease();
 	test_receive_queue();
+	test_queue_diagnostics();
+	test_queue_reset_and_wrap();
+	test_queue_completion_and_faults();
 	test_adapter_failures();
 	test_passive_window();
 	test_passive_expiry_and_failure();

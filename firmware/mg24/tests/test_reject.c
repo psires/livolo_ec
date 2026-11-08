@@ -331,6 +331,7 @@ static void test_capabilities(void)
 	assert(strstr(response, "radio_tx=0"));
 	assert(strstr(response, "rf_diag=none"));
 	assert(strstr(response, "reject_diag=untrusted_v1"));
+	assert(strstr(response, "queue_diag=ring_v1"));
 	assert(!strstr(response, "synthetic_only"));
 	assert(!starts && !stops && !sends);
 }

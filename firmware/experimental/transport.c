@@ -7,10 +7,12 @@
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 #define RADIO_TX_CAPABILITY "0"
 #define RADIO_DIAGNOSTICS                                                      \
-	" rf_diag=none rx_diag=passive_v1 reject_diag=untrusted_v1"
+	" rf_diag=none rx_diag=passive_v1 reject_diag=untrusted_v1 "           \
+	"queue_diag=ring_v1"
 #else
 #define RADIO_TX_CAPABILITY "synthetic_only"
-#define RADIO_DIAGNOSTICS " rf_diag=synthetic_v1 rx_diag=passive_v1"
+#define RADIO_DIAGNOSTICS                                                      \
+	" rf_diag=synthetic_v1 rx_diag=passive_v1 queue_diag=ring_v1"
 #endif
 
 /** @brief Validate a bounded whitespace-free build or board token.

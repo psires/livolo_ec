@@ -46,6 +46,7 @@ int main(void)
 	assert(strstr(output, "lease_max=0 session_bytes=0"));
 	assert(strstr(output,
 		      "update=none experimental=1 gateway=0 radio_tx=0"));
+	assert(!strstr(output, "queue_diag="));
 	for (size_t i = 0; i < sizeof(mutating) / sizeof(mutating[0]); i++) {
 		assert(feed(&state, mutating[i], output));
 		assert(strstr(output, "ERR UNSUPPORTED"));
