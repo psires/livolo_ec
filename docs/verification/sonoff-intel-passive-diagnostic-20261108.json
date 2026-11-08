@@ -1,0 +1,69 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "One bounded receive-only diagnosis on dedicated Intel Sonoff after unknown pre-flash HA Install",
+  "prior_trial_record": "docs/verification/sonoff-intel-ha-trial-20261108.json",
+  "reported_by": "Linux specialist, sole live operator",
+  "daemon_source_commit": "40c3f3e73d32b6de2030117cb3cc3895907fe341",
+  "script_sha256": "7afa42c6c548635f173e7f30d69b97c6a69e0a5cdf4cdd4706e7fc3d48899603",
+  "offline_tests_sha256": "e6cb7e3e9a70ecd4fcd09ea1d4b7c5d64be8070a5fe0b598865b6562c1ae886c",
+  "offline_tests": "5 passed independently by Release Engineer and ZigBee specialist",
+  "preconditions": {
+    "private_consistent_sqlite_backup_integrity": "passed",
+    "journal_backup_sha256": "6db87172a3b135136fa42f0521b63441e00bfbb79cb663065112c5354d52d0da",
+    "observer_backup_sha256": "da0a450555c83a885023806dc787bc40d85a798554547166d17eebc7a8c346de",
+    "runtime_stop": "graceful exit 0; restart policy no",
+    "existing_uart_owner": false,
+    "policy_copy": "Byte-identical hash verified; protected UID10001 copy mounted read-only; original unchanged"
+  },
+  "execution": {
+    "submissions": 1,
+    "uart_open_count": 1,
+    "uart_access": "O_RDONLY; exact target and descriptor identity checked; TIOCEXCL",
+    "guards": "Exact physical lease and both existing database guards acquired",
+    "uart_data_writes": 0,
+    "modem_line_setters": 0,
+    "capture": "Same descriptor, three seconds at 115200 then three seconds at 921600; fixed 20-second overall alarm; incremental private raw files and monotonic chunk timestamps",
+    "hupcl": "preserved",
+    "observed_modem_bits": 6,
+    "observed_modem_bits_changed": false
+  },
+  "observations": [
+    {
+      "baud": 115200,
+      "bytes": 127,
+      "supported_complete_menu": false,
+      "raw_sha256": "9aeff64347fb7d22e1288f38ee08280ae2f7a1c86d1a6a7d4bfbe6fa5aac646c"
+    },
+    {
+      "baud": 921600,
+      "bytes": 1299,
+      "fresh_valid_sniffer_statuses": 3,
+      "firmware_version_observed": "0.12",
+      "raw_sha256": "901e9e27ac7ace89701ca44a92ed67985dc1cd8fd45d82d86a87c8ada03fdc70"
+    }
+  ],
+  "result": {
+    "mode": "sniffer_0_12_observed",
+    "observation_scope": "post_open_only",
+    "physical_reset_possible": true,
+    "cleanup_errors": [],
+    "exit_code": 0,
+    "private_result_sha256": "e15d71816a9421af363f3a87850d811f9de84451987ac4eacd1215e7aad02e89"
+  },
+  "state_at_completion": {
+    "runtime": "stopped",
+    "uart_owner_present": false,
+    "physical_flock_held": false,
+    "logical_journal_and_ha_observer": "preserved; unknown Install receipt and recovery restriction unchanged"
+  },
+  "limitations": [
+    "Kernel open, termios and close may affect hardware; observed modem bits do not exclude transient pulses.",
+    "Observed sniffer after open does not establish pre-open mode or the cause of the earlier timeout.",
+    "No full image readback or successful firmware installation is claimed.",
+    "Receive-only diagnosis does not qualify HA installation, recovery or public firmware."
+  ],
+  "next_step": "Review no-UART guard continuity and serial lifecycle/recovery design before any additional radio action",
+  "public_qualified": false
+}
