@@ -248,7 +248,31 @@ healthy daemon when the adapter is unplugged.
 
 ## Radio firmware updates
 
+The current source adds **Configure → Radio firmware (read-only)**, bringing
+the compatibility report and the last observed job into one native HA screen.
+It shows the last reported running version separately from the current radio
+session’s reported version and the offered image. Preflight checks existing
+CAPS/VERSION evidence from the daemon’s active session; it does not query the
+radio again. Plain-language guidance explains
+missing images, an offline radio, missing flashing tools, bootloader prerequisites
+and recovery requirements. An existing gateway gets a direct link to its device
+page, where HA's standard firmware update control and live diagnostic status
+remain available. This source change has not been released or deployed.
+
+The report is a snapshot: select **Refresh** and submit to read it again, or
+submit without Refresh to close it. Measured image-transfer progress is separate
+from overall progress; even 100% transfer still requires radio and network
+verification. An unknown outcome or recovery requirement remains visible and
+does not trigger another installation. Opening, refreshing or closing this
+screen never starts a firmware job or changes the configured network.
+
+This screen supports updates to a radio already running compatible Livolo
+firmware. It does not convert a stock adapter. Initial flashing needs a separate
+supported setup procedure; the presence of a firmware update entity or flashing
+helper does not establish support for initial installation on a given board.
+
 Integration/client **0.3.0** add **Configure → Check firmware update (read-only)**.
+That report is now presented as **Radio firmware (read-only)** in current source.
 The report shows the identified board, installed and candidate versions,
 compatibility checks and blocking reason. Refresh repeats only read requests;
 it does not open the radio, send UART commands, create an update job or write the

@@ -52,7 +52,7 @@
         "menu_options": {
           "refresh": "Refresh reported state",
           "forget": "Forget a device",
-          "firmware_preflight": "Check firmware update (read-only)",
+          "firmware_preflight": "Radio firmware (read-only)",
           "pair_new": "Pair new device",
           "settings": "Settings",
           "development": "Development"
@@ -108,8 +108,8 @@
         }
       },
       "firmware_preflight": {
-        "title": "Firmware preflight",
-        "description": "Board: **{board}**. Installed: **{installed}**. Candidate: **{target}**.\n\nCompatible: **{compatible}**. Ready to request installation: **{executable}**. Blocking reason: **{reason}**.\n\n{checks}\n\nThis check does not flash, restart or send radio commands. It uses the daemon’s current identity evidence and revalidates the local firmware package. Results are advisory; installation checks again. To install, use the gateway’s Firmware update entity after closing this report. Submit to close, or select Refresh to check again.",
+        "title": "Radio firmware",
+        "description": "Board: **{board}**. Last reported running version: **{last_installed}**. Current radio session’s reported version: **{installed}**. Offered version: **{target}**.\n\n{job}\n\n**Next step:** {guidance}\n\nCompatible: **{compatible}**. Ready to request installation: **{executable}**. Blocking reason: **{reason}**.\n\n{checks}\n\n{gateway_link}\n\nThis is a read-only snapshot using the daemon’s existing radio-session evidence; it does not query the radio again. Select Refresh and submit to check again, or submit without Refresh to close. Installation is a separate explicit action and rechecks compatibility. This screen does not flash, restart or send radio commands. Routine updates require a radio already running Livolo firmware; converting a stock adapter needs a separate supported setup procedure.",
         "data": {
           "refresh": "Refresh the report"
         }

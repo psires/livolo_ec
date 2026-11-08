@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers import selector
+from homeassistant.helpers import device_registry as dr, selector
 
 from ._client import (
     AuthenticationError,
@@ -20,6 +20,7 @@ from ._client import (
     normalize_url,
 )
 from .const import CONF_ALLOW_SIMULATED, CONF_DEVELOPMENT, CONF_TOKEN, CONF_URL, DOMAIN
+from .firmware_presentation import guidance, job_summary, public_code
 
 
 def connection_schema(defaults):
@@ -384,35 +385,63 @@ class LivoloOptionsFlow(OptionsFlow):
                 "checks",
             )
         }
+        placeholders.update(
+            last_installed="Not reported",
+            job="Firmware status could not be read. No installation was requested.",
+            guidance="Refresh after checking the daemon connection. This screen does not install firmware.",
+            gateway_link="Open the Livolo EC gateway device to inspect its firmware update control.",
+        )
+        gateway = dr.async_get(self.hass).async_get_device(
+            identifiers={(DOMAIN, self.config_entry.unique_id)}
+        )
+        if gateway and self.config_entry.entry_id in gateway.config_entries:
+            placeholders["gateway_link"] = (
+                f"[Open the gateway device](/config/devices/device/{gateway.id}) "
+                "for the standard firmware update control and live Radio firmware status."
+            )
         try:
             client = self._client()
             data = (await client.snapshot())["data"]
             if network_id(data) != self.config_entry.unique_id:
                 raise IncompatibleError("The daemon network changed")
             firmware = data.get("firmware_update")
+            placeholders["job"] = job_summary(firmware)
+            if isinstance(firmware, dict):
+                placeholders["last_installed"] = public_code(
+                    firmware.get("installed_version")
+                )
             if (
                 not isinstance(firmware, dict)
                 or firmware.get("preflight_supported") is not True
             ):
                 errors["base"] = "preflight_unsupported"
+                placeholders["guidance"] = (
+                    "Update the Livolo daemon to enable compatibility checks. "
+                    "Existing switch control remains available."
+                )
             else:
                 report = await client.firmware_preflight()
-                placeholders = {
-                    "board": report["board"] or "Unknown",
-                    "installed": report["installed_version"] or "Unknown",
-                    "target": report["target_version"] or "None available",
-                    "compatible": (
-                        "Unknown"
-                        if report["compatible"] is None
-                        else "Yes" if report["compatible"] else "No"
-                    ),
-                    "executable": "Yes" if report["executable"] else "No",
-                    "reason": (report["blocked_reason"] or "none").replace("_", " "),
-                    "checks": "\n".join(
-                        f"- {item['id'].replace('_', ' ')}: {item['status']} ({item['code'].replace('_', ' ')})"
-                        for item in report["checks"]
-                    ),
-                }
+                placeholders.update(
+                    {
+                        "board": report["board"] or "Unknown",
+                        "installed": report["installed_version"] or "Unknown",
+                        "target": report["target_version"] or "None available",
+                        "compatible": (
+                            "Unknown"
+                            if report["compatible"] is None
+                            else "Yes" if report["compatible"] else "No"
+                        ),
+                        "executable": "Yes" if report["executable"] else "No",
+                        "reason": (report["blocked_reason"] or "none").replace(
+                            "_", " "
+                        ),
+                        "checks": "\n".join(
+                            f"- {item['id'].replace('_', ' ')}: {item['status']} ({item['code'].replace('_', ' ')})"
+                            for item in report["checks"]
+                        ),
+                        "guidance": guidance(report["blocked_reason"]),
+                    }
+                )
         except AuthenticationError:
             errors["base"] = "invalid_auth"
         except IncompatibleError:
