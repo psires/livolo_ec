@@ -96,8 +96,8 @@ size_t ec_mg24_reject_read(unsigned index, char *out, size_t capacity)
 		   (unsigned)record->data[0] + 1 == record->copied &&
 		   record->copied == metadata->packet_bytes;
 	if (metadata->details_available) {
-		snprintf(crc, sizeof(crc), "%lu",
-			 (unsigned long)metadata->crc_passed);
+		/* Record admission permits only the two boolean values. */
+		strcpy(crc, metadata->crc_passed ? "1" : "0");
 		snprintf(rssi, sizeof(rssi), "%ld", (long)metadata->rssi);
 		snprintf(lqi, sizeof(lqi), "%lu", (unsigned long)metadata->lqi);
 	} else {

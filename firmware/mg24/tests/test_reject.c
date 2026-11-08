@@ -210,6 +210,82 @@ static void test_invalid_and_incomplete(void)
 	assert(strstr(response, "fcs=unavailable"));
 }
 
+/** @brief Check exact CRC tokens and read bounds for known and absent details. */
+static void test_crc_format_and_bounds(void)
+{
+	static const char *known[] = {
+		"crc_passed=0 rssi=-42 lqi=87 ",
+		"crc_passed=1 rssi=-42 lqi=87 ",
+	};
+	const char *unknown = "crc_passed=unknown rssi=unknown lqi=unknown ";
+	char expected[512], guarded[514];
+
+	for (unsigned details = 0; details <= 1; details++) {
+		for (unsigned crc = 0; crc <= 1; crc++) {
+			struct ec_mg24_reject_metadata meta = metadata();
+			size_t length;
+
+			reset();
+			meta.details_available = details;
+			meta.crc_passed = crc;
+			ec_mg24_reject_record(&meta, raw, sizeof(raw));
+			length = ec_mg24_reject_read(0, expected,
+						     sizeof(expected));
+			assert(length && length == strlen(expected));
+			assert(strstr(expected,
+				      details ? known[crc] : unknown));
+			for (size_t capacity = 0; capacity <= length;
+			     capacity++) {
+				memset(guarded, 0x5a, sizeof(guarded));
+				assert(!ec_mg24_reject_read(0, guarded + 1,
+							    capacity));
+				assert(guarded[0] == 0x5a);
+				for (size_t i = capacity + 1;
+				     i < sizeof(guarded); i++)
+					assert(guarded[i] == 0x5a);
+			}
+			memset(guarded, 0x5a, sizeof(guarded));
+			assert(ec_mg24_reject_read(0, guarded + 1,
+						   length + 1) == length);
+			assert(!memcmp(guarded + 1, expected, length + 1));
+			assert(guarded[0] == 0x5a);
+			for (size_t i = length + 2; i < sizeof(guarded); i++)
+				assert(guarded[i] == 0x5a);
+		}
+	}
+}
+
+/** @brief Reject nonboolean CRC flags even when their details are unavailable. */
+static void test_invalid_crc_flags(void)
+{
+	static const uint32_t invalid_crc[] = { 2, UINT32_MAX };
+	const char *summary =
+		"OK reject_seen=1 reject_stored=0 reject_omitted=1 "
+		"reject_truncated=0 reject_invalid=1 "
+		"reject_count_mode=saturating";
+	char response[512];
+
+	for (unsigned details = 0; details <= 1; details++) {
+		for (unsigned i = 0;
+		     i < sizeof(invalid_crc) / sizeof(invalid_crc[0]); i++) {
+			struct ec_mg24_reject_metadata meta = metadata();
+
+			reset();
+			meta.details_available = details;
+			meta.crc_passed = invalid_crc[i];
+			ec_mg24_reject_record(&meta, raw, sizeof(raw));
+			assert(ec_mg24_reject_read(0, response,
+						   sizeof(response)));
+			assert(!strcmp(response, "ERR RF_REJECT_ABSENT"));
+			strcpy(response, "OK");
+			assert(ec_mg24_reject_append_summary(
+				       response, sizeof(response), 2) ==
+			       strlen(summary));
+			assert(!strcmp(response, summary));
+		}
+	}
+}
+
 /** @brief Bound worst-case formatting and saturate counters without wrapping. */
 static void test_bounds_and_saturation(void)
 {
@@ -343,6 +419,8 @@ int main(void)
 {
 	test_storage_and_evidence();
 	test_invalid_and_incomplete();
+	test_crc_format_and_bounds();
+	test_invalid_crc_flags();
 	test_bounds_and_saturation();
 	test_parser_fences();
 	test_capabilities();
