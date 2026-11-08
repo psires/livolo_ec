@@ -1,0 +1,126 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Offline Sonoff candidate/recovery inspection only",
+  "source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
+  "candidate": {
+    "board": "sonoff-zbdongle-e",
+    "version": "0.14",
+    "protocol": 3,
+    "sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+    "application_bytes": 60496,
+    "application_sha256": "228b4f7c605e98201caae142c5242009036e6bbc4ac92187bb3ab27e3a8ac0ac",
+    "bootloader_preserved": true,
+    "rollback_supported": false,
+    "flash_start": 16384,
+    "flash_end": 76880,
+    "authentication": "trusted_local_package"
+  },
+  "candidate_size": 60572,
+  "two_retained_builds_and_review_stage_identical": true,
+  "build_report_sha256": "8f55201b3a1eedc28451009bb0828830727cfdbd467618e13988071747e99ec4",
+  "inventory_sha256": "cc139af7280d530954f3484533ce5608a91b64a8803f1fbb936f4fe808b4f930",
+  "compiled_capability_strings_present": [
+    "scheduler=timed_v1",
+    "query=transaction_v1",
+    "query_ac=slot_preserved_v1",
+    "query_grid=heartbeat_200ms_v1",
+    "output_grid=transaction_200ms_v1",
+    "auto_ack_phase=tx_entry_or_zero_v1",
+    "update=none",
+    "persistence=none"
+  ],
+  "live_capabilities_verified_by_this_check": false,
+  "notice_files_checked": [
+    {
+      "path": "notices/project-LICENSE.txt",
+      "sha256": "f2459cc9f4564c7e974465f14a897afa68097a9a0c432b1ea4e9c95280d2940b"
+    },
+    {
+      "path": "notices/project-input-notices.txt",
+      "sha256": "b6a5dc10b2d0db7c59079f6be72fae0e117a77e2e4fe86f147181b5ce6d03b20"
+    },
+    {
+      "path": "notices/toolchain-input-notices.txt",
+      "sha256": "485f4d0f5c9deac732d424cdec3741666f8ef0f1c6f56ad5434e0919b0a82466"
+    },
+    {
+      "path": "notices/gcc-14-base-copyright.txt",
+      "sha256": "20390f8a6f3b1e4d7cb45dd8652dabb259bbef688cbad839bcdb0b9ba7252f79"
+    },
+    {
+      "path": "notices/gcc-arm-none-eabi-copyright.txt",
+      "sha256": "ba40708beab7133c5b5bc25f28b4fc677617aabdb1368c1889b859b335edf0a1"
+    },
+    {
+      "path": "notices/GPL-3.txt",
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    {
+      "path": "notices/newlib-arm-none-eabi-copyright.txt",
+      "sha256": "0383bc85177c121b1ee5e00ff07f51d0cab2dd5bbe51875fdff01a91c234c3ae"
+    },
+    {
+      "path": "notices/newlib-dev-copyright.txt",
+      "sha256": "0383bc85177c121b1ee5e00ff07f51d0cab2dd5bbe51875fdff01a91c234c3ae"
+    },
+    {
+      "path": "notices/gecko-License.txt",
+      "sha256": "d2abb2ff8f2882b3c46687889caf81af543461c60442292c7385b461d216b20e"
+    },
+    {
+      "path": "notices/gecko-input-notices.txt",
+      "sha256": "a29b083a6a33d018528d7d69b993a6262ec1ac52007ba91af9f6514e19dd7362"
+    },
+    {
+      "path": "notices/gecko-CMSIS-LICENSE.txt",
+      "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    {
+      "path": "notices/Silicon-Labs-MSLA-20260804.txt",
+      "sha256": "e6966d27e4eab74f720c9705e3ebf8ecf240cd61f3d2e5d17d93ecbcd4286014"
+    },
+    {
+      "path": "docs/MG21_BINARY_TERMS.md",
+      "sha256": "7ef30a698fe2aa16c82466056f49d7e2085608252429de34f4c79c02bf7a117c"
+    },
+    {
+      "path": "docs/verification/mg21-license-provenance-20261107.md",
+      "sha256": "1533ec5678e0b049c22028e864955818bb8807e9f65bd02124c3a3af1ef0d42c"
+    },
+    {
+      "path": "provenance/input-notice-inventory.json",
+      "sha256": "fc6f76fda8ebb613bc0d2dc97818e8838071980201d1d23bdc8430383668953b"
+    },
+    {
+      "path": "provenance/msla-retrieval.json",
+      "sha256": "fec5ff7c0d04a0e5addf0f43e4790aac5db2be32b83e2f7c3f3e45a4ad0f81eb"
+    }
+  ],
+  "recovery": {
+    "role": "passive_sniffer",
+    "version": "0.12",
+    "baud": 921600,
+    "gbl_sha256": "c9d5bb865ab6734c9c739a36bcc4a71139ab7fcc01090e5a55371f1378e1896d",
+    "gbl_size": 37952,
+    "application_sha256": "736bd3187431d9d8b68fb5f47130a38e9354b21735589efa6a9280137f748b78",
+    "application_size": 37876,
+    "repackaged_bytes_identical": true,
+    "original_factory_readback": false
+  },
+  "negative_checks": {
+    "zb-gw04-1v2@0.14": "bundle_invalid",
+    "sonoff-zbdongle-e@0.13": "bundle_invalid",
+    "sniffer_rejected_as_gateway": "bundle_invalid"
+  },
+  "qualification": {
+    "public_qualified": false,
+    "ha_guided_flashing_tested": false,
+    "physical_loader_reverified": false,
+    "security_configuration_read_back": false,
+    "rf_control_tested": false,
+    "interrupted_recovery_tested": false
+  },
+  "live_actions": 0
+}

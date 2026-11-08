@@ -33,7 +33,7 @@ def configuration(options, data_path=Path("/data")):
         raise ValueError("firmware_catalog must be bundled or local")
     profile = options.get("radio_setup_profile", "disabled")
     mode = options.get("radio_mode", "gateway")
-    if profile not in ("disabled", "zb-gw04-1v2") or mode not in (
+    if profile not in ("disabled", "zb-gw04-1v2", "sonoff-zbdongle-e") or mode not in (
         "gateway",
         "bootstrap",
     ):
@@ -155,7 +155,7 @@ def bootstrap_settings(options, raw, data_path=Path("/data")):
     if options.get("radio_setup_profile", "disabled") == "disabled":
         return None
     if raw["serial_baudrate"] != 460800 or not raw["serial_port"].startswith("/dev/"):
-        raise ValueError("ZB-GW04 setup requires a selected /dev serial port at 460800")
+        raise ValueError("Radio setup requires a selected /dev serial port at 460800")
     if raw["network"] is not None:
         parse(raw)
     elif (
@@ -190,7 +190,7 @@ def bootstrap_settings(options, raw, data_path=Path("/data")):
             or policy["schema"] != 1
         ):
             raise ValueError("Invalid bootstrap policy")
-    return dict(
+    settings = dict(
         serial_port=os.path.realpath(raw["serial_port"]),
         port_aliases=list(
             dict.fromkeys((raw["serial_port"], os.path.realpath(raw["serial_port"])))
@@ -210,6 +210,9 @@ def bootstrap_settings(options, raw, data_path=Path("/data")):
         mode=options.get("radio_mode", "gateway"),
         network=raw["network"],
     )
+    if options["radio_setup_profile"] == "sonoff-zbdongle-e":
+        settings["profile"] = "sonoff-zbdongle-e"
+    return settings
 
 
 def prepare_shared_leases(path, uid=10001, gid=10001):

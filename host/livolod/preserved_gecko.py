@@ -1,4 +1,4 @@
-"""Internal ZB-GW04 application-only adapter with injected physical I/O.
+"""Internal reviewed-Gecko application-only adapter with injected physical I/O.
 
 The opt-in bootstrap worker supplies the physical provider, exact-unit policy,
 durable permissions and inherited guards. This adapter alone does not authorize
@@ -17,6 +17,7 @@ from .firmware_artifacts import inspect_artifact_bytes
 from .firmware_backends import _run_flasher, backend_status
 from .firmware_bundle import BundleError
 from .firmware_worker import validate_guard
+from .gecko_profiles import gecko_profile
 
 BOARD = "zb-gw04-1v2"
 APP_BAUD = 460800
@@ -38,10 +39,11 @@ class GeckoTarget:
     board: str = BOARD
     vid: int = 0x1A86
     pid: int = 0x7523
+    serial: str = None
 
     def identity(self):
-        """Bind this serial-less CH340 to topology, attachment and current device node."""
-        return dict(
+        """Bind the exact bridge to topology/generation and its serial when required."""
+        value = dict(
             port=self.port,
             usb_path=self.usb_path,
             attachment=self.attachment,
@@ -50,13 +52,27 @@ class GeckoTarget:
             vid=self.vid,
             pid=self.pid,
         )
+        if self.serial is not None:
+            value["serial"] = self.serial
+        return value
 
     def validate(self):
         """Reject unsupported profile shapes without claiming to inspect physical hardware."""
+        profile = gecko_profile(self.board)
         if (
-            self.board != BOARD
-            or self.vid != 0x1A86
-            or self.pid != 0x7523
+            self.vid != profile.vid
+            or self.pid != profile.pid
+            or self.loader_version != profile.loader_version
+            or (
+                profile.serial_required
+                and (
+                    not isinstance(self.serial, str)
+                    or not 1 <= len(self.serial) <= 128
+                    or not self.serial.isascii()
+                    or any(ord(c) < 33 or ord(c) > 126 for c in self.serial)
+                )
+            )
+            or (not profile.serial_required and self.serial is not None)
             or not isinstance(self.port, str)
             or not self.port.startswith("/dev/")
             or "\0" in self.port
@@ -75,7 +91,7 @@ class GeckoTarget:
             or any(type(value) is not int or value < 0 for value in self.device_number)
         ):
             raise BundleError(
-                "unsupported_profile", "An exact reviewed ZB-GW04 endpoint is required"
+                "unsupported_profile", "An exact reviewed Gecko endpoint is required"
             )
 
 
@@ -113,7 +129,7 @@ def check_endpoint(target, observe):
         raise BundleError(
             "ownership_unresolved", "Physical ownership is not established"
         )
-    if observed["board_evidence"] != "operator_confirmed_zbgw04_1v2":
+    if observed["board_evidence"] != gecko_profile(target.board).board_evidence:
         raise BundleError(
             "board_evidence_required", "USB bridge identity is insufficient"
         )
@@ -125,6 +141,7 @@ def check_loader(target, evidence):
     @param target Server-owned profile with a separately reviewed loader version.
     @param evidence Fresh exact loader probe projection from the held endpoint.
     """
+    target.validate()
     if (
         not isinstance(evidence, dict)
         or any(
@@ -146,12 +163,14 @@ def check_loader(target, evidence):
         )
 
 
-def check_application(version, evidence):
+def check_application(version, evidence, board=BOARD):
     """Verify independent application replies, keeping RF disabled and network unconfigured.
 
     @param version Expected compiled version of the transferred immutable artifact.
     @param evidence Bounded projection with separate VERSION, CAPS and STATUS mappings.
+    @param board Exact immutable profile expected by the admitted operation.
     """
+    gecko_profile(board)
     if not isinstance(evidence, dict) or set(evidence) != {"version", "caps", "status"}:
         raise BundleError(
             "application_mismatch", "Application verification is incomplete"
@@ -160,7 +179,7 @@ def check_application(version, evidence):
     if (
         not all(isinstance(value, dict) for value in (reported, caps, status))
         or any(
-            reply.get("board") != BOARD
+            reply.get("board") != board
             or reply.get("fw_version") != version
             or reply.get("proto") != "3"
             for reply in (reported, caps)
@@ -216,7 +235,7 @@ def install_preserved_gecko(
             or hashlib.sha256(data).hexdigest() != sha256
         ):
             raise BundleError("artifact_invalid", "Artifact identity changed")
-        metadata = inspect_artifact_bytes(data, board=BOARD, version=version)
+        metadata = inspect_artifact_bytes(data, board=target.board, version=version)
         # Reuse the production helper version check, not an arbitrary executable.
         reason = helper_status({"backend": "mg21_gecko_gbl_v1"})
         if reason:
@@ -244,10 +263,10 @@ def install_preserved_gecko(
         check_endpoint(target, observe)
         evidence = verify_application(target.port, APP_BAUD, timeout=3)
         check_endpoint(target, observe)
-        check_application(version, evidence)
+        check_application(version, evidence, board=target.board)
         return dict(
             operation="provision",
-            board=BOARD,
+            board=target.board,
             version=version,
             artifact_sha256=metadata["sha256"],
             stage="application_verified",

@@ -1,6 +1,7 @@
 """Exercise the unregistered Gecko worker using only synthetic bytes and injected I/O."""
 
 from copy import deepcopy
+from contextlib import closing
 from dataclasses import replace
 import fcntl
 import hashlib
@@ -45,7 +46,7 @@ class PreservedGeckoTests(unittest.TestCase):
             attachment="fixture-generation-1",
             device_number=(188, 0),
             interface="00",
-            loader_version="fixture-reviewed-loader",
+            loader_version="1.9.2",
         )
         self.endpoint = dict(
             identity=self.target.identity(),
@@ -91,7 +92,7 @@ class PreservedGeckoTests(unittest.TestCase):
         @param port Exact frozen endpoint passed without fallback.
         @param guard Inherited parent descriptor that must remain open and held.
         """
-        with sqlite3.connect(self.root / "journal.sqlite3") as reader:
+        with closing(sqlite3.connect(self.root / "journal.sqlite3")) as reader:
             self.assertEqual(
                 reader.execute("SELECT phase FROM boundaries").fetchall(), [("flash",)]
             )

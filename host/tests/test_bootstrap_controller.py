@@ -15,16 +15,17 @@ from livolod.bootstrap_store import BootstrapStore
 from test_firmware_bundle import gbl, mg21_image
 
 
-def catalog(root):
+def catalog(root, board="zb-gw04-1v2"):
     """Create a hash-valid synthetic catalog that must never be sent to a radio.
 
     @param root Private fixture directory.
+    @param board Explicit board encoded in synthetic image and manifest.
     """
     root.mkdir(exist_ok=True)
-    data = gbl(mg21_image("zb-gw04-1v2", FIRMWARE_COMPAT_VERSION))
+    data = gbl(mg21_image(board, FIRMWARE_COMPAT_VERSION))
     entry = dict(
         id="fixture",
-        board="zb-gw04-1v2",
+        board=board,
         role="gateway",
         version=FIRMWARE_COMPAT_VERSION,
         protocol=3,

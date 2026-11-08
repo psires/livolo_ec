@@ -17,7 +17,6 @@ from .firmware_bundle import BundleError, MAX_FILE
 from .firmware_worker import Channel, validate_guard
 from .preserved_gecko import GeckoTarget, install_preserved_gecko, check_loader
 from .zbgw04_provider import (
-    BOARD_EVIDENCE,
     DedicatedAccess,
     LinuxUSB,
     LoaderPolicy,
@@ -25,6 +24,7 @@ from .zbgw04_provider import (
     ZBGW04Provider,
     select_target,
 )
+from .gecko_profiles import gecko_profile
 
 
 def target_from_json(value):
@@ -44,7 +44,10 @@ def target_json(target):
 
     @param target Frozen physical target.
     """
-    return json.loads(json.dumps(asdict(target)))
+    value = asdict(target)
+    if value.get("serial") is None:
+        value.pop("serial", None)
+    return json.loads(json.dumps(value))
 
 
 def physical_selector(value):
@@ -52,7 +55,11 @@ def physical_selector(value):
 
     @param value Canonical target mapping from a trusted runtime or journal.
     """
-    return {key: value[key] for key in ("usb_path", "interface", "board", "vid", "pid")}
+    result = {
+        key: value[key] for key in ("usb_path", "interface", "board", "vid", "pid")
+    }
+    result["serial"] = value.get("serial")
+    return result
 
 
 def reap_adopted_group(group):
@@ -86,7 +93,8 @@ class RadioOwnership:
         @param inventory Optional metadata provider for isolated tests.
         """
         self.settings = settings
-        self.inventory = inventory or LinuxUSB().inventory
+        self.profile = gecko_profile(settings.get("profile", "zb-gw04-1v2"))
+        self.inventory = inventory or LinuxUSB(profile=self.profile.board).inventory
         self.target = self.lease = None
         self.pinned = False
 
@@ -96,7 +104,7 @@ class RadioOwnership:
         @param allow_reattach True only when the old normal serial owner is already closed.
         """
         target = select_target(
-            self.settings["serial_port"], BOARD_EVIDENCE, self.inventory
+            self.settings["serial_port"], self.profile.board_evidence, self.inventory
         )
         if self.target is not None and self.target != target:
             if (
@@ -392,7 +400,7 @@ def execute(spec, channel):
     provider = ZBGW04Provider(
         target,
         lease,
-        board_evidence=BOARD_EVIDENCE,
+        board_evidence=gecko_profile(target.board).board_evidence,
         access_check=access,
         loader_policy=LoaderPolicy(**policy["loader"]),
     )

@@ -12,6 +12,7 @@ import uuid
 from .config import identity, hex_value
 from .firmware_bundle import BundleError
 from .bootstrap_catalog import bootstrap_candidate
+from .gecko_profiles import gecko_profile
 
 PROFILE = "zb-gw04-1v2"
 PLAN_LIFETIME = 120
@@ -116,8 +117,13 @@ class BootstrapController:
         )
         self.tasks = set()
         self.closed = False
+        self.profile = gecko_profile(settings.get("profile", PROFILE))
+        store.bind_profile(self.profile.board, PROFILE)
         self.target_id = (
-            "zb-" + digest({"port": settings["serial_port"], "profile": PROFILE})[:24]
+            "zb-"
+            + digest({"port": settings["serial_port"], "profile": self.profile.board})[
+                :24
+            ]
         )
         self.candidate = None
         self.blocked_reason = None
@@ -181,7 +187,7 @@ class BootstrapController:
         )
         return dict(
             mode=self.mode,
-            profile=PROFILE,
+            profile=self.profile.board,
             engineering_only=self.engineering_only,
             physical_install_supported=eligible and self.mode == "bootstrap",
             prepare_supported=eligible and self.mode == "bootstrap",
@@ -218,8 +224,8 @@ class BootstrapController:
                 else [
                     dict(
                         target_id=self.target_id,
-                        board=PROFILE,
-                        label="ZB-GW04 1v2",
+                        board=self.profile.board,
+                        label=self.profile.label,
                         candidate_id=candidate["id"],
                         version=candidate["version"],
                         artifact_sha256=candidate["sha256"],
@@ -255,7 +261,7 @@ class BootstrapController:
             raise BootstrapError(
                 getattr(error, "code", "artifact_unavailable")
             ) from None
-        if candidate["board"] != PROFILE:
+        if candidate["board"] != self.profile.board:
             raise BootstrapError("unsupported_profile")
         return candidate
 
@@ -303,7 +309,7 @@ class BootstrapController:
             stage="accepted",
             error=None,
             recovery=None,
-            profile=PROFILE,
+            profile=self.profile.board,
             target_id=self.target_id,
             candidate_id=None,
             artifact_sha256=None,
@@ -391,6 +397,9 @@ class BootstrapController:
             if (
                 binding["settings_digest"] != digest(self.settings)
                 or binding["setup_session"] != self.session
+                or binding["profile"] != self.profile.board
+                or binding["target_id"] != self.target_id
+                or binding["instance_id"] != self.store.instance_id
             ):
                 raise BootstrapError("plan_changed")
             candidate = self._artifact(binding["candidate_id"])
@@ -510,7 +519,10 @@ class BootstrapController:
                         stage="setup_cancelled",
                         cancelled_unconfigured=True,
                     )
-                    self.store.save(job)
+                    self.session = uuid.uuid4().hex
+                    self.inspection = None
+                    self._deadlines.clear()
+                    self.store.save(job, {"setup_session": self.session})
                     return
 
                 async def checkpoint(stage):
@@ -538,7 +550,7 @@ class BootstrapController:
                         instance_id=self.store.instance_id,
                         target_id=self.target_id,
                         candidate_id=candidate["id"],
-                        profile=PROFILE,
+                        profile=self.profile.board,
                         version=candidate["version"],
                         artifact_sha256=candidate["sha256"],
                         expires_at=self.clock() + PLAN_LIFETIME,
@@ -567,7 +579,9 @@ class BootstrapController:
                 if kind == "cancel":
                     from .preserved_gecko import check_application
 
-                    check_application(binding["baseline"]["version"], result)
+                    check_application(
+                        binding["baseline"]["version"], result, board=self.profile.board
+                    )
                     try:
                         await self.runtime.handoff(self.store.meta("network"))
                     except BootstrapError as error:
@@ -600,7 +614,7 @@ class BootstrapController:
                 if (
                     not isinstance(result, dict)
                     or result.get("application_verified") is not True
-                    or result.get("board") != PROFILE
+                    or result.get("board") != self.profile.board
                     or result.get("version") != job["version"]
                     or result.get("artifact_sha256") != job["artifact_sha256"]
                     or result.get("network_ready") is not False

@@ -28,22 +28,35 @@
     },
     {
       "id": "native_image_identity",
-      "status": "pending_clean_commit_rebuild",
+      "status": "clean_commit_identity_and_recipe_reviewed_from_operator_metadata",
       "required_evidence": "Actual Docker image ID, linux/amd64 inspection, runtime version checks, build recipe and base-image identities; record a registry digest only if one exists and hash any delivered archive"
     },
     {
       "id": "offline_container_lifecycle",
-      "status": "exploratory_pass_reported_by_linux_specialist",
+      "status": "clean_commit_pass_reported_by_linux_specialist",
       "required_evidence": "Fresh startup, health, authenticated API, websocket behavior, persistent configuration/catalog/database, restart and container recreation with no radio access; rerun on the committed artifact",
-      "limitation": "A nonexistent serial port tests offline behavior; it does not prove simulated or physical radio control"
+      "limitation": "A nonexistent serial port tests offline behavior; it does not prove simulated or physical radio control",
+      "source_commit": "8cbf4ef77bb3534490a74825f326065688020492",
+      "observed": "Authenticated API and websocket, UID 10001, ingress origin checks, first-install and recreation, persistent local catalog, SQLite integrity; no radio access"
     },
     {
       "id": "simulated_service_and_ha_integration",
       "status": "partial_exploratory_pass_reported_by_linux_specialist",
       "required_evidence": "Fresh integration installation against a known isolated simulated daemon, authentication, state updates, disconnect/reconnect, HA and daemon restart, and preserved entry/device/entity identity without duplicate registrations",
       "review_owner": "Home Assistant specialist",
-      "observed": "Default simulated-endpoint rejection and explicit opt-in; authenticated API; three registered entities; two-gang ON/OFF; daemon reconnect and HA restart with stable registry identifiers; SQLite integrity",
+      "observed": "Default simulated-endpoint rejection and explicit opt-in; authenticated API; three registered entities; two-gang ON/OFF; daemon reconnect and HA restart with stable registry identifiers; SQLite integrity; same-image companion recreation retained two peers and restored two-gang entities",
       "limitations": "One-gang control unavailable because simulator startup reports use the wrong suffix; not a passing control test. Repeat acceptance on the clean committed artifact. Same-version restarts are not upgrades."
+    },
+    {
+      "id": "ha_integration_manual_version_upgrade",
+      "status": "pass_reported_by_linux_specialist",
+      "baseline_version": "0.5.2",
+      "baseline_zip_sha256": "c91413b006872b44de119886380c1f54728a76f7f80399419a263dacf0567747",
+      "candidate_version": "0.6.0",
+      "candidate_source_commit": "8cbf4ef77bb3534490a74825f326065688020492",
+      "observed": "Disposable HA Container upgraded through manual ZIP replacement and full restart; preserved entry ID/data/options/token and three entity identities/names/areas; two-gang entity online",
+      "limitations": "No customized names/areas or automation created, so only existing unchanged fields were verified. No HACS, Supervisor, physical radio or daemon image version-upgrade claim.",
+      "rollback": "Manual 0.6.0 to official 0.5.2 ZIP/code rollback followed by full HA restart passed with the same entry/data/options and three entity registry identities; two-gang entity online. This is not daemon-image rollback."
     },
     {
       "id": "amd64_upgrade_and_rollback",
@@ -64,7 +77,7 @@
     },
     {
       "id": "sonoff_ha_firmware_installation",
-      "status": "blocked_pending_explicit_sonoff_profile_and_first_install_flow",
+      "status": "source_review_passed_clean_combined_build_and_fresh_loader_required",
       "required_evidence": "Exact-board provider and loader/security policy, reviewed private candidate and recovery artifacts, actual HA inspect/explicit install, independent application VERSION/CAPS/STATUS, explicit new-network initialization/handoff, and scoped failure/recovery checks on the clean AMD64 image",
       "constraints": "No fabricated gateway baseline for the starting sniffer. Cancellation without a baseline cannot claim restored sniffer or gateway service. Recovery needs its own explicit action and passive sniffer verification. Keep firmware qualified:false until the relevant tests pass.",
       "firmware_source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
@@ -98,6 +111,59 @@
     "scope": "Candidate-only AMD64 staging and native CI matrix; no public architecture promotion",
     "container_release_tests": 12,
     "ha_packaging_tests": 20,
-    "platform_guard": "Reject unsupported publication platform before Git resolution or output creation; regression test does not depend on the checkout revision"
+    "platform_guard": "Reject unsupported publication platform before Git resolution or output creation; regression test does not depend on the checkout revision",
+    "ci": {
+      "source_commit": "8cbf4ef77bb3534490a74825f326065688020492",
+      "checks_passed": 12,
+      "native_container_matrix": "ARM64 and AMD64, standalone and HA wrapper",
+      "container_run": "https://github.com/psires/livolo_ec/actions/runs/42508208307",
+      "public_image_published": false
+    }
+  },
+  "reviewed_commits": {
+    "amd64_packaging": "8cbf4ef77bb3534490a74825f326065688020492",
+    "sonoff_ha_flow": "b8a2cbd352a71856401163e941b52677d9dba4ab"
+  },
+  "clean_artifact_reported_by_linux_specialist": {
+    "source_commit": "8cbf4ef77bb3534490a74825f326065688020492",
+    "platform": "linux/amd64",
+    "image_id": "sha256:9b584f09441adeeebe9700249163b54155d224a511069c0ea8e50a40927f52ab",
+    "source_context_tar_sha256": "1a631fc477955eb25afe6fab962f1457aeafcf21992bc268357d641730a34065",
+    "integration_zip_sha256": "5e8bac3960e16e114e7d85f9e9a3e230a29fc8566e29d484cc2fae7a8a9c2949",
+    "docker_archive_sha256": "b4cf3c04e1011c113a98edd6ee5b32951c897d2c51005dbf993655902744c247",
+    "distribution_version": "0.6.0",
+    "daemon_version": "0.15.0",
+    "firmware_compatibility_version": "0.14",
+    "integration_version": "0.6.0",
+    "radio_access": false,
+    "includes_sonoff_provider": false,
+    "build_recipe_evidence": "reviewed Linux specialist metadata; build log retained on dedicated Intel testbed",
+    "build_command": "docker buildx build --platform linux/amd64 --load -t livolo-ec-ha-app:amd64-8cbf4ef .",
+    "staging_command": "python homeassistant/build_release.py --app --candidate --experimental-amd64 from git archive of the stated source commit",
+    "base_images": {
+      "python_resolved_index_sha256": "a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72",
+      "python_input_pinned": false,
+      "frontend_resolved_sha256": "4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e",
+      "nordic_pinned_index_sha256": "5be5aaecb962a41567bc8041f1e9e3432cb085b037fe057f9a562630b2e4b370"
+    },
+    "limitation": "Engineering build used tag-resolved Python/frontend inputs; identities recorded after resolution. Use the pinned preparation recipe for the final combined trial artifact."
+  },
+  "ha_flow_review": {
+    "source_commit": "b8a2cbd352a71856401163e941b52677d9dba4ab",
+    "ci_checks_passed": 6,
+    "independent_full_ha_tests": 387,
+    "test_scope": "Shared checkout included two subsequently frozen wrapper tests; all four HA source hashes matched the owner freeze",
+    "physical_qualification": false
+  },
+  "sonoff_provider_review": {
+    "status": "offline_source_review_passed_physical_trial_pending",
+    "full_host_tests_reported_by_unix": 510,
+    "new_sonoff_cases": 23,
+    "physical_qualification": false,
+    "limitations": "Offline checks use simulated serial/USB and synthetic test artifacts. Exact firmware artifact was checked separately. No physical installation or fresh loader observation yet.",
+    "independent_focused_tests_before_final_cleanup": 124,
+    "independent_final_cleanup_and_sonoff_tests": 47,
+    "final_focused_tests_reported_by_zigbee": 125,
+    "sqlite_resource_warnings_after_cleanup": 0
   }
 }

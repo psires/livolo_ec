@@ -1,4 +1,4 @@
-"""Explicit-action Linux providers for one reviewed ZB-GW04, with no API registration.
+"""Explicit-action Linux providers for reviewed Gecko profiles, with no API registration.
 
 Inventory reads sysfs only. Serial methods require a physical lease, recorded
 dedicated-radio consent, quiesced Livolo service and no detected conflicts.
@@ -29,6 +29,7 @@ import time
 from .firmware_bundle import BundleError
 from .preserved_gecko import APP_BAUD, LOADER_BAUD, GeckoTarget, check_application
 from .version import parse_version
+from .gecko_profiles import gecko_profile, evidence_profile
 
 BOARD_EVIDENCE = "operator_confirmed_zbgw04_1v2"
 LOADER_VERSION = "1.9.2"
@@ -106,6 +107,7 @@ class LinuxUSB:
         boot_id="/proc/sys/kernel/random/boot_id",
         node_stat=os.stat,
         environment_check=None,
+        profile="zb-gw04-1v2",
     ):
         """Inject filesystem roots/stat only for offline tests.
 
@@ -114,12 +116,14 @@ class LinuxUSB:
         @param boot_id Host boot-generation file.
         @param node_stat Device stat function; never supplied by an API client.
         @param environment_check Optional offline substitute for native sysfs validation.
+        @param profile Fixed server-selected board; never inferred from the first USB match.
         """
         self.sysfs = Path(sysfs).resolve()
         self.dev = Path(dev)
         self.boot_id = Path(boot_id)
         self.node_stat = node_stat
         self.environment_check = environment_check or _check_attachment_environment
+        self.profile = gecko_profile(profile)
 
     def inventory(self):
         """Return a coherent, mount-stable generation from real native 64-bit sysfs.
@@ -174,7 +178,7 @@ class LinuxUSB:
             self.environment_check(usb)
             vid = int((usb / "idVendor").read_text().strip(), 16)
             pid = int((usb / "idProduct").read_text().strip(), 16)
-            if (vid, pid) != (0x1A86, 0x7523):
+            if (vid, pid) != (self.profile.vid, self.profile.pid):
                 continue
             interface = next(
                 (p for p in lineage if (p / "bInterfaceNumber").exists()), None
@@ -198,10 +202,12 @@ class LinuxUSB:
                 "Not a character device",
             )
             serial_path = usb / "serial"
+            serial = serial_path.read_text().strip() if serial_path.exists() else None
+            serial = serial or None
             _require(
-                not serial_path.exists() or not serial_path.read_text().strip(),
+                bool(serial) if self.profile.serial_required else serial is None,
                 "unsupported_profile",
-                "This profile requires the reviewed serial-less bridge",
+                "USB serial does not match the selected profile",
             )
             usb_stat = usb.stat()
             attachment = dict(
@@ -227,7 +233,11 @@ class LinuxUSB:
                     ).hexdigest(),
                     device_number=(os.major(node.st_rdev), os.minor(node.st_rdev)),
                     interface=number,
-                    loader_version=LOADER_VERSION,
+                    loader_version=self.profile.loader_version,
+                    board=self.profile.board,
+                    vid=vid,
+                    pid=pid,
+                    serial=serial,
                 )
             )
         return tuple(result)
@@ -241,16 +251,15 @@ def select_target(port, board_evidence, inventory):
     @param inventory Metadata-only callable returning GeckoTarget candidates.
     @return Unique current target; generic by-id aliases are not selected implicitly.
     """
-    _require(
-        board_evidence == BOARD_EVIDENCE,
-        "board_evidence_required",
-        "Confirm the actual ZB-GW04 1v2 board",
-    )
+    profile = evidence_profile(board_evidence)
     candidates = tuple(inventory())
     matches = [item for item in candidates if item.port == port]
     _require(len(matches) == 1, "target_changed", "Endpoint is absent or ambiguous")
     target = matches[0]
     target.validate()
+    _require(
+        target.board == profile.board, "unsupported_profile", "Selected board differs"
+    )
     collisions = [
         item
         for item in candidates
@@ -440,7 +449,9 @@ class LoaderPolicy:
             self.attachment == target.attachment
             and isinstance(self.evidence_id, str)
             and 1 <= len(self.evidence_id) <= 128
-            and self.version == target.loader_version == LOADER_VERSION
+            and self.version
+            == target.loader_version
+            == gecko_profile(target.board).loader_version
             and self.requires_signed is False
             and self.requires_encrypted is False,
             "loader_unverified",
@@ -552,7 +563,11 @@ class ZBGW04Provider:
         self.board_evidence = board_evidence
         self.access_check = access_check
         self.loader_policy = loader_policy
-        self.inventory = inventory if inventory is not None else LinuxUSB().inventory
+        self.inventory = (
+            inventory
+            if inventory is not None
+            else LinuxUSB(profile=target.board).inventory
+        )
         self.serial_factory, self.clock = serial_factory, clock
         self.fd_stat, self.menu_pattern = fd_stat, menu_pattern
         self.claim_exclusive = claim_exclusive
@@ -726,7 +741,8 @@ class ZBGW04Provider:
         @param deadline Monotonic deadline shared with any subsequent run selection.
         """
         pattern = self.menu_pattern()
-        self._write(serial, b"\n3", deadline)
+        profile = gecko_profile(self.target.board)
+        self._write(serial, profile.menu_request, deadline)
         data = bytearray()
         while len(data) <= 4096:
             data.extend(self._read(serial, min(256, 4097 - len(data)), deadline))
@@ -740,7 +756,7 @@ class ZBGW04Provider:
                 _require(
                     match.groupdict().get("type") == b"Gecko"
                     and b"1. upload gbl\r\n" in match.group()
-                    and match.group("version") == LOADER_VERSION.encode()
+                    and match.group("version") in profile.loader_wire_versions
                     and re.search(rb"signed|encrypt|secure", data, re.I) is None,
                     "loader_unverified",
                     "Unexpected loader version or security indication",
@@ -748,7 +764,7 @@ class ZBGW04Provider:
                 break
         return dict(
             kind="gecko",
-            version=LOADER_VERSION,
+            version=profile.loader_version,
             baud=LOADER_BAUD,
             upload_supported=True,
             requires_signed=False,
@@ -809,7 +825,7 @@ class ZBGW04Provider:
             self.target.port, APP_BAUD, timeout=min(3, self._remaining(deadline))
         )
         self._remaining(deadline)
-        check_application(expected_version, evidence)
+        check_application(expected_version, evidence, board=self.target.board)
         return evidence
 
     def verify_application(self, port, baud, timeout=3):
@@ -881,5 +897,5 @@ class ZBGW04Provider:
             raise BundleError(
                 "application_mismatch", "Invalid application version"
             ) from error
-        check_application(version, replies)
+        check_application(version, replies, board=self.target.board)
         return replies

@@ -111,6 +111,30 @@ class BootstrapStore:
         row = self.db.execute("SELECT value FROM meta WHERE key=?", (key,)).fetchone()
         return json.loads(row[0]) if row else default
 
+    def bind_profile(self, profile, legacy):
+        """Prevent a configured board from reinterpreting another board's journal.
+
+        @param profile Selected immutable board profile identifier.
+        @param legacy Only profile supported by journals predating explicit tagging.
+        """
+        with self.db:
+            saved = self.meta("profile")
+            populated = any(
+                self.db.execute(query).fetchone()[0]
+                for query in (
+                    "SELECT count(*) FROM meta WHERE key NOT IN ('instance_id','physical')",
+                    "SELECT count(*) FROM operations",
+                    "SELECT count(*) FROM plans",
+                )
+            )
+            if (saved is not None and saved != profile) or (
+                saved is None and populated and profile != legacy
+            ):
+                raise ValueError(
+                    "Configured profile differs from physical setup journal"
+                )
+            self._meta("profile", profile)
+
     def _meta(self, key, value):
         """Write metadata within the caller's transaction.
 

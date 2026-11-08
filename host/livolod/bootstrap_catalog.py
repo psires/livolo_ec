@@ -10,6 +10,7 @@ from .firmware_bundle import (
 )
 from .bootstrap_worker import target_from_json
 from .zbgw04_provider import LoaderPolicy
+from .gecko_profiles import gecko_profile
 
 # Maintainer-reviewed exact unit/artifact engineering trial, not public qualification.
 APPROVED_TRIAL = dict(
@@ -20,6 +21,26 @@ APPROVED_TRIAL = dict(
     evidence_id="b437e13",
 )
 
+# Separate exact-unit engineering evidence, never inherited from the ZB-GW04 trial.
+# The operator retains the reviewed unit serial/topology/attachment in the protected
+# target policy. This record does not establish general factory-loader eligibility.
+SONOFF_APPROVED_TRIAL = dict(
+    board="sonoff-zbdongle-e",
+    version="0.14",
+    sha256="87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+    source_commit="0fd515ca156823e513d2d86f0507b8da9b8558e8",
+    evidence_id="sonoff-intel-loader-review-20261108",
+)
+
+
+def reviewed_trial(board):
+    """Return the separate immutable-by-contract approval for a configured profile.
+
+    @param board Exact server-owned board/profile identifier.
+    """
+    gecko_profile(board)
+    return SONOFF_APPROVED_TRIAL if board == "sonoff-zbdongle-e" else APPROVED_TRIAL
+
 
 def engineering_entry(entry, policy):
     """Authorize only an explicitly unqualified entry bound to the reviewed trial.
@@ -28,7 +49,8 @@ def engineering_entry(entry, policy):
     @param policy Exact server-owned engineering record; never supplied by HTTP.
     """
     return (
-        policy == APPROVED_TRIAL
+        isinstance(policy, dict)
+        and policy in (APPROVED_TRIAL, SONOFF_APPROVED_TRIAL)
         and entry.get("qualified") is False
         and all(
             entry.get(key) == policy[key]
@@ -44,30 +66,39 @@ def bootstrap_candidate(settings, candidate_id=None):
     @param candidate_id Optional immutable candidate handle to revalidate at admission.
     """
     policy = settings.get("loader_policy") or {}
+    profile = gecko_profile(settings.get("profile", "zb-gw04-1v2"))
+    approved = reviewed_trial(profile.board)
     engineering = policy.get("engineering")
     if engineering is None:
         if candidate_id is None:
             return select_candidate(
                 settings["catalog"],
-                board="zb-gw04-1v2",
+                board=profile.board,
                 host_version=FIRMWARE_COMPAT_VERSION,
                 app_baudrate=460800,
             )
-        return load_candidate(
+        candidate = load_candidate(
             settings["catalog"],
             candidate_id,
             host_version=FIRMWARE_COMPAT_VERSION,
             app_baudrate=460800,
         )
+        if candidate["board"] != profile.board:
+            raise BundleError(
+                "unsupported_profile", "Candidate belongs to another profile"
+            )
+        return candidate
     try:
         if (
             set(policy) != {"schema", "target", "loader", "engineering"}
             or policy["schema"] != 1
-            or engineering != APPROVED_TRIAL
+            or engineering != approved
             or FIRMWARE_COMPAT_VERSION != engineering["version"]
         ):
             raise ValueError("Unknown engineering policy")
         target = target_from_json(policy["target"])
+        if target.board != profile.board:
+            raise ValueError("Policy belongs to another board")
         loader = LoaderPolicy(**policy["loader"])
         loader.validate(target)
         if loader.evidence_id != engineering["evidence_id"]:

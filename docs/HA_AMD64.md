@@ -23,9 +23,9 @@ and use the radio as described in [the app guide](../homeassistant/app/DOCS.md).
 Candidate firmware catalogs may be incomplete; do not assume radio flashing is
 available. Back up existing app data before replacing an installation.
 
-CI is configured to validate both image variants on native x86-64 runners
-using offline first-install and persistence checks; these jobs have not yet run
-for this change. Those checks do not prove
+Both image variants passed native x86-64 CI at source revision `8cbf4ef`,
+including offline first-install and persistence checks. The ARM64 jobs also
+passed at that revision. Those checks do not prove
 USB radio or Supervisor behavior on a physical Intel system. A new multi-platform
 published image and a corresponding app release are still needed before Intel
 can be advertised in the public repository metadata.

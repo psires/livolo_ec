@@ -8,6 +8,54 @@ physical radio operations. The existing
 is evidence for the selected board and artifacts, not qualification of this new
 provider or the HA update workflow.
 
+## Sonoff engineering profile
+
+The same ownership implementation also serves the separately selected
+`sonoff-zbdongle-e` profile in `gecko_profiles.py`. The historical
+`ZBGW04Provider` class name remains for compatibility; its target selects an
+immutable board contract, rather than inheriting ZB-GW04 identity or loader
+approval. The ZB-GW04 details below remain the default profile.
+
+Sonoff requires CP210x `10c4:ea60`, an exact nonempty USB serial, and separately
+recorded board confirmation. The protected policy uses **`target.serial`**;
+`usb_serial` is not an alias. Legacy ZB policies omit the serial key entirely.
+Both the prepared attachment binding and the stable normal-service selector
+include the Sonoff serial. Reattaching the same unit may renew its generation
+after normal service closes, but another serial at the same USB port is rejected,
+including after daemon restart. A populated untagged legacy setup journal is
+treated as ZB-GW04 and cannot be silently relabeled for Sonoff.
+
+After manual BOOT/RESET entry, the Sonoff inspection sends **newline only** at
+115200 baud and requires the complete Gecko menu. Only wire versions `2.04.02`
+and `2.4.2` normalize to the reviewed `2.4.2` policy. Partial menus, other
+versions/families, contradictory security text and timeouts fail closed without
+numeric probes, automatic modem-line reset or fallback. Inactive DTR/RTS at open
+is retained. The pinned upload helper runs only after this verification and the
+existing durable flash acknowledgment.
+
+The separate Sonoff artifact record remains `qualified:false` and
+`engineering_only:true`. Its evidence identifier is reserved for an exact-unit
+loader review, not for the offline artifact inspection. Deployment requires that
+review and a private policy bound to the current attachment; adding a profile or
+seeing a menu alone does not establish signing/encryption policy. See
+[the Sonoff qualification procedure](SONOFF_GUIDED_QUALIFICATION.md).
+
+First use starts explicitly in bootstrap mode without opening normal gateway
+UART, creating a network or inventing a gateway baseline for the sniffer.
+Cancellation without a baseline performs no serial work and reports
+`setup_cancelled`, `cancelled_unconfigured:true`, `network_ready:false` and
+`setup_required:true`. It does not restore sniffer firmware or leave bootloader
+mode. Cancellation revokes prepared consent by rotating the setup session and
+clearing inspection deadlines; later installation requires a fresh inspection.
+Historical operation lookup remains idempotent.
+
+Firmware postflight must independently verify the selected Sonoff board/version,
+protocol 3, 460800 baud, `armed=0` and `ack=0`. Network initialization and normal
+handoff are separate explicit operations. First handoff requires
+`output_mode: disabled` before creating normal state. Normal Service then arms
+reception and ACKs using its existing protocol behavior; **output controls remain
+disabled, but normal network readiness does not mean a disarmed radio**.
+
 ## Supported ownership contract
 
 The user explicitly dedicates the selected radio to Livolo. The controller must

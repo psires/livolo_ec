@@ -3,6 +3,7 @@
 import argparse
 import asyncio
 from copy import deepcopy
+from contextlib import closing
 import json
 import logging
 import os
@@ -23,6 +24,7 @@ from .native_api import NativeAPI
 from .service import Service
 from .storage import Store
 from .uart import Gateway
+from .gecko_profiles import gecko_profile
 
 
 class SetupService(Service):
@@ -105,6 +107,7 @@ class BootstrapRuntime:
         @param ready_timeout Bounded normal readiness deadline after explicit handoff.
         """
         self.raw, self.settings = deepcopy(raw), deepcopy(settings)
+        self.profile = gecko_profile(settings.get("profile", "zb-gw04-1v2"))
         self.service_factory, self.gateway_factory = service_factory, gateway_factory
         self.ready_timeout = ready_timeout
         self.service = self.task = self.store = self.web = self.api = None
@@ -125,8 +128,11 @@ class BootstrapRuntime:
         elif self.has_gateway_state():
             # Read only; never seed a gateway network or clear its recovery record.
             try:
-                with sqlite3.connect(
-                    Path(self.raw["database"]).resolve().as_uri() + "?mode=ro", uri=True
+                with closing(
+                    sqlite3.connect(
+                        Path(self.raw["database"]).resolve().as_uri() + "?mode=ro",
+                        uri=True,
+                    )
                 ) as db:
                     row = db.execute(
                         "SELECT value FROM meta WHERE key='firmware_job'"
@@ -195,7 +201,7 @@ class BootstrapRuntime:
         if (
             not caps
             or not reported
-            or caps.get("board") != "zb-gw04-1v2"
+            or caps.get("board") != self.profile.board
             or reported.get("board") != caps["board"]
             or reported.get("fw_version") != caps.get("fw_version")
             or caps.get("proto") != "3"
@@ -245,6 +251,8 @@ class BootstrapRuntime:
         raw = deepcopy(self.raw)
         raw["network"] = dict(raw.get("network") or {}, **network)
         config = parse(raw)
+        if not self.has_gateway_state() and config.output_mode != "disabled":
+            raise BootstrapError("initial_outputs_must_be_disabled")
         store = Store(config.database, config.gateway + ":" + config.tag)
         try:
             service = self.service_factory(
