@@ -7,11 +7,16 @@
 #include "pa_conversions_efr32.h"
 #include <stdatomic.h>
 #include <string.h>
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+#include "reject.h"
+#endif
 
 static RAIL_Handle_t radio;
 static unsigned selected_channel;
 static atomic_uint calibration;
+#ifndef EC_RF_REJECT_DIAGNOSTICS
 static uint8_t tx_fifo[256] __attribute__((aligned(4)));
+#endif
 static uint8_t rx_fifo[2048] __attribute__((aligned(4)));
 
 /** @brief Retain RX packets for bounded main-loop copying and publish TX status.
@@ -85,11 +90,19 @@ static int start(unsigned channel)
 						RAIL_RF_STATE_RX };
 	uint16_t rx_size = sizeof(rx_fifo);
 
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	if (channel != 11)
+		return -1;
+#else
 	if (channel != 11 && channel != 26)
 		return -1;
+#endif
 	selected_channel = 0;
 	/* Core only calls start while inactive; failed attempts also reset counts. */
 	ec_mg24_health_reset();
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	ec_mg24_reject_reset();
+#endif
 	if (radio) {
 		if (RAIL_StartRx(radio, channel, NULL) != RAIL_STATUS_NO_ERROR)
 			return -1;
@@ -106,9 +119,15 @@ static int start(unsigned channel)
 	    RAIL_IEEE802154_Init(radio, &ieee) ||
 	    RAIL_ConfigRxOptions(radio, RAIL_RX_OPTION_STORE_CRC,
 				 RAIL_RX_OPTION_STORE_CRC) ||
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	    RAIL_ConfigRxOptions(radio, RAIL_RX_OPTION_IGNORE_CRC_ERRORS,
+				 RAIL_RX_OPTION_IGNORE_CRC_ERRORS) ||
+#endif
 	    RAIL_SetRxFifo(radio, rx_fifo, &rx_size) ||
+#ifndef EC_RF_REJECT_DIAGNOSTICS
 	    RAIL_SetTxFifo(radio, tx_fifo, 0, sizeof(tx_fifo)) !=
 		    sizeof(tx_fifo) ||
+#endif
 	    RAIL_InitTxPowerCurvesAlt(&RAIL_TxPowerCurvesVbat) ||
 	    RAIL_ConfigTxPower(radio, &power) || RAIL_SetTxPowerDbm(radio, 0) ||
 	    RAIL_SetRxTransitions(radio, &transitions) ||
@@ -135,6 +154,12 @@ static int start(unsigned channel)
  */
 static int send(const uint8_t *mac, size_t length, unsigned cca)
 {
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	(void)mac;
+	(void)length;
+	(void)cca;
+	return -1;
+#else
 	uint8_t packet[126];
 	RAIL_CsmaConfig_t csma = RAIL_CSMA_CONFIG_SINGLE_CCA;
 	RAIL_Status_t status;
@@ -157,6 +182,7 @@ static int send(const uint8_t *mac, size_t length, unsigned cca)
 		return -1;
 	}
 	return 0;
+#endif
 }
 
 /** @brief Drain at most four held frames per pass, releasing every packet handle. */
@@ -176,6 +202,35 @@ static void poll(void)
 			radio, RAIL_RX_PACKET_HANDLE_OLDEST_COMPLETE, &info);
 		if (packet == RAIL_RX_PACKET_HANDLE_INVALID)
 			break;
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+		if (info.packetStatus == RAIL_RX_PACKET_READY_CRC_ERROR) {
+			struct ec_mg24_reject_metadata metadata = {
+				.status = info.packetStatus,
+				.packet_bytes = info.packetBytes,
+				.ticks = ticks,
+			};
+			uint16_t wanted = info.packetBytes > sizeof(bytes)
+						  ? sizeof(bytes)
+						  : info.packetBytes;
+			uint16_t copied;
+
+			metadata.details_available =
+				RAIL_GetRxPacketDetailsAlt(radio, packet,
+							   &details) ==
+				RAIL_STATUS_NO_ERROR;
+			if (metadata.details_available) {
+				metadata.crc_passed = details.crcPassed;
+				metadata.rssi = details.rssi;
+				metadata.lqi = details.lqi;
+			}
+			copied = RAIL_PeekRxPacket(radio, packet, bytes, wanted,
+						   0);
+			RAIL_ReleaseRxPacket(radio, packet);
+			ec_mg24_reject_record(&metadata, bytes, copied);
+			ec_rf_drop();
+			continue;
+		}
+#endif
 		if (info.packetStatus != RAIL_RX_PACKET_READY_SUCCESS)
 			reason = EC_MG24_PACKET_STATUS_INVALID;
 		else if (info.packetBytes < 4 ||

@@ -9,6 +9,9 @@
 #ifdef EC_RF_DIAGNOSTICS
 #include "rf.h"
 extern const struct ec_rf_ops ec_mg24_rf_ops;
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+#include "reject.h"
+#endif
 #endif
 
 #define RX_SIZE 2048u
@@ -96,6 +99,10 @@ int main(void)
 	ec_rf_setup(&ec_mg24_rf_ops);
 	parser.radio_command = ec_rf_command;
 	parser.build = "xiao-rx-2";
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	parser.radio_command = ec_mg24_reject_command;
+	parser.build = "xiao-reject-1";
+#endif
 #endif
 	for (;;) {
 #ifdef EC_RF_DIAGNOSTICS

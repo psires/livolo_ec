@@ -3,6 +3,9 @@
 #include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+#include "reject.h"
+#endif
 
 _Static_assert(ATOMIC_INT_LOCK_FREE == 2,
 	       "ISR counters require lock-free atomics");
@@ -45,5 +48,11 @@ size_t ec_mg24_health(char *out, size_t capacity)
 		snapshot[EC_MG24_PACKET_DETAILS_FAILED],
 		snapshot[EC_MG24_PACKET_LAYOUT_INVALID],
 		snapshot[EC_MG24_CALIBRATION_FAILED]);
-	return length > 0 && (size_t)length < capacity ? length : 0;
+	if (length <= 0 || (size_t)length >= capacity)
+		return 0;
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	return ec_mg24_reject_append_summary(out, capacity, length);
+#else
+	return length;
+#endif
 }

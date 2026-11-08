@@ -19,11 +19,17 @@ class XiaoTransportTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_diagnostic_caps_never_configure_arm_or_transmit(self):
         """Diagnostic identities cannot arm a gateway, even with no registered peers."""
-        for board, mode, registered, build in product(
-            ("seeed-xiao-mg24", "seeed-xiao-esp32c6"),
-            ("disabled", "experimental_phase"),
-            (False, True),
-            ("xiao-bringup-1", "xiao-rf-1", "xiao-rx-1"),
+        profiles = list(
+            product(
+                ("seeed-xiao-mg24", "seeed-xiao-esp32c6"),
+                ("xiao-bringup-1", "xiao-rf-1", "xiao-rx-1"),
+            )
+        ) + [
+            ("seeed-xiao-mg24", "xiao-reject-1"),
+            ("seeed-xiao-esp32c6", "xiao-usb-1"),
+        ]
+        for (board, build), mode, registered in product(
+            profiles, ("disabled", "experimental_phase"), (False, True)
         ):
             with self.subTest(
                 board=board, mode=mode, registered=registered, build=build
@@ -49,8 +55,13 @@ class XiaoTransportTests(unittest.IsolatedAsyncioTestCase):
                             capabilities = (
                                 "radio_tx=synthetic_only rf_diag=synthetic_v1"
                             )
-                        if build == "xiao-rx-1":
+                        if build in ("xiao-rx-1", "xiao-usb-1"):
                             capabilities += " rx_diag=passive_v1"
+                        if build == "xiao-reject-1":
+                            capabilities = (
+                                "radio_tx=0 rf_diag=none rx_diag=passive_v1 "
+                                "reject_diag=untrusted_v1"
+                            )
                         replies = {
                             "PING": "OK EC-GATEWAY 3",
                             "VERSION": (

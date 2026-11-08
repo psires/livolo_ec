@@ -4,6 +4,12 @@ PREFIX ?= arm-none-eabi-
 CC = $(PREFIX)gcc
 BUILD ?= build
 RF_DIAGNOSTICS ?= 1
+REJECT_DIAGNOSTICS ?= 0
+ifeq ($(REJECT_DIAGNOSTICS),1)
+ifneq ($(RF_DIAGNOSTICS),1)
+$(error REJECT_DIAGNOSTICS requires RF_DIAGNOSTICS=1)
+endif
+endif
 DEVICE = $(GSDK)/platform/Device/SiliconLabs/EFR32MG24
 EMLIB = $(GSDK)/platform/emlib
 INCLUDES = ../experimental $(DEVICE)/Include $(GSDK)/platform/CMSIS/Core/Include \
@@ -26,6 +32,10 @@ INCLUDES += $(RAIL)/common $(RAIL)/protocol/ieee802154 \
 CFLAGS += -DEC_RF_DIAGNOSTICS=1
 SOURCES += radio.c health.c ../experimental/rf.c \
  $(PA)/pa_conversions_efr32.c $(PA)/pa_curves_efr32.c
+ifeq ($(REJECT_DIAGNOSTICS),1)
+CFLAGS += -DEC_RF_REJECT_DIAGNOSTICS=1
+SOURCES += reject.c
+endif
 RADIO_LINK = -Wl,--whole-archive $(RADIO_LIB) -Wl,--no-whole-archive
 endif
 vpath %.c $(sort $(dir $(SOURCES)))
@@ -34,10 +44,10 @@ vpath %.c $(sort $(dir $(SOURCES)))
 all: $(BUILD)/ec-xiao-mg24.bin
 $(BUILD):
 	mkdir -p $@
-$(BUILD)/.config-$(RF_DIAGNOSTICS): | $(BUILD)
+$(BUILD)/.config-$(RF_DIAGNOSTICS)-$(REJECT_DIAGNOSTICS): | $(BUILD)
 	rm -f $(BUILD)/.config-*
 	touch $@
-$(OBJECTS): $(BUILD)/.config-$(RF_DIAGNOSTICS)
+$(OBJECTS): $(BUILD)/.config-$(RF_DIAGNOSTICS)-$(REJECT_DIAGNOSTICS)
 $(BUILD)/%.o: %.c Makefile | $(BUILD)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 $(BUILD)/ec-xiao-mg24.elf: $(OBJECTS) application.ld $(RADIO_LIB)

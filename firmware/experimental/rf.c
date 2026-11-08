@@ -22,6 +22,15 @@ static unsigned fault;
 static unsigned channel;
 static uint8_t sequences[32], tx_frame[41];
 
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+int ec_rf_diagnostic_idle(void)
+{
+	return !atomic_load(&active) && !atomic_load(&busy) && !fault &&
+	       !atomic_load(&completion) && !event_pending &&
+	       atomic_load(&head) == atomic_load(&tail);
+}
+#endif
+
 void ec_rf_setup(const struct ec_rf_ops *ops)
 {
 	radio = ops;
@@ -34,7 +43,11 @@ void ec_rf_setup(const struct ec_rf_ops *ops)
 	atomic_store(&dropped, 0);
 	nonce = started = sent_at = 0;
 	tx_started = tx_done = tx_failed = event_pending = fault = 0;
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	channel = 11;
+#else
 	channel = 26;
+#endif
 	memset(sequences, 0, sizeof(sequences));
 }
 

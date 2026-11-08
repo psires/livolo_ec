@@ -4,6 +4,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+#define RADIO_TX_CAPABILITY "0"
+#define RADIO_DIAGNOSTICS                                                      \
+	" rf_diag=none rx_diag=passive_v1 reject_diag=untrusted_v1"
+#else
+#define RADIO_TX_CAPABILITY "synthetic_only"
+#define RADIO_DIAGNOSTICS " rf_diag=synthetic_v1 rx_diag=passive_v1"
+#endif
+
 /** @brief Validate a bounded whitespace-free build or board token.
  * @param token Static token supplied by the board adapter, possibly NULL.
  * @return Nonzero only for 1 through 63 safe ASCII identifier characters.
@@ -77,10 +86,8 @@ static size_t reply(struct ec_experimental *state, char *out, size_t capacity)
 			"fw_version=" EC_VERSION " update=none experimental=1 "
 			"gateway=0 radio_tx=%s%s build=%s",
 			state->baud, state->board,
-			state->radio_command ? "synthetic_only" : "0",
-			state->radio_command
-				? " rf_diag=synthetic_v1 rx_diag=passive_v1"
-				: "",
+			state->radio_command ? RADIO_TX_CAPABILITY : "0",
+			state->radio_command ? RADIO_DIAGNOSTICS : "",
 			state->build);
 		if (length < 0 || (size_t)length >= sizeof(body))
 			return 0;
@@ -88,7 +95,7 @@ static size_t reply(struct ec_experimental *state, char *out, size_t capacity)
 		snprintf(body, sizeof(body),
 			 "OK configured=0 armed=0 peers=0 radio_tx=%s "
 			 "experimental=1 malformed=%lu",
-			 state->radio_command ? "synthetic_only" : "0",
+			 state->radio_command ? RADIO_TX_CAPABILITY : "0",
 			 (unsigned long)state->malformed);
 	} else if (state->radio_command && !strncmp(cursor, "RF", 2)) {
 		if (!state->radio_command(cursor, body, sizeof(body)))

@@ -41,6 +41,12 @@ void ec_rf_setup(const struct ec_rf_ops *ops);
  * @return Response body length, or zero if storage is insufficient.
  */
 size_t ec_rf_command(const char *command, char *out, size_t capacity);
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+/** @brief Gate private rejected-frame access/start on fully drained safe idle.
+ * @return Nonzero only if inactive, no busy/fault/completion/event and RX empty.
+ */
+int ec_rf_diagnostic_idle(void);
+#endif
 /** @brief Service callbacks, expiry and timeout before every USB/UART iteration. */
 void ec_rf_poll(void);
 /** @brief Retrieve one complete event without blocking or partial consumption.

@@ -48,6 +48,39 @@ length errors; this does not establish their RF cause or attribute the earlier
 58 events. The recheck remains a strict failure, with no acceptance relaxation.
 See the [passive reception receipt](../../docs/verification/xiao-rx-20261108.json).
 
+For separately reviewed rejected-frame classification, build in a new directory
+with `REJECT_DIAGNOSTICS=1` (requires `RF_DIAGNOSTICS=1`). This private
+`xiao-reject-1` variant advertises `radio_tx=0`, `rf_diag=none` and
+`reject_diag=untrusted_v1`. It starts in inactive channel-11 passive mode;
+RFSTART/RFTX are fenced before adapter effects and the transmit path is compiled
+out. It enables RAIL's ignore-CRC option only to retain `READY_CRC_ERROR` evidence.
+Such packets increment aggregate drops and never enter normal CRC-valid RX events.
+Other frame-error events retain their separate diagnostic counter. The ordinary
+build keeps its CRC policy and exact baseline image.
+
+The private build retains the first eight untrusted records, each limited to
+128 bytes including PHR and any received FCS. `RFREJECT 0` through `RFREJECT 7`
+read immutable records only while fully inactive, drained and unfaulted.
+Metadata includes RAIL status, reported/stored lengths, truncation and details
+availability. Packet lengths include PHR and any received FCS bytes. RSSI is in
+dBm, LQI is SDK-provided, and ticks are poll-time microseconds modulo 2^32.
+`layout_complete=1` means only consistent
+PHR/length bounds; `fcs=original` identifies the retained final two bytes, not
+their validity. Bad-frame source addresses are not trusted identities. Compare
+software radio CRC and application checksum separately, preserving incomplete
+or unavailable details. RAIL's ready-CRC-error status alone is not proof of a
+complete ambient frame.
+
+Additional health counters `reject_seen`, `reject_stored`, `reject_omitted`,
+`reject_truncated` and `reject_invalid` saturate at `UINT32_MAX`; stored is capped
+at eight. They clear only while inactive before a start attempt. Reads and STOP
+do not drain/reset evidence. Multiple events or first-eight sampling cannot
+provide an RF loss denominator. The reviewed procedure is one bounded passive
+capture, stopped before at most eight reads, followed by restoration of the exact
+approved baseline and full-flash verification. Restore the union of all touched
+erase pages from that unit's backup, including any diagnostic-only tail pages.
+This private image is not a release bundle or a new acceptance policy.
+
 Build with a separate Gecko SDK 4.4.6 checkout, commit
 `59d2160fe448b13730a91c0f019a8b4c53c43eb2`, including Device/EFR32MG24,
 CMSIS, emlib, common, bootloader and RAIL/PA inputs:
