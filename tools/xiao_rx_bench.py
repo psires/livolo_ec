@@ -59,7 +59,7 @@ def receive_command(
     @param sleep Injectable scheduler yield.
     @return Matching successful numbered response.
     """
-    if text not in ("PING", "VERSION", "CAPS", "RFSTATUS", "RFSTOP"):
+    if text not in ("PING", "VERSION", "CAPS", "RFSTATUS", "RFSTOP", "RFQUEUE"):
         match = re.fullmatch(r"RFLISTEN ([0-9a-f]{8})", text)
         if match is None or int(match[1], 16) == 0:
             raise ValueError("Passive harness rejects this command")
@@ -212,6 +212,7 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
         final={},
         cleanup_errors=[],
         window_completed=False,
+        queue={},
     )
     started = []
 
@@ -247,6 +248,7 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
             ):
                 if caps.get(key) != value:
                     raise ValueError("Missing passive-only diagnostic contract")
+            evidence["queue"][link.name] = rf.queue_capability(caps)
             evidence["baseline"][link.name] = rf.status(send(link, "RFSTATUS"), 0)
             if evidence["baseline"][link.name]["busy"] != "0":
                 raise ValueError("Inactive endpoint reports pending radio work")
@@ -294,6 +296,16 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
                     channel=11,
                     mode="passive",
                 )
+                if evidence["queue"].get(link.name, {}).get("available"):
+                    snapshot = rf.queue_status(
+                        receive_command(link, "RFQUEUE", [link], 1, clock, sleep)
+                    )
+                    evidence["queue"][link.name]["counters"] = snapshot
+                    rf.reconcile_queue(
+                        snapshot,
+                        evidence["final"][link.name],
+                        sum(e["kind"] == "rx" for e in link.events),
+                    )
             except Exception as error:
                 evidence["cleanup_errors"].append(f"{link.name}: {error}")
         evidence["receivers"] = {

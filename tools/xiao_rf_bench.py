@@ -300,6 +300,80 @@ def status(reply, active, *, channel=None, mode=None):
     return data
 
 
+def queue_capability(caps):
+    """Negotiate optional queue evidence without treating legacy absence as success.
+
+    @param caps Parsed CAPS fields from the selected endpoint.
+    @return Explicit availability record; unknown advertised contracts are rejected.
+    """
+    value = caps.get("queue_diag")
+    if value is None:
+        return dict(available=False, reason="not_advertised")
+    if value != "ring_v1":
+        raise ValueError("Unknown queue diagnostic capability")
+    return dict(available=True, counters=None)
+
+
+def queue_status(reply):
+    """Validate a complete, quiescent portable-queue snapshot.
+
+    @param reply Successful RFQUEUE response after STOP and event drain.
+    @return Validated string fields with explicit wrap, scope and timestamp semantics.
+    """
+    if not reply.startswith("OK "):
+        raise ValueError("Queue snapshot unavailable")
+    data = fields(reply[3:])
+    counters = (
+        "rx_queue_full",
+        "rx_enqueued",
+        "rx_dequeued",
+        "rx_high_water",
+        "rx_max_age_us",
+    )
+    contract = dict(
+        queue_capacity="7",
+        counter_bits="32",
+        counter_mode="wrapping",
+        scope="last_successful_start",
+        age_basis="adapter_timestamp",
+        age_clock="mod32",
+    )
+    if set(data) != set(counters) | set(contract) or any(
+        data.get(k) != v for k, v in contract.items()
+    ):
+        raise ValueError("Unexpected queue diagnostic contract")
+    for key in counters:
+        integer(data[key], 0, 0xFFFFFFFF)
+    high_water = int(data["rx_high_water"])
+    if high_water > 7:
+        raise ValueError("Queue high-water exceeds capacity")
+    if (int(data["rx_queue_full"]) and high_water != 7) or (
+        not high_water and any(int(data[k]) for k in counters if k != "rx_high_water")
+    ):
+        raise ValueError("Queue activity contradicts high-water evidence")
+    return data
+
+
+def reconcile_queue(queue, state, delivered):
+    """Require quiescent accounting without converting measured overflow to a pass.
+
+    @param queue Validated RFQUEUE fields.
+    @param state Final RFSTATUS fields.
+    @param delivered Complete receive events independently delivered to the host.
+    """
+    if any(state.get(k) != "0" for k in ("active", "busy", "queued", "fault")):
+        raise ValueError("Queue accounting requires clean stopped state")
+    full, enqueued, dequeued = (
+        int(queue[k]) for k in ("rx_queue_full", "rx_enqueued", "rx_dequeued")
+    )
+    if (
+        int(state["rx"]) != (enqueued + full) & 0xFFFFFFFF
+        or enqueued != dequeued
+        or dequeued != delivered & 0xFFFFFFFF
+    ):
+        raise ValueError("Queue accounting does not match delivered events")
+
+
 def analyze(expected, received, transmitted):
     """Match entire independent captures and report loss without assigning its cause.
 
@@ -450,7 +524,13 @@ def run(
     plan = samples(mode)
     expected = {link.name: {} for link in links}
     evidence.update(
-        mode=mode, nonce=nonce, baseline={}, final={}, cleanup_errors=[], requests=[]
+        mode=mode,
+        nonce=nonce,
+        baseline={},
+        final={},
+        cleanup_errors=[],
+        requests=[],
+        queue={},
     )
     deadline = clock() + 30
 
@@ -490,6 +570,7 @@ def run(
             ):
                 if caps.get(key) != value:
                     raise ValueError(f"Unexpected diagnostic capability: {key}")
+            evidence["queue"][link.name] = queue_capability(caps)
             current = status(request(link, "RFSTATUS"), 0)
             evidence["baseline"][link.name] = current
         evidence["preflight_event_counts"] = {
@@ -542,6 +623,16 @@ def run(
                 evidence["final"][link.name] = status(
                     command(link, "RFSTATUS", [link], 1, clock, sleep), 0
                 )
+                if evidence["queue"].get(link.name, {}).get("available"):
+                    snapshot = queue_status(
+                        command(link, "RFQUEUE", [link], 1, clock, sleep)
+                    )
+                    evidence["queue"][link.name]["counters"] = snapshot
+                    reconcile_queue(
+                        snapshot,
+                        evidence["final"][link.name],
+                        sum(e["kind"] == "rx" for e in link.events),
+                    )
             except Exception as error:
                 evidence["cleanup_errors"].append(f"{link.name}: {error}")
         evidence["directions"] = {
