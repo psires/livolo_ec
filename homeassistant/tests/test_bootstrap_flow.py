@@ -14,6 +14,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.livolo_ec._client import LivoloError
 from custom_components.livolo_ec._client.bootstrap import BootstrapError
 from custom_components.livolo_ec.bootstrap_flow import BootstrapFlowMixin
+from custom_components.livolo_ec.bootstrap_observer import observer_for
 
 
 def assert_radio_placeholders(result):
@@ -835,11 +836,15 @@ async def test_engineering_image_warning_precedes_explicit_install(
 
 
 @pytest.mark.parametrize("network", [None, "2a992b12:a7"])
-async def test_sonoff_cancel_without_baseline_never_claims_restoration(hass, network):
+@pytest.mark.parametrize("restore_observer", [False, True])
+async def test_sonoff_cancel_without_baseline_never_claims_restoration(
+    hass, network, restore_observer
+):
     """First setup cancellation creates no hub or gateway probe, even with configured network values.
 
     @param hass Actual HA instance.
     @param network Optional daemon configuration, which is not a verified gateway baseline.
+    @param restore_observer Whether a fresh flow must restore its observer from HA storage.
     """
     physical = PhysicalContractFixture(
         network=network, mode="bootstrap", profile="sonoff-zbdongle-e"
@@ -881,6 +886,23 @@ async def test_sonoff_cancel_without_baseline_never_claims_restoration(hass, net
         assert result["reason"] == "bootstrap_cancelled"
         assert hass.config_entries.async_entries("livolo_ec") == []
         assert [kind for kind, _ in physical.calls] == ["cancel"]
+        completed = deepcopy(physical.results)
+        if restore_observer:
+            hass.data.pop("livolo_ec_bootstrap_observers")
+        reopened = await hass.config_entries.flow.async_init(
+            "livolo_ec",
+            context={"source": "user"},
+            data={
+                "url": "http://new.invalid:8090",
+                "token": "secret",
+                "setup_radio": True,
+            },
+        )
+        assert reopened["type"] == "form"
+        assert reopened["step_id"] == "radio_select"
+        assert [kind for kind, _ in physical.calls] == ["cancel"]
+        assert physical.results == completed
+        assert hass.config_entries.async_entries("livolo_ec") == []
         native.info.assert_not_awaited()
         native.snapshot.assert_not_awaited()
 
@@ -1219,3 +1241,127 @@ async def test_uncertain_entry_requires_fresh_specific_manual_reinspection_capab
     assert "BOOT" in reopened["description_placeholders"]["instructions"]
     assert len(physical.calls) == 2
     assert physical.results[ident]["status"] == "unknown"
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        "observed",
+        "observed_stale_plan",
+        "pending",
+        "unknown",
+        "recovery",
+        "different_active",
+        "pending_other_active",
+    ],
+)
+async def test_old_cancel_observer_restores_without_replaying_or_hiding_active_work(
+    hass, state
+):
+    """Restore the installed pre-fix observer, healing only an already-observed terminal cancellation.
+
+    @param hass Actual HA instance with its test storage backend.
+    @param state Previously observed cancel or an unresolved/competing operation to preserve.
+    """
+    physical = PhysicalContractFixture(
+        network=None, mode="bootstrap", profile="sonoff-zbdongle-e"
+    )
+    physical.target["entry_methods"] = ["manual", "sonoff_sniffer_0_12"]
+    body = dict(
+        request_id="old-cancel", instance_id="physical-instance", confirmed=True
+    )
+    receipt = await physical.submit("cancel", body, "physical-instance")
+    receipt["stage"] = "setup_cancelled"
+    if state == "unknown":
+        receipt["status"] = "unknown"
+    if state == "recovery":
+        receipt["recovery"] = "manual_bootloader_inspection_required"
+    physical.results["old-cancel"] = deepcopy(receipt)
+    original_receipt = deepcopy(receipt)
+    pending = state in ("pending", "unknown", "pending_other_active")
+    saved = dict(receipt, status="pending") if pending else receipt
+    url = "http://cancelled.invalid:8090"
+    observer = observer_for(hass, url)
+    await observer.bind("physical-instance", None)
+    await observer.save(
+        last_operation=saved,
+        pending={"operation": "cancel", "body": body} if pending else None,
+        completed_requests=(
+            {} if pending else {"cancel": {"body": body, "request_id": "old-cancel"}}
+        ),
+        dismissed_request_id=None,
+        plan=(
+            dict(physical.plan, plan_id="old-plan")
+            if state == "observed_stale_plan"
+            else None
+        ),
+    )
+    hass.data.pop("livolo_ec_bootstrap_observers")
+    if state in ("different_active", "pending_other_active"):
+        physical.meta["active_request_id"] = "other-active"
+        physical.results["other-active"] = dict(
+            request_id="other-active",
+            kind="prepare",
+            status="pending",
+            stage="identifying_application",
+            recovery=None,
+            plan=None,
+            transfer_percent=None,
+        )
+    native = SimpleNamespace(
+        info=AsyncMock(side_effect=AssertionError("No normal gateway access")),
+        snapshot=AsyncMock(side_effect=AssertionError("No normal gateway access")),
+    )
+    with (
+        patch(
+            "custom_components.livolo_ec.bootstrap_flow.BootstrapClient",
+            return_value=physical,
+        ),
+        patch("custom_components.livolo_ec.bootstrap_flow.Client", return_value=native),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            "livolo_ec",
+            context={"source": "user"},
+            data={"url": url, "token": "secret", "setup_radio": True},
+        )
+        restored = observer_for(hass, url)
+        assert restored is not observer
+        assert physical.results["old-cancel"] == original_receipt
+        assert [kind for kind, _ in physical.calls] == ["cancel"]
+        assert hass.config_entries.async_entries("livolo_ec") == []
+        if state in ("observed", "observed_stale_plan"):
+            assert result["step_id"] == "radio_detect"
+            assert restored.state["dismissed_request_id"] == "old-cancel"
+            assert restored.state["last_operation"] == original_receipt
+            if state == "observed_stale_plan":
+                fresh_flow = hass.config_entries.flow._progress[result["flow_id"]]
+                denied = await fresh_flow.async_step_radio_review(
+                    {"confirmed": True, "dedicated_radio": True}
+                )
+                assert denied["errors"] == {"base": "bootstrap_incompatible"}
+                assert [kind for kind, _ in physical.calls] == ["cancel"]
+            result = await hass.config_entries.flow.async_configure(
+                result["flow_id"],
+                dict(
+                    target_id="radio-1",
+                    board_confirmed=True,
+                    dedicated_radio=True,
+                    entry_confirmed=True,
+                ),
+            )
+            assert result["step_id"] == "radio_review"
+            assert [kind for kind, _ in physical.calls] == ["cancel", "prepare"]
+            assert physical.calls[-1][1]["request_id"] != "old-cancel"
+            assert physical.results["old-cancel"] == original_receipt
+        elif state == "pending":
+            assert result["type"] == "abort"
+            assert result["reason"] == "bootstrap_cancelled"
+            assert restored.state["dismissed_request_id"] == "old-cancel"
+        else:
+            assert restored.state.get("dismissed_request_id") is None
+            if state == "pending_other_active":
+                assert result["errors"] == {"base": "bootstrap_unavailable"}
+            else:
+                assert result["step_id"] == "radio_progress"
+        native.info.assert_not_awaited()
+        native.snapshot.assert_not_awaited()

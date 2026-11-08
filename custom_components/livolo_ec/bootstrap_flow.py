@@ -225,6 +225,15 @@ class BootstrapFlowMixin:
                     or info.get("manual_reinspection_supported") is True
                     and request == info["active_request_id"]
                 ):
+                    previous = observer.state.get("last_operation") or {}
+                    resume_completed_cancel = (
+                        pending is None
+                        and previous.get("request_id") == request
+                        and previous.get("kind") == "cancel"
+                        and previous.get("status") == "confirmed"
+                        and previous.get("cancelled_unconfigured") is True
+                        and not previous.get("recovery")
+                    )
                     result = await client.operation(request, info["instance_id"])
                     await self._radio_accept(observer, result)
                     if (
@@ -233,7 +242,12 @@ class BootstrapFlowMixin:
                         and not result.get("recovery")
                     ):
                         return await self._radio_select_form(observer)
-                    return await self._radio_route(info, observer, result)
+                    return await self._radio_route(
+                        info,
+                        observer,
+                        result,
+                        resume_completed_cancel=resume_completed_cancel,
+                    )
                 if info["mode"] == "gateway":
                     if not info["enter_supported"]:
                         raise BootstrapError(
@@ -248,12 +262,13 @@ class BootstrapFlowMixin:
         except (LivoloError, OSError) as error:
             return self._radio_failure(error)
 
-    async def _radio_route(self, info, observer, result):
+    async def _radio_route(self, info, observer, result, resume_completed_cancel=False):
         """Choose the next visible step from durable results, not local elapsed time.
 
         @param info Current validated service metadata.
         @param observer Observer locked by the caller.
         @param result Last validated operation.
+        @param resume_completed_cancel Whether HA had already observed this completed new-hub cancellation before this flow.
         """
         if result["status"] != "confirmed" or result.get("recovery"):
             if (
@@ -310,6 +325,11 @@ class BootstrapFlowMixin:
                 and not self._radio_entry()
                 and result.get("network_ready") is False
             ):
+                if info.get("active_request_id") not in (None, result["request_id"]):
+                    raise BootstrapError("setup_operation_active")
+                await observer.save(dismissed_request_id=result["request_id"])
+                if resume_completed_cancel:
+                    return await self._radio_select_form(observer)
                 return self.async_abort(reason="bootstrap_cancelled")
             if result.get("network_ready") is not True:
                 raise IncompatibleError("Handoff has not confirmed network readiness")
