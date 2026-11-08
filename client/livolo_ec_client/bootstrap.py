@@ -13,6 +13,7 @@ OPERATIONS = {"enter", "initialize", "prepare", "install", "handoff", "cancel"}
 STATUSES = {"pending", "confirmed", "rejected", "unknown"}
 PREFIX = "/api/v1/provisioning/"
 MAX_RESPONSE_BYTES = 128 * 1024
+SNIFFER_ENTRY_METHOD = "sonoff_sniffer_0_12"
 
 
 class BootstrapError(LivoloError):
@@ -168,6 +169,7 @@ def operation_data(value, instance_id, request_id=None):
         "network_ready",
         "setup_required",
         "cancelled_unconfigured",
+        "entry_attempted",
     ):
         field = value.get(key, False)
         if type(field) is not bool:
@@ -291,6 +293,7 @@ class BootstrapClient:
             "initialize_supported",
             "cancel_supported",
             "baseline_available",
+            "manual_reinspection_supported",
         ):
             field = value.get(key, False)
             if type(field) is not bool:
@@ -351,6 +354,20 @@ class BootstrapClient:
             if item.get("requires_bootloader") is not True:
                 raise IncompatibleError("Unsupported bootstrap target entry method")
             safe["requires_bootloader"] = True
+            methods = item.get("entry_methods", ["manual"])
+            if (
+                not isinstance(methods, list)
+                or not 1 <= len(methods) <= 2
+                or any(
+                    method not in ("manual", SNIFFER_ENTRY_METHOD) for method in methods
+                )
+                or len(set(methods)) != len(methods)
+                or "manual" not in methods
+                or SNIFFER_ENTRY_METHOD in methods
+                and safe["board"] != "sonoff-zbdongle-e"
+            ):
+                raise IncompatibleError("Invalid bootstrap entry methods")
+            safe["entry_methods"] = list(methods)
             result.append(safe)
         if len({item["target_id"] for item in result}) != len(result):
             raise IncompatibleError("Ambiguous bootstrap targets")
@@ -398,6 +415,17 @@ class BootstrapClient:
                 "network",
             },
         }
+        if operation == "prepare" and (
+            "entry_method" in body or "entry_confirmed" in body
+        ):
+            fields["prepare"] |= {"entry_method", "entry_confirmed"}
+            if (
+                body.get("entry_method") != SNIFFER_ENTRY_METHOD
+                or body.get("entry_confirmed") is not True
+            ):
+                raise ValueError(
+                    "Explicit supported software entry confirmation required"
+                )
         if (
             operation not in fields
             or set(body) != fields[operation]
@@ -409,6 +437,7 @@ class BootstrapClient:
             "network",
             "dedicated",
             "board_confirmed",
+            "entry_confirmed",
         }:
             ident(body[key])
         if operation == "prepare" and (

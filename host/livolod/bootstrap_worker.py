@@ -25,6 +25,7 @@ from .zbgw04_provider import (
     select_target,
 )
 from .gecko_profiles import gecko_profile
+from .sniffer_identity import ENTRY_METHOD
 
 
 def target_from_json(value):
@@ -214,6 +215,7 @@ class BootstrapWorker:
                 binding=binding,
                 dedicated=True,
                 quiesced=self.runtime.quiesced,
+                entry_method=job.get("entry_method", "manual"),
             )
             if candidate:
                 payload = Path(directory.name) / "application.gbl"
@@ -264,6 +266,10 @@ class BootstrapWorker:
         """
         sequence, receipt = 0, None
         boundary_seen = False
+        entry_phase = None
+        remote_entry = (
+            job["kind"] == "prepare" and job.get("entry_method") == ENTRY_METHOD
+        )
         while True:
             line = await self.child.stdout.readline()
             if not line:
@@ -282,16 +288,23 @@ class BootstrapWorker:
                 raise BundleError("invalid_worker_result", "Invalid worker identity")
             stage = value.get("stage")
             if value["critical"]:
-                expected = "flash" if job["kind"] == "install" else "run_intact"
+                expected = (
+                    "bootloader_entry"
+                    if remote_entry
+                    else "flash" if job["kind"] == "install" else "run_intact"
+                )
                 if (
                     boundary_seen
-                    or job["kind"] not in ("install", "cancel")
+                    or (remote_entry and entry_phase != "identifying_application")
+                    or (job["kind"] not in ("install", "cancel") and not remote_entry)
                     or stage != expected
                 ):
                     raise BundleError(
                         "invalid_worker_result", "Unexpected mutation boundary"
                     )
                 boundary_seen = True
+                if remote_entry:
+                    entry_phase = "bootloader_entry"
                 await checkpoint(stage)
                 self.child.stdin.write(
                     (
@@ -301,7 +314,13 @@ class BootstrapWorker:
                 )
                 await self.child.stdin.drain()
             elif stage == "completed":
-                if job["kind"] in ("install", "cancel") and not boundary_seen:
+                if remote_entry and entry_phase != "verifying_loader":
+                    raise BundleError(
+                        "invalid_worker_result", "Missing loader observation phase"
+                    )
+                if (
+                    job["kind"] in ("install", "cancel") or remote_entry
+                ) and not boundary_seen:
                     raise BundleError(
                         "invalid_worker_result", "Missing durable mutation permission"
                     )
@@ -318,6 +337,17 @@ class BootstrapWorker:
                 ):
                     code = "worker_failed"
                 raise BundleError(code, "Physical setup worker did not complete")
+            elif stage in ("identifying_application", "verifying_loader"):
+                if not remote_entry or (
+                    (stage == "identifying_application" and entry_phase is not None)
+                    or (
+                        stage == "verifying_loader"
+                        and entry_phase != "bootloader_entry"
+                    )
+                ):
+                    raise BundleError("invalid_worker_result", "Unexpected entry phase")
+                entry_phase = stage
+                await checkpoint(stage)
             elif stage in ("verifying_target", "verifying_application"):
                 await checkpoint(stage)
             else:
@@ -406,7 +436,16 @@ def execute(spec, channel):
     )
     with provider:
         if spec["kind"] == "prepare":
-            loader = provider.probe_loader(target.port, 115200, timeout=3)
+            method = spec.get("entry_method", "manual")
+            if method == ENTRY_METHOD:
+                loader = provider.prepare_from_sniffer(
+                    before_entry=lambda: channel.before("bootloader_entry"),
+                    progress=lambda stage: channel.emit(stage),
+                )
+            elif method == "manual":
+                loader = provider.probe_loader(target.port, 115200, timeout=3)
+            else:
+                raise BundleError("unsupported_profile", "Unsupported entry method")
             check_loader(target, loader)
             return dict(target=target_json(target), loader=loader)
         if spec["kind"] == "cancel":

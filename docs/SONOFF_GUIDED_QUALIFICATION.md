@@ -42,8 +42,10 @@ record. The ZB-GW04 `b437e13` trial approval cannot authorize it.
 
 The evidence for this unit accepting unsigned, unencrypted applications is
 historical: successful gateway installation on 2026-10-24, then sniffer
-installation and operation on 2026-11-01. This supports a bounded exact-unit
-engineering policy reviewed together with a fresh loader observation. It is not
+installation and operation on 2026-11-01. This supports a reviewed, bounded
+exact-unit engineering policy recording the expected loader security behavior.
+The policy may be admitted before remote entry; Prepare must then obtain a
+fresh matching loader observation before issuing an installation plan. It is not
 a query of security configuration, proof of unchanged loader bytes, or approval
 for every Sonoff with the same version string. Reject contradictory security
 indications, unexpected menus or versions, and changed target identity.
@@ -65,6 +67,88 @@ do not advertise an automatic UI transition before it is implemented and tested.
 Historical CP210x RTS/DTR entry is a separate mechanism and must not be copied
 from the ZB-GW04 profile. Never send gateway numeric request IDs or scan baud
 rates with writes while the application/loader mode is unknown.
+
+### Implemented HA-authorized known-sniffer entry
+
+The engineering flow is implemented and has passed independent source review
+and 150 focused offline tests. Physical qualification through the real HA flow
+is still pending; these results do not establish successful hardware entry or
+installation. The live trial remains held until the reviewed build is ready.
+The current sniffer already implements the required software command; no new
+radio firmware is needed to enter its loader. Manual buttons remain a recovery
+fallback when passive identification cannot establish the known application.
+
+Keep one explicit HA Prepare action with optional
+`entry_method: "sonoff_sniffer_0_12"` and `entry_confirmed: true`. Missing both
+fields preserves the legacy loader-only manual request. There is no separate
+Identify button, entry endpoint or entry policy. The existing protected
+exact-unit loader policy records the reviewed historical security expectation,
+bound to the selected Sonoff's serial, topology and attachment. Advertising the
+entry method permits an attempt, not a claim that the current sniffer has
+already been observed. GET, startup, refresh and a failed inspection must never
+trigger entry. Retain the physical lease, process guards, quiesced normal
+service, inactive DTR/RTS, exclusive descriptor and repeated target checks.
+
+On that guarded descriptor, listen without writes at fixed **921600**. Discard
+pre-existing RX input with a bounded input reset/drain and start a fresh decoder;
+cached bytes from an earlier observation cannot establish current identity.
+Require at least two newly received CRC-valid ESN1 status records within a bounded
+window, each with version **0.12**, baud **921600** and the exact NUL-terminated
+`EC-MG21-BOARD=sonoff-zbdongle-e` marker. Require forward record sequence and
+status timestamps; allow sequence gaps caused by documented UART record loss
+and normal 32-bit sequence wrap. RX records may be interleaved, but received RF
+traffic is not required. A previous capture or cached API identity cannot
+replace this observation. These checks establish protocol identity, not a
+cryptographic identity or equality with an entire flash image.
+
+The wire reference is `firmware/sniffer-mg21/sniffer-wire.h`: a 20-byte
+`<4sHBBIQ` header, body length at most 129, kind 2 for status, flags 1, and
+little-endian CRC32 over header/body. Status begins with `<HH8I` (36 bytes).
+`tools/capture_mg21_sniffer.py:Decoder` supplies the existing framing and
+sequence reference. A production parser should have explicit byte/time bounds
+and validate the exact status length and marker terminator. Do not copy the
+capture CLI's serial-opening defaults into the guarded provider.
+
+After durable permission immediately before entry, recheck ownership/identity
+and write exactly `\nBOOTLOADER\n` once on the same descriptor. A short write,
+lost acknowledgement, process interruption or timeout after permission is an
+uncertain transition, never a reason to replay the command automatically. The
+sniffer idles RF reception and drains UART for up to one second before setting
+the preserved-loader reset reason and resetting the MCU. There is no textual
+success acknowledgement to await.
+
+Observe the complete expected Gecko menu at fixed **115200**, with only the
+reviewed newline solicitation and no upload/run command. Retain the same
+physical ownership through the baud transition and reject attachment changes.
+Actual menu observation is distinct from permission to install: it cannot
+infer signing/encryption requirements. The security-policy basis remains the
+reviewed historical acceptance, not newly read security flags. Only successful
+fresh identity and matching complete loader evidence allow Prepare to issue its
+ordinary installation plan. No plan is issued on failed proof or menu checks.
+Retain the existing reviewed-policy requirement for admission and the separate
+explicit Install permission. Do not manufacture a policy or claim a fresh menu
+was already observed merely to enable Prepare.
+
+Record the stages `identifying_application`, durable `bootloader_entry`,
+`verifying_loader` and finally `prepared`, retaining write outcome and fresh
+menu evidence. Cancellation after entry must state that the
+device may remain in the loader; it must not claim the sniffer was restored.
+Repeated requests and restart reconciliation must preserve the prior result
+without sending another entry command. A later explicit inspection/recovery
+action may resolve the uncertainty without automatic upload or run.
+
+Additional fixtures must cover stale buffered input, fragmented records and initial stream suffixes,
+valid interleaved RX records, a quiet RF environment, sequence wrap/gaps,
+duplicate/backward sequences, wrong status version/baud/board/flags/length,
+bad CRC, an embedded marker without a valid envelope, oversized or endless
+input, no status, and only one status. Test replacement or lost lease after
+identification and immediately before write; failed durable permission;
+short/failed writes; absent/wrong/partial/security-contradictory loader menus;
+and cancellation/restart/lost-response reconciliation at each transition.
+Assert the exact write transcript, no writes before validated identity and
+permission, no modem-line reset, no gateway numeric probes, and no automatic
+retry or flash. Linux must subsequently qualify this through the real HA
+action; an operator shell command is not equivalent evidence.
 
 ## First setup, verification and recovery
 

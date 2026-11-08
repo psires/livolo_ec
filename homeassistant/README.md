@@ -109,22 +109,39 @@ pairing, USB hotplug or automatic upgrades. See the
 The development source includes a native **Set up radio** flow for an existing
 hub under **Settings → Devices & services → Livolo EC → Configure**. For a new
 hub, select **Set up radio firmware first** when entering the daemon API URL and
-token. This preview requires the matching app and firmware catalog; it is not
+token. This preview requires the matching app or companion daemon and firmware catalog; it is not
 part of the published 0.5.2 integration described above.
 
-The initial profile is experimental and specific to the reviewed **ZB-GW04 1v2
-with its preserved Gecko bootloader**. It does not establish conversion from
-factory firmware or support for other boards. In the app Configuration, choose
-**Radio setup profile: zb-gw04-1v2** and restart the app once. Leave **Radio mode:
-gateway** for an existing hub; **bootstrap** starts setup for an unconfigured
-radio. Setup is disabled by default. The selected adapter must be dedicated to
-Livolo; detected ownership conflicts block setup without stopping other apps.
+The experimental profiles cover reviewed **ZB-GW04 1v2** and **Sonoff ZBDongle-E**
+units with their preserved Gecko bootloaders. They do not establish generic
+factory-firmware conversion or support for other boards. The public Supervisor
+app's **Radio setup profile** selector exposes only **disabled** and
+**zb-gw04-1v2**. Sonoff is currently limited to the isolated HA Container setup
+with explicit companion-daemon/wrapper options; it is not a selectable profile
+in that Supervisor app. Configure the exact profile through the supported path
+for your deployment, then restart the service once. Leave **Radio mode: gateway**
+for an existing Livolo hub; **bootstrap** starts setup for an unconfigured radio,
+including one running sniffer firmware. Setup is disabled by default. The selected
+adapter must be dedicated to Livolo; detected ownership conflicts block setup
+without stopping other apps.
 
 For an existing hub, explicitly enter setup to pause switch control. Select and
-identify the exact board. Keep USB power connected, hold **BOOT**, press and
-release **RESET**, hold BOOT for three seconds, then release. **Inspect** checks
-the bootloader without installing firmware. Review the offered board and firmware
-version, confirm installation, then refresh to follow the recorded operation.
+identify the exact board. When the daemon advertises the reviewed Sonoff sniffer
+entry method, **Prepare the radio automatically** is the normal path. Confirm
+**Detect supported firmware, enter bootloader and inspect** to authorize that
+sequence. The daemon first passively verifies the supported sniffer; advertising
+the capability does not mean the current application has already been identified.
+Only matching evidence permits the single software-entry command. Capture stops,
+but no firmware is installed. A fresh matching loader observation is required
+before a review plan is offered. Installation still needs separate confirmation.
+
+If the sniffer cannot be verified, no entry command is sent. Return to selection
+and explicitly choose manual setup. Older daemons retain this manual path.
+Follow the selected board's instructions: ZB-GW04 uses its three-second BOOT hold;
+Sonoff uses BOOT, RESET, then release both buttons together. Keep USB power
+connected. **Inspect** checks the loader without installing firmware. Review the
+offered board and firmware version, confirm installation, then refresh to follow
+the recorded operation.
 If the review expires, return to selection and explicitly inspect again.
 Private engineering images are labelled **Engineering test only; not a qualified
 public firmware release** in the review and installation confirmation. This
@@ -143,7 +160,15 @@ firmware directly; no prior inspection or firmware catalog is required.
 Cancellation after possible writes or uncertain recovery is blocked. If the
 previous firmware cannot run with the current app, restoring the matching app
 version may be needed before the hub is ready. Cancelling a new unconfigured
-radio creates no HA hub.
+radio creates no HA hub and does not restore or verify its previous sniffer;
+the radio may remain in bootloader mode.
+
+An uncertain software-entry result is never retried automatically. Only when
+the daemon reports that the worker has stopped safely can you explicitly choose
+**Inspect the current bootloader state**. No button action is needed for this
+first inspection, and the software-entry command is not repeated. BOOT/RESET
+instructions remain a separate fallback if loader inspection fails. This narrow
+recovery does not enable retries after uncertain firmware writes.
 
 Closing the dialog leaves setup active. Reopening it, reloading HA or losing an
 HTTP reply resumes observation of the saved request; it never automatically

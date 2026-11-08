@@ -1,6 +1,7 @@
 """Durable physical controller tests; all physical dependencies are non-I/O fixtures."""
 
 import asyncio
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -287,7 +288,7 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         """A model journal or network database cannot authorize physical work."""
         for application in (0, 0x4C505631):
             path = self.root / f"foreign-{application}.db"
-            with sqlite3.connect(path) as db:
+            with closing(sqlite3.connect(path)) as db:
                 db.execute(f"PRAGMA application_id={application}")
                 db.execute("CREATE TABLE model (id TEXT)")
             with self.assertRaises(ValueError):

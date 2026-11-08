@@ -13,10 +13,12 @@ from .config import identity, hex_value
 from .firmware_bundle import BundleError
 from .bootstrap_catalog import bootstrap_candidate
 from .gecko_profiles import gecko_profile
+from .sniffer_identity import ENTRY_METHOD
 
 PROFILE = "zb-gw04-1v2"
 PLAN_LIFETIME = 120
 LOG = logging.getLogger(__name__)
+ENTRY_RECOVERY = "manual_bootloader_inspection_required"
 
 
 def failure_location(error):
@@ -173,6 +175,30 @@ class BootstrapController:
             **fields,
         )
 
+    def _entry_reinspection(self):
+        """Allow only a drained entry-only uncertainty to request fresh loader inspection."""
+        unresolved = self.store.unresolved()
+        return bool(
+            unresolved
+            and not self.closed
+            and not self.legacy_reason
+            and not self.blocked_reason
+            and self.candidate
+            and self.mode == "bootstrap"
+            and self.runtime.quiesced is True
+            and getattr(self.worker, "poisoned", False) is False
+            and not self.store.meta("installation_attempted", False)
+            and all(
+                job["kind"] == "prepare"
+                and job["status"] != "pending"
+                and job.get("entry_attempted") is True
+                and job.get("recovery") == ENTRY_RECOVERY
+                and job.get("profile") == self.profile.board
+                and job.get("target_id") == self.target_id
+                for job in unresolved
+            )
+        )
+
     def info(self):
         """Return stored service/mode/capability facts without UART, probing or retries."""
         pending = self.store.unresolved()
@@ -185,12 +211,16 @@ class BootstrapController:
         eligible = bool(
             self.candidate and not reason and not pending and not self.closed
         )
+        reinspection = self._entry_reinspection()
+        if reinspection:
+            reason = ENTRY_RECOVERY
         return dict(
             mode=self.mode,
             profile=self.profile.board,
             engineering_only=self.engineering_only,
             physical_install_supported=eligible and self.mode == "bootstrap",
-            prepare_supported=eligible and self.mode == "bootstrap",
+            prepare_supported=(eligible and self.mode == "bootstrap") or reinspection,
+            manual_reinspection_supported=reinspection,
             enter_supported=eligible
             and not self.legacy_reason
             and self.mode == "gateway",
@@ -230,6 +260,13 @@ class BootstrapController:
                         version=candidate["version"],
                         artifact_sha256=candidate["sha256"],
                         requires_bootloader=True,
+                        entry_methods=(
+                            ["manual", ENTRY_METHOD]
+                            if self.profile.board == "sonoff-zbdongle-e"
+                            and not self.store.unresolved()
+                            and not self.store.meta("baseline")
+                            else ["manual"]
+                        ),
                         engineering_only=self.engineering_only,
                         port_aliases=self.settings.get(
                             "port_aliases", [self.settings["serial_port"]]
@@ -280,6 +317,12 @@ class BootstrapController:
             "handoff": {"install_request_id", "confirmed", "network"},
         }
         if (
+            kind == "prepare"
+            and isinstance(payload, dict)
+            and ("entry_method" in payload or "entry_confirmed" in payload)
+        ):
+            fields["prepare"] |= {"entry_method", "entry_confirmed"}
+        if (
             kind not in fields
             or not isinstance(payload, dict)
             or set(payload) != fields[kind] | {"request_id", "instance_id"}
@@ -289,6 +332,12 @@ class BootstrapController:
             raise BootstrapError("invalid_request", 400)
         if payload["instance_id"] != self.store.instance_id:
             raise BootstrapError("instance_changed")
+        if "entry_method" in payload and (
+            payload["entry_method"] != ENTRY_METHOD
+            or payload["entry_confirmed"] is not True
+            or self.profile.board != "sonoff-zbdongle-e"
+        ):
+            raise BootstrapError("entry_confirmation_required", 400)
         for flag in (
             ("dedicated", "board_confirmed") if kind == "prepare" else ("confirmed",)
         ):
@@ -323,6 +372,8 @@ class BootstrapController:
             transfer_percent=None,
             expected_network_id=self.info()["expected_network_id"],
             setup_session=self.session,
+            entry_method=payload.get("entry_method", "manual"),
+            entry_attempted=False,
         )
         try:
             candidate, binding, accepted_network = self._admission(kind, payload, job)
@@ -357,7 +408,12 @@ class BootstrapController:
         )
         if self.legacy_reason:
             raise BootstrapError(self.legacy_reason)
-        if self.closed or self.store.unresolved():
+        reinspection = (
+            kind == "prepare"
+            and job["entry_method"] == "manual"
+            and self._entry_reinspection()
+        )
+        if self.closed or (self.store.unresolved() and not reinspection):
             raise BootstrapError("operation_unresolved")
         if (kind == "enter") != (self.mode == "gateway"):
             raise BootstrapError("wrong_mode")
@@ -370,6 +426,12 @@ class BootstrapController:
             if isinstance(reason, str):
                 raise BootstrapError(reason)
         elif kind == "prepare":
+            if job["entry_method"] == ENTRY_METHOD and self.store.meta("baseline"):
+                raise BootstrapError("entry_baseline_conflict")
+            if reinspection:
+                job["entry_reinspection"] = [
+                    j["request_id"] for j in self.store.unresolved()
+                ]
             if payload["target_id"] != self.target_id or not handle(
                 payload["candidate_id"], 256
             ):
@@ -531,9 +593,19 @@ class BootstrapController:
                     @param stage Bounded worker stage name.
                     """
                     job["stage"] = stage
+                    metadata = (
+                        {"installation_attempted": True} if stage == "flash" else None
+                    )
+                    if stage == "bootloader_entry":
+                        job["entry_attempted"] = True
+                        self.session = uuid.uuid4().hex
+                        self.inspection = None
+                        self._deadlines.clear()
+                        job["setup_session"] = self.session
+                        metadata = {"setup_session": self.session}
                     self.store.save(
                         job,
-                        {"installation_attempted": True} if stage == "flash" else None,
+                        metadata,
                     )
 
                 result = await self.worker.run(
@@ -574,7 +646,7 @@ class BootstrapController:
                         plan_id=public["plan_id"],
                         plan=public,
                     )
-                    self.store.prepared(job, private)
+                    self.store.prepared(job, private, job.get("entry_reinspection", ()))
                     return
                 if kind == "cancel":
                     from .preserved_gecko import check_application
@@ -682,10 +754,15 @@ class BootstrapController:
             uncertain = kind in ("install", "handoff", "enter") or (
                 kind == "cancel" and job["stage"] != "accepted"
             )
+            entry_uncertain = kind == "prepare" and job.get("entry_attempted")
             job.update(
-                status="unknown" if uncertain else "rejected",
+                status="unknown" if uncertain or entry_uncertain else "rejected",
                 error=getattr(error, "code", "operation_failed"),
-                recovery="recovery_required" if uncertain else None,
+                recovery=(
+                    "recovery_required"
+                    if uncertain
+                    else ENTRY_RECOVERY if entry_uncertain else None
+                ),
             )
             self.mode = "bootstrap" if uncertain else self.mode
             self.store.save(job, {"mode": self.mode})

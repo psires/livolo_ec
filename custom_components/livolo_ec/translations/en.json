@@ -72,7 +72,8 @@
         "data": {
           "refresh": "Refresh progress",
           "review_again": "Return to radio selection and inspect again",
-          "cancel_setup": "Cancel setup safely"
+          "cancel_setup": "Cancel setup safely",
+          "manual_reinspection": "Use manual bootloader inspection; do not repeat automatic entry"
         }
       },
       "radio_initialize": {
@@ -96,6 +97,30 @@
         "description": "{instructions}\n\nCancellation is unavailable after possible firmware writes or an uncertain result. If previous Livolo firmware cannot run with this daemon version, restoring the matching daemon or app version may be necessary. Closing the dialog alone does not cancel setup.",
         "data": {
           "confirmed": "I completed the instructions above; cancel this setup"
+        }
+      },
+      "radio_detect": {
+        "title": "Prepare the radio automatically",
+        "description": "Select your **{board}** and confirm its exact model. The daemon supports checking for the reviewed Livolo sniffer firmware; it has not identified the currently attached firmware yet.\n\nSubmit to detect supported firmware, enter the bootloader and inspect. The daemon first verifies the supported sniffer without sending commands. Only a matching sniffer receives the bootloader entry command. This stops capture and changes the radio mode, but installs no firmware. Keep USB power connected. You will review the firmware and confirm installation separately.\n\nOther firmware is not automatically converted. Choose manual setup to see this board’s BOOT/RESET instructions instead. An uncertain transition will not be retried automatically.",
+        "data": {
+          "target_id": "Radio and exact board",
+          "board_confirmed": "I checked the exact board model shown above against the radio label",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "entry_confirmed": "Detect supported firmware, enter bootloader and inspect; I understand capture will stop",
+          "manual_setup": "Use manual BOOT/RESET setup instead",
+          "cancel_setup": "Cancel setup safely"
+        }
+      },
+      "radio_reinspect": {
+        "title": "Inspect the current bootloader state",
+        "description": "The previous automatic entry may already have reached the bootloader on **{board}**. Inspect its current state first. This sends no software-entry command and installs no firmware.\n\nNo BOOT/RESET action is required for this first inspection. If inspection cannot verify the bootloader, use the button instructions as a fallback. Only a verified inspection can produce a firmware review; installation still needs separate confirmation.",
+        "data": {
+          "target_id": "Radio and exact board",
+          "board_confirmed": "I checked the exact board model shown above against the radio label",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "bootloader_ready": "Inspect the current state without repeating automatic entry",
+          "use_buttons": "Show BOOT/RESET fallback instructions if needed",
+          "cancel_setup": "Cancel setup safely"
         }
       }
     },
@@ -255,7 +280,8 @@
         "data": {
           "refresh": "Refresh progress",
           "review_again": "Return to radio selection and inspect again",
-          "cancel_setup": "Cancel setup safely"
+          "cancel_setup": "Cancel setup safely",
+          "manual_reinspection": "Use manual bootloader inspection; do not repeat automatic entry"
         }
       },
       "radio_initialize": {
@@ -279,6 +305,30 @@
         "description": "{instructions}\n\nCancellation is unavailable after possible firmware writes or an uncertain result. If previous Livolo firmware cannot run with this daemon version, restoring the matching daemon or app version may be necessary. Closing the dialog alone does not cancel setup.",
         "data": {
           "confirmed": "I completed the instructions above; cancel this setup"
+        }
+      },
+      "radio_detect": {
+        "title": "Prepare the radio automatically",
+        "description": "Select your **{board}** and confirm its exact model. The daemon supports checking for the reviewed Livolo sniffer firmware; it has not identified the currently attached firmware yet.\n\nSubmit to detect supported firmware, enter the bootloader and inspect. The daemon first verifies the supported sniffer without sending commands. Only a matching sniffer receives the bootloader entry command. This stops capture and changes the radio mode, but installs no firmware. Keep USB power connected. You will review the firmware and confirm installation separately.\n\nOther firmware is not automatically converted. Choose manual setup to see this board’s BOOT/RESET instructions instead. An uncertain transition will not be retried automatically.",
+        "data": {
+          "target_id": "Radio and exact board",
+          "board_confirmed": "I checked the exact board model shown above against the radio label",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "entry_confirmed": "Detect supported firmware, enter bootloader and inspect; I understand capture will stop",
+          "manual_setup": "Use manual BOOT/RESET setup instead",
+          "cancel_setup": "Cancel setup safely"
+        }
+      },
+      "radio_reinspect": {
+        "title": "Inspect the current bootloader state",
+        "description": "The previous automatic entry may already have reached the bootloader on **{board}**. Inspect its current state first. This sends no software-entry command and installs no firmware.\n\nNo BOOT/RESET action is required for this first inspection. If inspection cannot verify the bootloader, use the button instructions as a fallback. Only a verified inspection can produce a firmware review; installation still needs separate confirmation.",
+        "data": {
+          "target_id": "Radio and exact board",
+          "board_confirmed": "I checked the exact board model shown above against the radio label",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "bootloader_ready": "Inspect the current state without repeating automatic entry",
+          "use_buttons": "Show BOOT/RESET fallback instructions if needed",
+          "cancel_setup": "Cancel setup safely"
         }
       }
     },

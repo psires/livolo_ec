@@ -23,7 +23,7 @@
   "gates": [
     {
       "id": "source_and_version_binding",
-      "status": "pending",
+      "status": "manual_entry_baseline_bound_remote_entry_revision_pending",
       "required_evidence": "Reviewed committed source including the required ancestor, passing checks, clean-source build context hash, exact distribution/daemon/firmware-compatibility/integration versions, and source revision bound to the resulting artifact"
     },
     {
@@ -77,7 +77,7 @@
     },
     {
       "id": "sonoff_ha_firmware_installation",
-      "status": "source_review_passed_clean_combined_build_and_fresh_loader_required",
+      "status": "remote_entry_source_review_passed_clean_combined_build_and_actual_ha_trial_pending",
       "required_evidence": "Exact-board provider and loader/security policy, reviewed private candidate and recovery artifacts, actual HA inspect/explicit install, independent application VERSION/CAPS/STATUS, explicit new-network initialization/handoff, and scoped failure/recovery checks on the clean AMD64 image",
       "constraints": "No fabricated gateway baseline for the starting sniffer. Cancellation without a baseline cannot claim restored sniffer or gateway service. Recovery needs its own explicit action and passive sniffer verification. Keep firmware qualified:false until the relevant tests pass.",
       "firmware_source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
@@ -87,6 +87,22 @@
       "candidate_offline_board_version_layout_check": "independently passed by Release Engineer",
       "known_sniffer_recovery_sha256": "c9d5bb865ab6734c9c739a36bcc4a71139ab7fcc01090e5a55371f1378e1896d",
       "original_factory_readback_available": false
+    },
+    {
+      "id": "sonoff_remote_bootloader_entry",
+      "status": "offline_source_review_passed_clean_build_and_physical_qualification_pending",
+      "contract": "Explicit optional Prepare entry_method sonoff_sniffer_0_12 and entry_confirmed true; absent fields preserve manual entry. Fresh strict passive sniffer identity under the exact lease precedes durable permission and one fixed entry command. Complete expected loader menu is mandatory before a plan; Install remains separate.",
+      "security_basis": "Private exact-unit historical unsigned/unencrypted acceptance is a reviewed expectation, not a fresh security readback. Prepare must reject any observed contradiction.",
+      "failure_boundary": "No automatic replay after uncertain entry. Explicit server-gated manual reinspection may reconcile entry uncertainty only after worker cleanup; it cannot bypass possible-flash recovery.",
+      "physical_trial_performed": false,
+      "validation": {
+        "full_host_tests_reported_by_unix": 535,
+        "independent_focused_daemon_tests": 150,
+        "independent_full_ha_tests": 415,
+        "independent_fixture_cleanup_tests": 13,
+        "new_daemon_entry_tests": 25,
+        "physical_trial_performed": false
+      }
     },
     {
       "id": "public_publication",
@@ -165,5 +181,22 @@
     "independent_final_cleanup_and_sonoff_tests": 47,
     "final_focused_tests_reported_by_zigbee": 125,
     "sqlite_resource_warnings_after_cleanup": 0
+  },
+  "combined_manual_entry_baseline": {
+    "source_commit": "52d65aca7efd25bd798a046cce6330fd7b953735",
+    "reported_by": "Linux specialist, sole live operator",
+    "platform": "linux/amd64",
+    "image_id": "sha256:5d165128c33d4e5e4c9d14c278736abd233416145dd9e2841c3f71c02ffac726",
+    "docker_archive_sha256": "ed8b6e441d71135984fce68531f07fff6bc4e12704f883376aed60ac3b421511",
+    "context_tar_sha256": "8cd5c88b57e76e86759a6d6fb3d0bc59ed96c5c5e12144aa8645114c210c0d59",
+    "dockerfile_sha256": "ca19c44e423c4c896b5e84524f842153f6f5948829525654928b5df27bbc765a",
+    "integration_zip_sha256": "0b3c1fee2ef05f896be9de37f8bc0355e5c66368689953e0780f866d685efbc8",
+    "build_inputs": "Pinned Python/frontend/BuildKit and checksum-verified buildx v0.38.2 from release manifest; explicit version args",
+    "installed_checks": "Embedded release metadata, six provider/bootstrap module hashes and wrapper matched context; pip check and both helpers passed; daemon0.15.0 compat0.14; empty ordinary catalog; Sonoff bootstrap options without network/output controls",
+    "usb_metadata": "Nonprivileged container matched host serial/topology/rdev/full attachment generation; no UART open",
+    "physical_trial": "held pending proper known-sniffer software entry in HA",
+    "public_qualified": false,
+    "offline_container_check": "PASS reported by Linux: first install/recreation, authenticated API and websocket, ingress origin, persistent local catalog, UID10001, SQLite integrity; no radio access",
+    "ci_checks_passed": 12
   }
 }

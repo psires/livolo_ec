@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+from unittest.mock import AsyncMock
 
 from aiohttp import ClientSession, web
 import pytest
@@ -279,3 +280,190 @@ async def test_engineering_annotation_survives_all_read_models(aiohttp_server, f
             result = await client.operation("request-1", "instance-1")
             assert result["engineering_only"] is flag
             assert result["plan"]["engineering_only"] is flag
+
+
+@pytest.mark.parametrize(
+    "board,methods,valid",
+    [
+        ("sonoff-zbdongle-e", None, True),
+        ("sonoff-zbdongle-e", ["manual"], True),
+        ("sonoff-zbdongle-e", ["manual", "sonoff_sniffer_0_12"], True),
+        ("zb-gw04-1v2", ["manual", "sonoff_sniffer_0_12"], False),
+        ("sonoff-zbdongle-e", ["sonoff_sniffer_0_12"], False),
+        ("sonoff-zbdongle-e", ["manual", "manual"], False),
+        ("sonoff-zbdongle-e", "sonoff_sniffer_0_12", False),
+        ("sonoff-zbdongle-e", ["manual", "unreviewed"], False),
+    ],
+)
+async def test_remote_entry_advertisement_is_explicit_and_exact_board(
+    board, methods, valid
+):
+    """Legacy targets stay manual while invalid or cross-board remote capabilities fail closed.
+
+    @param board Exact advertised board profile.
+    @param methods Optional capability list; None omits the legacy field.
+    @param valid Whether the target has a permitted capability contract.
+    """
+    target = dict(
+        target_id="radio-1",
+        board=board,
+        candidate_id="image-1",
+        version="0.14",
+        artifact_sha256="a" * 64,
+        label="Test radio",
+        requires_bootloader=True,
+    )
+    if methods is not None:
+        target["entry_methods"] = methods
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, "http://example.invalid", "secret"))
+        client._request = AsyncMock(return_value=("instance-1", {"targets": [target]}))
+        if valid:
+            result = await client.targets("instance-1")
+            assert result["targets"][0]["entry_methods"] == (methods or ["manual"])
+        else:
+            with pytest.raises(IncompatibleError, match="entry methods"):
+                await client.targets("instance-1")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {"entry_method": "sonoff_sniffer_0_12"},
+        {"entry_confirmed": True},
+        {"entry_method": "sonoff_sniffer_0_12", "entry_confirmed": False},
+        {"entry_method": "sonoff_sniffer_0_12", "entry_confirmed": 1},
+        {"entry_method": "unreviewed", "entry_confirmed": True},
+    ],
+)
+async def test_remote_entry_missing_or_invalid_consent_never_sends_http(extra):
+    """A legacy acknowledgment or truthy substitute cannot authorize a software entry command.
+
+    @param extra Missing, unconfirmed or unknown optional entry fields.
+    """
+    body = dict(
+        request_id="request-1",
+        instance_id="instance-1",
+        target_id="radio-1",
+        candidate_id="image-1",
+        dedicated=True,
+        board_confirmed=True,
+        **extra,
+    )
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, "http://example.invalid", "secret"))
+        client._request = AsyncMock()
+        with pytest.raises(ValueError):
+            await client.submit("prepare", body, "instance-1")
+        client._request.assert_not_awaited()
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+async def test_prepare_transport_keeps_remote_consent_separate(
+    aiohttp_server, automatic
+):
+    """The real HTTP request sends optional entry consent only for explicit automatic preparation.
+
+    @param aiohttp_server Isolated loopback HTTP server factory.
+    @param automatic Whether this request explicitly authorizes known-sniffer entry.
+    """
+    bodies = []
+    plan = dict(
+        plan_id="plan-1",
+        instance_id="instance-1",
+        target_id="radio-1",
+        candidate_id="image-1",
+        profile="sonoff-zbdongle-e",
+        version="0.14",
+        artifact_sha256="a" * 64,
+        expires_at=2_000_000_000,
+        requires_confirmation=True,
+    )
+
+    async def respond(request):
+        """Record one preparation and return a distinct reviewed plan without installing.
+
+        @param request Authenticated local preparation POST.
+        """
+        assert request.headers["Authorization"] == "Bearer secret"
+        bodies.append(await request.json())
+        return web.json_response(
+            envelope(
+                dict(
+                    request_id="request-1",
+                    kind="prepare",
+                    status="confirmed",
+                    stage="prepared",
+                    plan=plan,
+                    entry_attempted=automatic,
+                )
+            )
+        )
+
+    app = web.Application()
+    app.router.add_post("/api/v1/provisioning/prepare", respond)
+    server = await aiohttp_server(app)
+    body = dict(
+        request_id="request-1",
+        instance_id="instance-1",
+        target_id="radio-1",
+        candidate_id="image-1",
+        dedicated=True,
+        board_confirmed=True,
+    )
+    if automatic:
+        body.update(entry_method="sonoff_sniffer_0_12", entry_confirmed=True)
+    async with ClientSession() as session:
+        result = await BootstrapClient(
+            Client(session, str(server.make_url("")), "secret")
+        ).submit("prepare", body, "instance-1")
+    assert bodies == [body]
+    assert result["plan"]["plan_id"] == "plan-1"
+    assert result["entry_attempted"] is automatic
+    assert not result["application_verified"] and not result["network_ready"]
+
+
+@pytest.mark.parametrize("flag", [1, "true", None])
+async def test_entry_recovery_capabilities_require_real_booleans(flag):
+    """Malformed safety flags cannot unlock manual recovery or claim an attempted entry.
+
+    @param flag Non-boolean value substituted into the server safety contract.
+    """
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, "http://example.invalid", "secret"))
+        client._request = AsyncMock(
+            return_value=(
+                "instance-1",
+                dict(info(), manual_reinspection_supported=flag),
+            )
+        )
+        with pytest.raises(IncompatibleError):
+            await client.info()
+    with pytest.raises(IncompatibleError):
+        operation_data(
+            dict(
+                request_id="request-1",
+                kind="prepare",
+                status="unknown",
+                stage="entry_unknown",
+                recovery="manual_bootloader_inspection_required",
+                entry_attempted=flag,
+            ),
+            "instance-1",
+        )
+
+
+def test_bootloader_observation_cannot_replace_prepared_plan():
+    """Even a claimed confirmed preparation requires an independently bound firmware plan."""
+    with pytest.raises(IncompatibleError, match="review plan"):
+        operation_data(
+            dict(
+                request_id="request-1",
+                kind="prepare",
+                status="confirmed",
+                stage="bootloader_observed",
+                entry_attempted=True,
+                menu_verified=True,
+            ),
+            "instance-1",
+        )

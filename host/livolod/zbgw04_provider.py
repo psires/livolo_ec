@@ -3,7 +3,7 @@
 Inventory reads sysfs only. Serial methods require a physical lease, recorded
 dedicated-radio consent, quiesced Livolo service and no detected conflicts.
 These establish a cooperative deployment contract, not global host exclusion.
-Nothing here resets, flashes, configures a network, arms RF or selects a device
+Nothing here flashes, configures a network, arms RF or selects a device
 by a generic bridge ID. A parent supervisor must bound kernel/driver stalls and
 retain inherited leases until all workers and helpers have exited.
 """
@@ -30,6 +30,7 @@ from .firmware_bundle import BundleError
 from .preserved_gecko import APP_BAUD, LOADER_BAUD, GeckoTarget, check_application
 from .version import parse_version
 from .gecko_profiles import gecko_profile, evidence_profile
+from .sniffer_identity import SnifferIdentity, SNIFFER_BAUD
 
 BOARD_EVIDENCE = "operator_confirmed_zbgw04_1v2"
 LOADER_VERSION = "1.9.2"
@@ -633,7 +634,7 @@ class ZBGW04Provider:
         @param port Must equal the frozen canonical endpoint.
         @param baud Must equal this action's fixed baud rate.
         @param expected_baud Fixed reviewed rate for this action.
-        @param timeout Total action I/O budget in seconds, greater than zero and at most three.
+        @param timeout Total budget, at most eight seconds for fixed sniffer entry or three otherwise.
         """
         _require(
             port == self.target.port
@@ -641,7 +642,7 @@ class ZBGW04Provider:
             and baud == expected_baud
             and type(timeout) in (int, float)
             and math.isfinite(timeout)
-            and 0 < timeout <= 3,
+            and 0 < timeout <= (8 if expected_baud == SNIFFER_BAUD else 3),
             "unsupported_profile",
             "Unexpected inspection endpoint or timing",
         )
@@ -724,6 +725,51 @@ class ZBGW04Provider:
         self._validate_loader_policy()
         with self._port(port, baud, LOADER_BAUD, timeout) as (serial, deadline):
             return self._loader_menu(serial, deadline)
+
+    def prepare_from_sniffer(self, before_entry, progress):
+        """Identify the supported sniffer, enter once with consent, then observe its loader.
+
+        @param before_entry Parent checkpoint that durably grants the one possible entry write.
+        @param progress Callback for nonmutating bounded observation phases.
+        @return Fresh loader observation under the separately reviewed historical security policy.
+        """
+        _require(
+            self.target.board == "sonoff-zbdongle-e",
+            "unsupported_profile",
+            "Software entry requires the reviewed Sonoff profile",
+        )
+        self._validate_loader_policy()
+        with self._port(self.target.port, SNIFFER_BAUD, SNIFFER_BAUD, 8) as (
+            serial,
+            deadline,
+        ):
+            progress("identifying_application")
+            serial.reset_input_buffer()
+            decoder = SnifferIdentity()
+            started = self.clock()
+            identify_deadline = min(deadline, started + 3)
+            while True:
+                previous = decoder.statuses
+                ready = decoder.feed(self._read(serial, 256, identify_deadline))
+                # Buffered bursts alone cannot prove an app is still transmitting.
+                if (
+                    ready
+                    and decoder.statuses > previous
+                    and self.clock() - started >= 0.5
+                ):
+                    break
+            self.observe()
+            before_entry()
+            self.observe()
+            self._write(serial, b"\nBOOTLOADER\n", deadline)
+            # The sniffer has no command ACK and may drain its TX queue for one second.
+            self.sleep(min(1.1, self._remaining(deadline)))
+            self._remaining(deadline)
+            self.observe()
+            serial.baudrate = LOADER_BAUD
+            serial.reset_input_buffer()
+            progress("verifying_loader")
+            return self._loader_menu(serial, min(deadline, self.clock() + 3))
 
     def _validate_loader_policy(self):
         """Refuse unknown or unreviewed loader security assumptions before serial open."""

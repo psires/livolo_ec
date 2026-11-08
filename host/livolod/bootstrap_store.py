@@ -95,6 +95,12 @@ class BootstrapStore:
                                 "cancel",
                             ):
                                 result["recovery"] = "recovery_required"
+                            elif result["kind"] == "prepare" and result.get(
+                                "entry_attempted"
+                            ):
+                                result["recovery"] = (
+                                    "manual_bootloader_inspection_required"
+                                )
                             self._save(result)
             self.instance_id = self.meta("instance_id")
             self.epoch = uuid.uuid4().hex
@@ -167,11 +173,18 @@ class BootstrapStore:
 
     def unresolved(self):
         """Return pending or recovery-fenced operations, including orphan worker intent."""
+        reconciled = self.meta("entry_reconciled", [])
         return [
             value
             for (encoded,) in self.db.execute("SELECT result FROM operations")
             for value in (json.loads(encoded),)
             if value["status"] == "pending" or value.get("recovery")
+            if not (
+                value["request_id"] in reconciled
+                and value.get("recovery") == "manual_bootloader_inspection_required"
+                and value["kind"] == "prepare"
+                and value["status"] != "pending"
+            )
         ]
 
     def admit(self, request, result, plan_id=None):
@@ -225,11 +238,12 @@ class BootstrapStore:
             for key, value in (metadata or {}).items():
                 self._meta(key, value)
 
-    def prepared(self, result, plan):
+    def prepared(self, result, plan, reconciled=()):
         """Commit inspected plan and successful prepare result atomically.
 
         @param result Confirmed prepare result containing the public plan.
         @param plan Private immutable plan binding, including controller epoch.
+        @param reconciled Prior uncertain entry requests superseded by explicit loader inspection.
         """
         with self.db:
             self.db.execute(
@@ -237,6 +251,11 @@ class BootstrapStore:
                 (plan["plan_id"], json.dumps(plan)),
             )
             self._save(result)
+            if reconciled:
+                self._meta(
+                    "entry_reconciled",
+                    sorted(set(self.meta("entry_reconciled", [])) | set(reconciled)),
+                )
 
     def plan(self, plan_id):
         """Read a prepared binding without changing its consumption state.

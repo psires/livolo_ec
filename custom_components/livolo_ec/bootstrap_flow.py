@@ -13,7 +13,7 @@ from ._client import (
     LivoloError,
     network_id,
 )
-from ._client.bootstrap import BootstrapClient, BootstrapError
+from ._client.bootstrap import BootstrapClient, BootstrapError, SNIFFER_ENTRY_METHOD
 from .bootstrap_observer import observer_for
 from .const import CONF_TOKEN, CONF_URL
 
@@ -72,6 +72,8 @@ class BootstrapFlowMixin:
         if getattr(self, "_radio_cancel_supported", False) and step in {
             "radio_setup",
             "radio_select",
+            "radio_detect",
+            "radio_reinspect",
             "radio_review",
             "radio_progress",
             "radio_initialize",
@@ -218,7 +220,11 @@ class BootstrapFlowMixin:
                     if pending
                     else (info["active_request_id"] or info["latest_request_id"])
                 )
-                if request and request != observer.state.get("dismissed_request_id"):
+                if request and (
+                    request != observer.state.get("dismissed_request_id")
+                    or info.get("manual_reinspection_supported") is True
+                    and request == info["active_request_id"]
+                ):
                     result = await client.operation(request, info["instance_id"])
                     await self._radio_accept(observer, result)
                     if (
@@ -254,7 +260,11 @@ class BootstrapFlowMixin:
                 result["kind"] == "install" and result["status"] != "rejected"
             ) or result.get("recovery"):
                 self._radio_cancel_supported = False
-            return self._radio_progress(result)
+            return self._radio_progress(
+                result,
+                manual_reinspection_supported=info.get("manual_reinspection_supported")
+                is True,
+            )
         if result["kind"] == "prepare":
             plan = result["plan"]
             if (
@@ -344,31 +354,58 @@ class BootstrapFlowMixin:
             )
         )
 
-    def _radio_progress(self, result):
+    def _radio_progress(self, result, manual_reinspection_supported=False):
         """Show a durable job without equating accepted or transferred with verified.
 
         @param result Validated physical operation state.
+        @param manual_reinspection_supported Server confirms the entry worker ended and manual recovery is safe.
         """
         fields = {vol.Optional("refresh", default=True): bool}
         if self._radio_can_reinspect(result):
             fields[vol.Optional("review_again", default=False)] = bool
+        if self._radio_can_recover_entry(result, manual_reinspection_supported):
+            fields[vol.Optional("manual_reinspection", default=False)] = bool
         reason = result.get("recovery") or result.get("error") or "None"
         reason = {
             "inspect_required": "Before resuming the previous firmware, use Return to radio selection, follow BOOT/RESET and Inspect, then choose Cancel setup. Inspection does not install firmware.",
             "plan_expired": "The review expired. Return to radio selection and inspect again before choosing Install.",
             "software_rollback_required": "The previous firmware was restored, but normal operation could not be verified. Restore the matching Livolo app version before resuming this hub.",
+            "manual_bootloader_inspection_required": "The bootloader transition could not be verified. Device mode is uncertain; no firmware was transferred by this preparation request. Automatic entry will not be repeated. Use manual inspection only when it is offered below.",
+            "application_unrecognized": "The supported sniffer could not be verified. No bootloader-entry command was sent. Return to radio selection and choose manual setup to inspect the bootloader explicitly.",
         }.get(reason, reason)
         return self._radio_form(
             "radio_progress",
             fields,
             status=result["status"],
-            stage=result["stage"],
+            stage={
+                "identifying_application": "Identifying the supported sniffer; no entry command sent yet",
+                "bootloader_entry": "Requesting bootloader entry; stopping capture",
+                "verifying_loader": "Verifying the bootloader before firmware review",
+            }.get(result["stage"], result["stage"]),
             progress=(
                 f"{result['transfer_percent']:g}% image transfer; verification still required"
                 if result["transfer_percent"] is not None
                 else "Stage only; no measured percentage"
             ),
             reason=reason,
+        )
+
+    @staticmethod
+    def _radio_can_recover_entry(result, supported):
+        """Allow only explicit loader inspection after a server-fenced entry uncertainty.
+
+        @param result Latest validated preparation result.
+        @param supported Fresh server capability confirming safe manual inspection.
+        """
+        return bool(
+            supported is True
+            and result.get("kind") == "prepare"
+            and result.get("status") in ("unknown", "rejected")
+            and result.get("recovery") == "manual_bootloader_inspection_required"
+            and result.get("entry_attempted") is True
+            and not result.get("plan")
+            and not result.get("application_verified")
+            and result.get("transfer_percent") is None
         )
 
     async def async_step_radio_progress(self, user_input=None):
@@ -379,10 +416,35 @@ class BootstrapFlowMixin:
         if user_input and user_input.get("cancel_setup"):
             return await self.async_step_radio_cancel()
         try:
-            _, _, observer = self._radio_clients()
+            _, client, observer = self._radio_clients()
             async with observer.lock:
                 await observer.restore()
                 last = observer.state.get("last_operation") or {}
+                if user_input and user_input.get("manual_reinspection"):
+                    info = await self._radio_info(client, observer)
+                    pending = observer.state.get("pending")
+                    request_id = (
+                        pending["body"]["request_id"]
+                        if pending
+                        else last.get("request_id")
+                    )
+                    if not request_id:
+                        raise BootstrapError("manual_reinspection_unavailable")
+                    last = await client.operation(request_id, info["instance_id"])
+                    await self._radio_accept(observer, last)
+                    if not self._radio_can_recover_entry(
+                        last, info.get("manual_reinspection_supported")
+                    ):
+                        raise BootstrapError("manual_reinspection_unavailable")
+                    self._radio_manual = True
+                    await observer.save(
+                        dismissed_request_id=last["request_id"],
+                        pending=None,
+                        plan=None,
+                        install=None,
+                        completed_requests={},
+                    )
+                    return await self._radio_select_form(observer)
                 if (
                     user_input
                     and user_input.get("review_again")
@@ -409,7 +471,10 @@ class BootstrapFlowMixin:
         """
         _, client, _ = self._radio_clients()
         info = await self._radio_info(client, observer)
-        if not info["prepare_supported"]:
+        if not info["prepare_supported"] and not (
+            getattr(self, "_radio_manual", False)
+            and info.get("manual_reinspection_supported") is True
+        ):
             raise BootstrapError(
                 info["blocked_reason"] or "radio_inspection_unavailable"
             )
@@ -424,19 +489,43 @@ class BootstrapFlowMixin:
             raise BootstrapError("unsupported_board_instructions")
         self._radio_choices = {item["target_id"]: item for item in choices["targets"]}
         self._radio_prepare_review_id = uuid.uuid4().hex
+        automatic = (
+            not getattr(self, "_radio_manual", False)
+            and info.get("manual_reinspection_supported") is not True
+        ) and any(
+            SNIFFER_ENTRY_METHOD in item.get("entry_methods", [])
+            and item["board"] == "sonoff-zbdongle-e"
+            for item in choices["targets"]
+        )
+        fields = {
+            vol.Optional("target_id"): vol.In(
+                {
+                    key: f"{item['label']} ({item['board']})"
+                    for key, item in self._radio_choices.items()
+                }
+            ),
+            vol.Required("board_confirmed", default=False): bool,
+            vol.Required("dedicated_radio", default=False): bool,
+        }
+        if automatic:
+            fields[vol.Required("entry_confirmed", default=False)] = bool
+            fields[vol.Optional("manual_setup", default=False)] = bool
+            return self._radio_form(
+                "radio_detect", fields, board=BOARD_INSTRUCTIONS[info["profile"]][0]
+            )
+        fields[vol.Required("bootloader_ready", default=False)] = bool
+        if (
+            info.get("manual_reinspection_supported") is True
+            and getattr(self, "_radio_manual", False)
+            and not getattr(self, "_radio_use_buttons", False)
+        ):
+            fields[vol.Optional("use_buttons", default=False)] = bool
+            return self._radio_form(
+                "radio_reinspect", fields, board=BOARD_INSTRUCTIONS[info["profile"]][0]
+            )
         return self._radio_form(
             "radio_select",
-            {
-                vol.Optional("target_id"): vol.In(
-                    {
-                        key: f"{item['label']} ({item['board']})"
-                        for key, item in self._radio_choices.items()
-                    }
-                ),
-                vol.Required("board_confirmed", default=False): bool,
-                vol.Required("dedicated_radio", default=False): bool,
-                vol.Required("bootloader_ready", default=False): bool,
-            },
+            fields,
             board=BOARD_INSTRUCTIONS[info["profile"]][0],
             instructions=BOARD_INSTRUCTIONS[info["profile"]][1],
         )
@@ -446,6 +535,38 @@ class BootstrapFlowMixin:
 
         @param user_input Explicit target, board identification and bootloader readiness.
         """
+        return await self._radio_prepare(user_input, automatic=False)
+
+    async def async_step_radio_detect(self, user_input=None):
+        """Offer explicit supported-sniffer entry or switch to manual instructions without I/O.
+
+        @param user_input Explicit remote-entry consent or manual fallback selection.
+        """
+        if user_input and user_input.get("cancel_setup"):
+            return await self.async_step_radio_cancel()
+        if user_input and user_input.get("manual_setup"):
+            self._radio_manual = True
+            return await self.async_step_radio_select()
+        return await self._radio_prepare(user_input, automatic=True)
+
+    async def async_step_radio_reinspect(self, user_input=None):
+        """Inspect an uncertain current loader state first, with optional physical fallback.
+
+        @param user_input Explicit loader-only inspection or request for button instructions.
+        """
+        if user_input and user_input.get("cancel_setup"):
+            return await self.async_step_radio_cancel()
+        if user_input and user_input.get("use_buttons"):
+            self._radio_use_buttons = True
+            return await self.async_step_radio_select()
+        return await self._radio_prepare(user_input, automatic=False)
+
+    async def _radio_prepare(self, user_input, automatic):
+        """Submit one inspected target with distinct manual or remote-entry consent.
+
+        @param user_input Explicit target, exact board, dedication and method-specific consent.
+        @param automatic Whether this form authorizes supported-sniffer software entry.
+        """
         if user_input and user_input.get("cancel_setup"):
             return await self.async_step_radio_cancel()
         try:
@@ -453,9 +574,12 @@ class BootstrapFlowMixin:
             async with observer.lock:
                 if (
                     not user_input
-                    or not user_input.get("board_confirmed")
-                    or not user_input.get("dedicated_radio")
-                    or not user_input.get("bootloader_ready")
+                    or user_input.get("board_confirmed") is not True
+                    or user_input.get("dedicated_radio") is not True
+                    or user_input.get(
+                        "entry_confirmed" if automatic else "bootloader_ready"
+                    )
+                    is not True
                 ):
                     return await self._radio_select_form(observer)
                 selected = getattr(self, "_radio_choices", {}).get(
@@ -464,6 +588,10 @@ class BootstrapFlowMixin:
                 if not selected:
                     raise IncompatibleError("Select a currently displayed radio")
                 info = await self._radio_info(client, observer)
+                if not info["prepare_supported"] and not (
+                    not automatic and info.get("manual_reinspection_supported") is True
+                ):
+                    raise BootstrapError("radio_inspection_unavailable")
                 choices = await client.targets(info["instance_id"])
                 if (
                     selected not in choices["targets"]
@@ -474,6 +602,12 @@ class BootstrapFlowMixin:
                     )
                 ):
                     raise IncompatibleError("Radio or image selection changed")
+                if automatic and (
+                    selected["board"] != "sonoff-zbdongle-e"
+                    or SNIFFER_ENTRY_METHOD not in selected.get("entry_methods", [])
+                    or info.get("manual_reinspection_supported") is True
+                ):
+                    raise BootstrapError("software_entry_unavailable")
                 for configured in self.hass.config_entries.async_entries("zha"):
                     device = configured.data.get("device")
                     if (
@@ -483,14 +617,19 @@ class BootstrapFlowMixin:
                     ):
                         raise BootstrapError("known_zha_conflict")
                 await observer.save(selection=selected)
+                payload = {
+                    "target_id": selected["target_id"],
+                    "candidate_id": selected["candidate_id"],
+                    "dedicated": True,
+                    "board_confirmed": True,
+                }
+                if automatic:
+                    payload.update(
+                        entry_method=SNIFFER_ENTRY_METHOD, entry_confirmed=True
+                    )
                 return await self._radio_submit_locked(
                     "prepare",
-                    {
-                        "target_id": selected["target_id"],
-                        "candidate_id": selected["candidate_id"],
-                        "dedicated": True,
-                        "board_confirmed": True,
-                    },
+                    payload,
                     info,
                     observer,
                 )
@@ -663,7 +802,8 @@ class BootstrapFlowMixin:
                         "No previous Livolo gateway was verified. Cancellation leaves "
                         "setup unfinished and creates no HA hub. It does not restore "
                         "or verify the previous sniffer or other application. No "
-                        "BOOT/RESET action is needed to cancel this setup."
+                        "BOOT/RESET action is needed to cancel this setup. The radio "
+                        "may remain in bootloader mode."
                     )
                 self._radio_cancel_review_id = uuid.uuid4().hex
                 return self._radio_form(

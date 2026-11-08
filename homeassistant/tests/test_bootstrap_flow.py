@@ -949,3 +949,273 @@ async def test_sonoff_existing_gateway_cancel_uses_its_own_buttons(hass, setup_g
     assert "three seconds" not in instructions
     assert "previous firmware before resuming" in instructions
     assert physical.calls == []
+
+
+async def open_remote_setup(hass, setup):
+    """Advertise only the exact Sonoff method and open its automatic form without a POST.
+
+    @param hass Actual HA instance.
+    @param setup Existing hub and physical-contract fixture.
+    """
+    physical = setup.physical
+    physical.meta.update(
+        mode="bootstrap",
+        enter_supported=False,
+        cancel_supported=True,
+        profile="sonoff-zbdongle-e",
+    )
+    physical.target.update(
+        board="sonoff-zbdongle-e", entry_methods=["manual", "sonoff_sniffer_0_12"]
+    )
+    physical.plan["profile"] = "sonoff-zbdongle-e"
+    result = await open_setup(hass, setup.entry)
+    assert result["step_id"] == "radio_detect"
+    assert_radio_placeholders(result)
+    assert physical.calls == []
+    return result
+
+
+@pytest.mark.parametrize("lost", [False, True])
+async def test_remote_prepare_requires_distinct_consent_and_never_replays(
+    hass, setup_gateway, lost
+):
+    """One advertised remote prepare needs new consent; a lost reply resumes only its saved request.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Existing hub with controlled native responses.
+    @param lost Whether the first preparation reply is lost after server completion.
+    """
+    result = await open_remote_setup(hass, setup_gateway)
+    consent = dict(
+        target_id="radio-1",
+        board_confirmed=True,
+        dedicated_radio=True,
+        entry_confirmed=False,
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], consent
+    )
+    assert result["step_id"] == "radio_detect"
+    assert setup_gateway.physical.calls == []
+    if lost:
+        setup_gateway.physical.lose = "prepare"
+    consent["entry_confirmed"] = True
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], consent
+    )
+    if lost:
+        assert result["errors"] == {"base": "bootstrap_unavailable"}
+        hass.config_entries.options.async_abort(result["flow_id"])
+        result = await open_setup(hass, setup_gateway.entry)
+    assert result["step_id"] == "radio_review"
+    assert [kind for kind, _ in setup_gateway.physical.calls] == ["prepare"]
+    submitted = setup_gateway.physical.calls[0][1]
+    assert submitted["entry_method"] == "sonoff_sniffer_0_12"
+    assert submitted["entry_confirmed"] is True
+    assert "bootloader_ready" not in submitted
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"confirmed": False, "dedicated_radio": True}
+    )
+    assert result["step_id"] == "radio_review"
+    assert [kind for kind, _ in setup_gateway.physical.calls] == ["prepare"]
+
+
+async def test_manual_fallback_keeps_legacy_payload(hass, setup_gateway):
+    """Choosing manual entry displays physical instructions and never sends remote-entry consent.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Gateway whose exact Sonoff target supports both methods.
+    """
+    result = await open_remote_setup(hass, setup_gateway)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"manual_setup": True}
+    )
+    assert result["step_id"] == "radio_select"
+    assert (
+        "release both buttons together"
+        in result["description_placeholders"]["instructions"]
+    )
+    assert setup_gateway.physical.calls == []
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        dict(
+            target_id="radio-1",
+            board_confirmed=True,
+            dedicated_radio=True,
+            bootloader_ready=True,
+        ),
+    )
+    assert result["step_id"] == "radio_review"
+    assert set(setup_gateway.physical.calls[0][1]) == {
+        "request_id",
+        "instance_id",
+        "target_id",
+        "candidate_id",
+        "dedicated",
+        "board_confirmed",
+    }
+
+
+async def test_remote_capability_change_blocks_submission(hass, setup_gateway):
+    """A capability removed after display cannot be replaced by stale remote-entry consent.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Sonoff target with initially advertised automatic preparation.
+    """
+    result = await open_remote_setup(hass, setup_gateway)
+    setup_gateway.physical.target["entry_methods"] = ["manual"]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        dict(
+            target_id="radio-1",
+            board_confirmed=True,
+            dedicated_radio=True,
+            entry_confirmed=True,
+        ),
+    )
+    assert result["errors"] == {"base": "bootstrap_incompatible"}
+    assert setup_gateway.physical.calls == []
+
+
+async def test_unrecognized_application_explains_no_entry_and_manual_fallback(
+    hass, setup_gateway
+):
+    """A refusal before entry gives actionable manual setup without suggesting an uncertain transition.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Sonoff fixture whose passive identification refuses the current firmware.
+    """
+    result = await open_remote_setup(hass, setup_gateway)
+    physical = setup_gateway.physical
+    physical.pending = "prepare"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        dict(
+            target_id="radio-1",
+            board_confirmed=True,
+            dedicated_radio=True,
+            entry_confirmed=True,
+        ),
+    )
+    ident = physical.calls[0][1]["request_id"]
+    physical.results[ident].update(
+        status="rejected",
+        error="application_unrecognized",
+        plan=None,
+        entry_attempted=False,
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"refresh": True}
+    )
+    reason = result["description_placeholders"]["reason"]
+    assert "No bootloader-entry command was sent" in reason
+    assert "manual setup" in reason
+    assert "uncertain" not in reason
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"review_again": True}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"manual_setup": True}
+    )
+    assert result["step_id"] == "radio_select"
+    assert "BOOT" in result["description_placeholders"]["instructions"]
+    assert len(physical.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "recovery,supported,manual_failure",
+    [
+        ("manual_bootloader_inspection_required", True, False),
+        ("manual_bootloader_inspection_required", False, False),
+        ("flash_recovery_required", True, False),
+        ("manual_bootloader_inspection_required", True, True),
+    ],
+)
+async def test_uncertain_entry_requires_fresh_specific_manual_reinspection_capability(
+    hass, setup_gateway, recovery, supported, manual_failure
+):
+    """Only a drained entry-specific recovery permits explicit loader-only inspection without replay.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Sonoff fixture with an uncertain original remote preparation.
+    @param recovery Entry-only uncertainty or unrelated flash recovery.
+    @param supported Whether the daemon currently permits manual reinspection.
+    @param manual_failure Whether loader-only inspection fails while the original uncertainty remains.
+    """
+    result = await open_remote_setup(hass, setup_gateway)
+    physical = setup_gateway.physical
+    physical.pending = "prepare"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        dict(
+            target_id="radio-1",
+            board_confirmed=True,
+            dedicated_radio=True,
+            entry_confirmed=True,
+        ),
+    )
+    ident = physical.calls[0][1]["request_id"]
+    physical.results[ident].update(
+        status="unknown", recovery=recovery, plan=None, entry_attempted=True
+    )
+    physical.meta["manual_reinspection_supported"] = supported
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"refresh": True}
+    )
+    assert result["step_id"] == "radio_progress"
+    expected = recovery == "manual_bootloader_inspection_required" and supported
+    assert ("manual_reinspection" in result["data_schema"].schema) == expected
+    assert [kind for kind, _ in physical.calls] == ["prepare"]
+    flow = hass.config_entries.options._progress[result["flow_id"]]
+    if expected:
+        physical.meta["manual_reinspection_supported"] = False
+        denied = await flow.async_step_radio_progress({"manual_reinspection": True})
+        assert denied["errors"] == {"base": "bootstrap_unavailable"}
+        assert len(physical.calls) == 1
+        physical.meta["manual_reinspection_supported"] = True
+    shown = await flow.async_step_radio_progress({"manual_reinspection": True})
+    if not expected:
+        assert shown["errors"] == {"base": "bootstrap_unavailable"}
+        assert len(physical.calls) == 1
+        return
+    assert shown["step_id"] == "radio_reinspect"
+    assert_radio_placeholders(shown)
+    assert len(physical.calls) == 1
+    physical.pending = None
+    if manual_failure:
+        physical.reject = "prepare"
+    shown = await flow.async_step_radio_reinspect(
+        dict(
+            target_id="radio-1",
+            board_confirmed=True,
+            dedicated_radio=True,
+            bootloader_ready=True,
+        )
+    )
+    assert len(physical.calls) == 2
+    original, manual = [body for _, body in physical.calls]
+    assert original["request_id"] != manual["request_id"]
+    assert "entry_method" not in manual and "entry_confirmed" not in manual
+    if not manual_failure:
+        assert shown["step_id"] == "radio_review"
+        return
+    assert shown["step_id"] == "radio_progress"
+    assert physical.results[manual["request_id"]]["recovery"] is None
+    assert physical.results[ident]["status"] == "unknown"
+    physical.meta["active_request_id"] = ident
+    physical.target["entry_methods"] = ["manual"]
+    hass.config_entries.options.async_abort(result["flow_id"])
+    reopened = await open_setup(hass, setup_gateway.entry)
+    assert reopened["step_id"] == "radio_progress"
+    assert "manual_reinspection" in reopened["data_schema"].schema
+    reopened = await hass.config_entries.options.async_configure(
+        reopened["flow_id"], {"manual_reinspection": True}
+    )
+    assert reopened["step_id"] == "radio_reinspect"
+    reopened = await hass.config_entries.options.async_configure(
+        reopened["flow_id"], {"use_buttons": True}
+    )
+    assert reopened["step_id"] == "radio_select"
+    assert "BOOT" in reopened["description_placeholders"]["instructions"]
+    assert len(physical.calls) == 2
+    assert physical.results[ident]["status"] == "unknown"

@@ -25,7 +25,7 @@ after normal service closes, but another serial at the same USB port is rejected
 including after daemon restart. A populated untagged legacy setup journal is
 treated as ZB-GW04 and cannot be silently relabeled for Sonoff.
 
-After manual BOOT/RESET entry, the Sonoff inspection sends **newline only** at
+For loader-only inspection after manual or software entry, Sonoff sends **newline only** at
 115200 baud and requires the complete Gecko menu. Only wire versions `2.04.02`
 and `2.4.2` normalize to the reviewed `2.4.2` policy. Partial menus, other
 versions/families, contradictory security text and timeouts fail closed without
@@ -39,6 +39,39 @@ loader review, not for the offline artifact inspection. Deployment requires that
 review and a private policy bound to the current attachment; adding a profile or
 seeing a menu alone does not establish signing/encryption policy. See
 [the Sonoff qualification procedure](SONOFF_GUIDED_QUALIFICATION.md).
+
+Targets may advertise `entry_methods: ["manual", "sonoff_sniffer_0_12"]` when no
+gateway baseline is captured. This advertises a conditional supported method,
+not an already observed application. An explicitly confirmed Prepare request
+can add `entry_method: "sonoff_sniffer_0_12"` and `entry_confirmed: true`.
+Omitting both preserves the original loader-only request and manual UI behavior.
+No new endpoint or generic reset strategy is introduced.
+
+Remote Prepare first discards buffered RX input at fixed 921600 baud and requires
+two fresh CRC-valid, strictly matching sniffer 0.12 status records with progressing
+sequence and timestamps. At least one qualifying new status must arrive half a
+second after observation begins; an immediate buffered burst cannot authorize
+entry. Observation is bounded to three seconds and 300,000 bytes. Wrong or absent
+identity causes zero serial writes. Once the parent commits `bootloader_entry`,
+the child writes exactly `\nBOOTLOADER\n` once, retains the same descriptor and
+lease, allows 1.1 seconds for the firmware's bounded drain/reset, switches to
+115200, clears old RX bytes and verifies the full loader menu. Total provider
+time is bounded to eight seconds. There is no modem-line reset, automatic fallback
+or implicit firmware installation.
+
+The protected loader policy must honestly identify its reviewed historical
+exact-unit security expectation; it is not a claim of fresh security-bit readback.
+The fresh matching target/menu observation is obtained during Prepare, before
+issuing the ordinary plan. Review and Install retain their separate confirmation.
+
+After possible entry, interruption leaves
+`recovery: manual_bootloader_inspection_required`, no plan and no automatic replay.
+Once cleanup is proven and no flash recovery exists,
+`info.manual_reinspection_supported` permits an explicit loader-only Prepare.
+That action first checks the current loader without requiring another reset;
+manual BOOT/RESET remains a separately chosen fallback. A successful inspection
+atomically records reconciliation and a new plan while preserving the original
+request result. A failed reinspection leaves the original uncertainty intact.
 
 First use starts explicitly in bootstrap mode without opening normal gateway
 UART, creating a network or inventing a gateway baseline for the sniffer.
@@ -190,8 +223,9 @@ Postflight uses 460800 baud and three separate request IDs for VERSION, CAPS and
 STATUS, with one shared timeout budget of at most three seconds. It rejects
 wrong board/protocol/baud, inconsistent versions, active RF or ACK, duplicate
 fields and oversized/malformed replies. The adapter independently compares the
-returned version with the selected artifact. Neither inspection sends NETWORK,
-ARM, pairing, switch control or BOOTLOADER commands. Metadata/lease/access checks
+returned version with the selected artifact. Loader-only and postflight inspections
+send no NETWORK, ARM, pairing, switch-control or BOOTLOADER commands; the separate
+explicitly consented remote-Prepare entry phase is described above. Metadata/lease/access checks
 surround the I/O. Serial reads and writes use the remaining action budget and
 hard byte limits; the outer worker supervisor still bounds kernel/driver or
 filesystem stalls that Python cannot preempt.
