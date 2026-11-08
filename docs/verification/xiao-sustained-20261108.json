@@ -1,0 +1,650 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "base_commit": "891874daf3ba3fbc426db61abb856256783678a1",
+  "scope": "Sustained investigation on the two experimental XIAOs; no pairing or control",
+  "installed_images": {
+    "mg24": "xiao-rx-2",
+    "c6": "xiao-usb-1",
+    "firmware_version": "0.14",
+    "protocol": 3
+  },
+  "firmware_flashing_performed": false,
+  "existing_radios_or_ha_modified": false,
+  "release_or_update_catalog_modified": false,
+  "c6_rf_off": {
+    "passed": true,
+    "receipt_sha256": "06951b8f2200274ebd87ae01d99755ac9aa1287b7fbdb1b34db9536bfa2561d5",
+    "journal_sha256": "2a289758441922b1e48e3a52d3e5b64617d251850d8efc92f8c78bfc506f4c84",
+    "journal_events": 26159,
+    "journal_bytes": 10576486,
+    "accepted_bytes": 3014953,
+    "writes": 12952,
+    "health_samples": 21,
+    "unknown_lines": 0,
+    "max_request_latency_seconds": 0.013134537963196635,
+    "lifecycle_elapsed_seconds": 600.1607791520073,
+    "phases": [
+      {
+        "label": "idle",
+        "duration_seconds": 180.02067560201976,
+        "offered_bytes": 0,
+        "accepted_bytes": 0,
+        "workload_writes": 0,
+        "minimum_post_return_gap_seconds": null,
+        "submission_span_seconds": null
+      },
+      {
+        "label": "paced_newlines",
+        "duration_seconds": 120.01973142300267,
+        "offered_bytes": 1424384,
+        "accepted_bytes": 1424384,
+        "workload_writes": 5564,
+        "minimum_post_return_gap_seconds": 0.020560965000186116,
+        "submission_span_seconds": 119.72512598801404
+      },
+      {
+        "label": "paced_overlength",
+        "duration_seconds": 120.01981132099172,
+        "offered_bytes": 1145950,
+        "accepted_bytes": 1145950,
+        "workload_writes": 5590,
+        "minimum_post_return_gap_seconds": 0.020560470002237707,
+        "submission_span_seconds": 119.68485749396496
+      },
+      {
+        "label": "higher_rate_paced_newlines",
+        "duration_seconds": 30.020425449998584,
+        "offered_bytes": 443392,
+        "accepted_bytes": 443392,
+        "workload_writes": 1732,
+        "minimum_post_return_gap_seconds": 0.01644537301035598,
+        "submission_span_seconds": 29.728470173024107
+      },
+      {
+        "label": "recovery_idle",
+        "duration_seconds": 150.01931761897868,
+        "offered_bytes": 0,
+        "accepted_bytes": 0,
+        "workload_writes": 0,
+        "minimum_post_return_gap_seconds": null,
+        "submission_span_seconds": null
+      }
+    ],
+    "limitation": "Bounded paced test only; no worst-case continuously-ready input qualification or historical stall diagnosis.",
+    "read_calls_delta": 97480,
+    "zero_length_reads_delta": 47763,
+    "firmware_uptime_ms": [
+      1017131,
+      1617231
+    ],
+    "scoped_kernel_query": {
+      "same_host_boot": true,
+      "query_succeeded": true,
+      "usb_events": 0,
+      "limitation": "Kernel observations do not establish USB electrical or endpoint-register state."
+    },
+    "port_closed_and_unowned": true
+  },
+  "passive_reception": {
+    "evidence_audit_passed": true,
+    "capture_assessment": "failed",
+    "schedule_completed": false,
+    "windows_attempted": 1,
+    "remaining_windows_not_run": 11,
+    "receipt_sha256": "5fe0c793ddb90a34a58d3f7ee422a954df7cb453a0d23bb3a677bd17c6a6f558",
+    "journal_sha256": "cd8e0423918ea0d7ccfef6d3db7e89079c7c4fdb3cfb8859b5f4b911f4e5aa63",
+    "journal_events": 1277,
+    "journal_bytes": 354432,
+    "unknown_lines": 0,
+    "frames": {
+      "mg24": {
+        "delivered_frames": 617,
+        "aggregate_dropped": 37,
+        "independent_original_fcs_valid": 617,
+        "accepted_before_portable_queue": 626,
+        "accepted_minus_delivered": 9
+      },
+      "c6": {
+        "delivered_frames": 520,
+        "aggregate_dropped": 22,
+        "independent_original_fcs_valid": null,
+        "accepted_before_portable_queue": 542,
+        "accepted_minus_delivered": 22
+      }
+    },
+    "mg24_frame_errors": 28,
+    "mg24_other_adapter_reasons_zero": true,
+    "c6_output_accounting": {
+      "device_written_bytes_delta": 61695,
+      "captured_line_bytes": 61695,
+      "device_write_calls_delta": 531,
+      "captured_lines": 531,
+      "scope": "From first RFHEALTH response inclusive through final RFHEALTH response exclusive"
+    },
+    "c6_input_accepted": 309,
+    "c6_input_delta_exact": true,
+    "c6_health_continuous": true,
+    "clean_stop_closed": true,
+    "inference": "Given frozen core increments rx before enqueue, overflow is its only post-increment drop path, queue drains to zero without clearing at STOP, and delivered counts have deficits exactly equal to remaining dropped counters: 9 MG24 and 22 C6 are consistent with portable receive-ring overflow. C6 complete output-byte accounting supports loss before USB output rather than serial delivery. This does not identify which payloads were dropped or explain the separate 28 MG24 frame errors.",
+    "limits": [
+      "No dedicated portable overflow counter in installed firmware",
+      "Host and device timing is not synchronized RF timing",
+      "Historical C6-only reports and synthetic miss cannot be retroactively attributed"
+    ],
+    "planned_windows": 12,
+    "planned_seconds_per_window": 45,
+    "planned_rf_off_gap_seconds": 10,
+    "channel": 11,
+    "native_target_counts_each_board": {
+      "46715621": 3,
+      "66780945": 12
+    },
+    "continuation": "Stopped after the first completed capture failed the delivery gate; no replacement window."
+  },
+  "controlled_synthetic": {
+    "audit_passed": true,
+    "strict_passed": false,
+    "receipt_sha256": "a67a422ae8821cfab4efa98602449fb1f3ef3fadc33d189d70b59ef294437d6d",
+    "journal_sha256": "cd1c64a83991f18c18fb9b4ed7362eb91825a38c19cd6718a90993978819d729",
+    "journal_events": 4966,
+    "journal_bytes": 1190657,
+    "accepted_bytes": {
+      "mg24": 11964,
+      "c6": 12000
+    },
+    "unknown_lines": 0,
+    "c6_continuity_comparisons": 23,
+    "windows": [
+      {
+        "index": 0,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              33
+            ],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 74,
+        "mg24_frame_errors": 3,
+        "rx_events": {
+          "mg24": 74,
+          "c6": 50
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error",
+          "c6 transmitted payloads absent from counterpart capture"
+        ]
+      },
+      {
+        "index": 1,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              0
+            ],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 68,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "c6": 52,
+          "mg24": 68
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error",
+          "c6 transmitted payloads absent from counterpart capture"
+        ]
+      },
+      {
+        "index": 2,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 69,
+        "mg24_frame_errors": 2,
+        "rx_events": {
+          "mg24": 69,
+          "c6": 53
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error"
+        ]
+      },
+      {
+        "index": 3,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              17
+            ],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 18,
+            "missing_sequences": [
+              43,
+              44
+            ],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 71,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "c6": 47,
+          "mg24": 71
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error",
+          "c6 transmitted payloads absent from counterpart capture",
+          "mg24 transmitted payloads absent from counterpart capture"
+        ]
+      },
+      {
+        "index": 4,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              17
+            ],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 81,
+        "mg24_frame_errors": 3,
+        "rx_events": {
+          "mg24": 81,
+          "c6": 50
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error",
+          "mg24 transmitted payloads absent from counterpart capture"
+        ]
+      },
+      {
+        "index": 5,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 61,
+        "mg24_frame_errors": 6,
+        "rx_events": {
+          "c6": 51,
+          "mg24": 61
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error"
+        ]
+      },
+      {
+        "index": 6,
+        "strict_passed": true,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 62,
+        "mg24_frame_errors": 0,
+        "rx_events": {
+          "mg24": 62,
+          "c6": 51
+        },
+        "failure_causes": []
+      },
+      {
+        "index": 7,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 68,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "c6": 50,
+          "mg24": 68
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error"
+        ]
+      },
+      {
+        "index": 8,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 72,
+        "mg24_frame_errors": 4,
+        "rx_events": {
+          "mg24": 72,
+          "c6": 53
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error"
+        ]
+      },
+      {
+        "index": 9,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 71,
+        "mg24_frame_errors": 2,
+        "rx_events": {
+          "c6": 51,
+          "mg24": 71
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error"
+        ]
+      },
+      {
+        "index": 10,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 18,
+            "missing_sequences": [
+              5,
+              10
+            ],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              33
+            ],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 65,
+        "mg24_frame_errors": 4,
+        "rx_events": {
+          "mg24": 65,
+          "c6": 49
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error",
+          "mg24 transmitted payloads absent from counterpart capture",
+          "c6 transmitted payloads absent from counterpart capture"
+        ]
+      },
+      {
+        "index": 11,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              33
+            ],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 72,
+        "mg24_frame_errors": 2,
+        "rx_events": {
+          "c6": 52,
+          "mg24": 72
+        },
+        "failure_causes": [
+          "MG24 aggregate frame_error",
+          "mg24 transmitted payloads absent from counterpart capture"
+        ]
+      }
+    ],
+    "limitation": "Full payload matches and TX completion are separate evidence; missing captures have no proven cause, and C6 original FCS is unavailable.",
+    "totals": {
+      "windows": 12,
+      "strict_passed_windows": 1,
+      "strict_failed_windows": 11,
+      "mg24_frame_errors": 29,
+      "mg24_independent_original_fcs_valid": 834,
+      "directions": {
+        "mg24": {
+          "expected": 240,
+          "received": 234,
+          "missing": 6
+        },
+        "c6": {
+          "expected": 240,
+          "received": 236,
+          "missing": 4
+        }
+      }
+    },
+    "prior_failed_receipt_sha256": "5fe0c793ddb90a34a58d3f7ee422a954df7cb453a0d23bb3a677bd17c6a6f558",
+    "same_open_lifecycle_seconds": {
+      "mg24": 227.7356087269727,
+      "c6": 227.73043481900822
+    },
+    "script_exit_code": 1,
+    "executed_dependency_hashes_verified": true,
+    "schedule_completed": true,
+    "channel": 26,
+    "tx_per_board_per_window": 20,
+    "cadence_seconds": 0.2,
+    "rf_off_gap_seconds": 10,
+    "direction_keys_identify_transmitter": true,
+    "all_tx_completed": true,
+    "portable_receive_delivery_deficits": 0,
+    "c6_reported_drops": 0,
+    "mg24_other_reason_counters_zero": true,
+    "rf_off_and_ports_closed_unowned": true,
+    "firmware_uptime_ms": [
+      2290141,
+      2517681
+    ],
+    "max_readonly_request_latency_seconds": 0.042581,
+    "scoped_kernel_query": {
+      "same_host_boot": true,
+      "query_succeeded": true,
+      "usb_events": 0
+    },
+    "admission": "Separate controlled experiment: initial state must match the exact stopped failed passive receipt; fresh RFSTART and all subsequent loss/health gates remain unchanged. No reset or replacement window.",
+    "unattributed_frame_errors": "Five failed windows captured all twenty synthetic frames in both directions; their MG24 frame errors total fifteen. Aggregate frame errors cannot be assigned to missing synthetic frames."
+  },
+  "source_review": {
+    "c6_rx_ring": "The pinned driver does not check RX ring enqueue failure; exact accepted/read-byte accounting is required in addition to read-error counters.",
+    "c6_original_stall": "Not reproduced or causally resolved by this bounded paced run.",
+    "mg24_filtering": "Pinned promiscuous mode retains CRC checking. Both accepted and absent target-source reports share the same MAC layouts; a deterministic layout filter explanation was not established.",
+    "mg24_short_gap": "Historical successful captures also occur roughly seven milliseconds after native reports. A fixed receiver recovery-gap explanation was not established.",
+    "limits": [
+      "MAC source and forwarding fields do not identify the physical transmitter.",
+      "C6 receive callbacks indicate SDK hardware acceptance; original FCS is replaced by RSSI/LQI and cannot be independently recomputed from its output.",
+      "Equal payloads in two captures need not represent the same transmission; unseen retries and host interval edges limit matching.",
+      "MG24 frame-error counts do not identify lost target packets or establish a packet-loss denominator.",
+      "C6 reported drops do not count every hardware acquisition or CRC rejection; zero reported drops is not proof of zero RF rejection."
+    ]
+  },
+  "offline_validation": {
+    "c6_workload_tests": 9,
+    "passive_workload_tests": 9,
+    "synthetic_workload_tests": 8,
+    "historical_rf_analyzer_tests": 6,
+    "sustained_rf_analyzer_tests": 7,
+    "review": "Root and Release engineer independently ran workload tests and reviewed frozen scripts; raw evidence is separately audited.",
+    "synthetic_transition_tests": 13
+  },
+  "bench_script_sha256": {
+    "sustained_common.py": "5fd2f3d6a89582db9079870d9392c00c0195bfd09c851882fefde7ba960f4c33",
+    "c6_sustained.py": "b0265282fbf0d052309ab1fcbcfb7e04df624d08026610b4642e89d221682f4b",
+    "passive_sustained.py": "7d336114ce957433fc494c5e920652d6bdc00c6251b063a8f29e9b8f612e315f",
+    "synthetic_sustained_v2.py": "6cd6ee025998d3c1b546d0b5b5f9809cd556dc6be738348babc8ebdf1be893ae"
+  },
+  "final_state": {
+    "both_new_xiaos_rf_off": true,
+    "both_ports_closed_unowned": true,
+    "installed_image_identities_unchanged": true,
+    "operator_manifest_sha256": "febfb986c4aeaac9bb3795b5bb2af45b34ac540a62ad59394f8686a873fa4337",
+    "limitation": "No flashing was performed; this stage did not repeat whole-flash readback."
+  },
+  "open_gates": [
+    "Sustained passive qualification failed; eleven remaining windows were not run.",
+    "Portable receive-event backlog needs explicit overflow telemetry and a measured drain-service design before further passive qualification.",
+    "The historical C6 intermittent stall was not reproduced; its cause remains unresolved.",
+    "MG24 frame errors and bidirectional controlled capture misses remain unexplained; current evidence does not attribute them to individual transmissions or a particular radio/PHY cause.",
+    "Pairing, control and production-update qualification remain on hold."
+  ]
+}

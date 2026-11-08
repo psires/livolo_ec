@@ -339,3 +339,63 @@ The [stability verification record](verification/xiao-stability-20261108.json)
 retains artifact hashes, measured results, preservation checks and open gates.
 Pairing and control remain on hold. Existing radios, services and HA were not
 changed, and no experimental firmware was added to a release or update catalog.
+
+### Sustained investigation, November 8
+
+The installed C6 `xiao-usb-1` image completed a ten-minute RF-off test through
+one USB connection. The fixed schedule covered idle operation, paced newline
+input, discarded overlength input, a higher-rate phase and recovery idle.
+All 3,014,953 accepted bytes were accounted for, uptime remained continuous,
+and all 21 health samples reported zero watchdog, read-error, write-error and
+pending-output values. The longest measured request took 13.135 ms.
+Independent raw-log review found no unknown or ROM lines; the scoped kernel
+query found no USB events. This is a bounded paced-load result, not a
+reproduction or resolution of the original
+intermittent stall, nor a continuously-ready-input qualification.
+
+The subsequent passive test planned twelve 45-second windows with ten-second
+RF-off gaps. Its first window completed and stopped cleanly, but failed the
+delivery gate, so the remaining eleven windows were **not run**. MG24 accepted
+626 frames into the portable receive path and delivered 617, with 37 aggregate
+drops: 28 frame errors and a residual of nine. C6 accepted 542 and delivered
+520, with 22 drops. Both boards delivered three native reports from `46715621`
+and twelve from `66780945`. All 617 delivered MG24 frames passed an independent
+original-FCS check.
+
+Source and timing evidence strongly support overflow of the portable receive
+queue, which has seven usable slots, for the nine and 22 delivery deficits.
+The core increments its receive counter before checking queue capacity, and
+STOP preserves the queue for draining. C6 firmware output counters also match
+all 61,695 captured bytes in the audited interval, supporting loss before USB
+output. Bursts with C6 callback gaps below 2 ms were delivered roughly 21 ms
+apart, consistent with the input wait and output yield in its main loop.
+MG24 diagnostic output is bounded by its 115200-baud UART. The installed images
+have no dedicated queue-overflow counter, so the missing payloads and precise
+overflow times cannot be identified.
+
+A separate controlled channel-26 experiment then completed twelve windows,
+alternating transmission order and sending twenty fixed test frames per board
+in each window, with 200 ms spacing and ten-second RF-off gaps. It preserved
+the failed passive receipt and verified its exact stopped state before starting
+fresh test windows; no board reset or firmware write was used. All 240
+transmissions per board completed, but C6 captured 234 MG24 frames and MG24
+captured 236 C6 frames. No portable receive-to-delivery deficits were observed
+in these windows. MG24 reported 29 frame errors with all other reason counters
+zero; C6 reported no drops. One window passed the strict assessment and eleven
+failed. These measured capture misses cannot be assigned to a specific RF or
+receiver cause, nor extrapolated to a general packet-loss rate.
+
+This queue evidence does not explain MG24's separate 28 frame errors or earlier
+captures whose accepted and delivered counts matched. Successful and absent
+forwarded reports also have overlapping spacing after native reports; a fixed
+receiver-recovery threshold was not established. MAC source fields and equal
+payloads do not identify physical transmitters or individual transmission
+attempts. The passive result remains **failed**; pairing and control stay on
+hold while receive-queue telemetry, output scheduling and RF discrepancies
+remain open qualification work.
+
+The [sustained verification record](verification/xiao-sustained-20261108.json)
+contains audited measurements, artifact hashes and remaining qualification
+limits. Both XIAOs finished RF-off with their ports closed. No firmware was
+flashed, and existing radios, services, HA, releases and update catalogs were
+unchanged.
