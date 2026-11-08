@@ -1,8 +1,8 @@
 # Sonoff guided setup engineering contract
 
 Prepared 2026-11-08 for the dedicated Intel testbed. This is an implementation
-and qualification plan, not a successful guided-install record or public
-firmware approval. The Linux specialist is the sole live operator. The active
+and qualification contract. The [successful exact-unit HA trial](verification/sonoff-intel-ha-success-20261108.json)
+is recorded separately; public firmware approval remains incomplete. The Linux specialist is the sole live operator. The active
 HA gateway and other radios are outside this trial.
 
 ## Selected hardware and images
@@ -72,8 +72,10 @@ rates with writes while the application/loader mode is unknown.
 ### Implemented HA-authorized known-sniffer entry
 
 The engineering flow passed independent source review and 150 focused offline
-tests, followed by one successful physical HA Prepare. Full HA installation
-qualification remains pending after the separate preflash inspection timeout.
+tests, followed by successful physical HA Prepare, Install, Initialize and Handoff
+on the reviewed unit after explicit reconciliation of the earlier preflash timeout.
+The normal service is ready with switch output controls disabled; no switches
+were paired or controlled. Remaining RF/control and recovery qualification is incomplete.
 The original unknown Install receipt and consumed plan remain preserved.
 The current sniffer already implements the required software command; no new
 radio firmware is needed to enter its loader. Manual buttons remain a recovery
@@ -104,7 +106,9 @@ with no upload; the original journal and HA observer hashes were unchanged.
 This supports the selected policy on the reviewed unit. It does not prove the
 earlier failure's electrical cause, exclude kernel open/close reset effects,
 establish the mode after final close, or qualify other Sonoff hardware variants.
-The production change still needs a clean build and a complete HA install trial.
+The clean `f48cf42` build subsequently passed the scoped HA install and handoff
+trial. The final snapshot reported `invalid_rx=252`; its cause is unresolved and
+no RF quality or public qualification is inferred.
 
 On that guarded descriptor, listen without writes at fixed **921600**. Discard
 pre-existing RX input with a bounded input reset/drain and start a fresh decoder;

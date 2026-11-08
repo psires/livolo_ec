@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Successful exact-unit experimental Sonoff remote setup through isolated Intel Home Assistant Container; not public firmware qualification",
+  "reported_by": "Linux specialist, sole live operator; source and artifact evidence reviewed by Release Engineer, Unix, HA and ZigBee specialists",
+  "source_commit": "f48cf42c06a934876847013330d6929b472c45ac",
+  "platform": "linux/amd64",
+  "versions": {
+    "distribution": "0.6.0",
+    "daemon": "0.15.0",
+    "firmware": "0.14",
+    "integration": "0.6.0",
+    "api": 1,
+    "uart_protocol": 3,
+    "uart_baud": 460800
+  },
+  "artifacts": {
+    "image_id": "sha256:d9ecaf7d3814a90b6e10c4a23e564a2f2d40bb3244ea359201f35bbcbaeae404",
+    "docker_archive_sha256": "d1d638a6b436352d09412fa06d136f7da9182019e64ac4984c32ad90d1bd5211",
+    "context_tar_sha256": "38d390ca9db217c6986f07e29ec012f701555acae1af361cf254fd613cd1ac89",
+    "integration_zip_sha256": "f72c9d9bf6502bfe231a299467604b3419cea137f1b40af8fbf69fb21c5d8a20"
+  },
+  "firmware": {
+    "board": "sonoff-zbdongle-e",
+    "source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
+    "bytes": 60572,
+    "sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+    "qualified": false
+  },
+  "validation": {
+    "files": 16,
+    "full_host_tests_reported_by_unix": 545,
+    "independent_host_focused_tests": 132,
+    "independent_final_maintenance_tests": 9,
+    "full_ha_tests_reported_by_ha": 474,
+    "independent_ha_focused_tests": 139,
+    "zigbee_focused_tests_python_optimized": 115,
+    "ci_checks_passed": 12,
+    "documentation_files_checked": 243
+  },
+  "previous_evidence": [
+    "docs/verification/sonoff-intel-ha-trial-20261108.json",
+    "docs/verification/sonoff-intel-passive-diagnostic-20261108.json",
+    "docs/verification/sonoff-intel-entry-reopen-20261108.json"
+  ],
+  "actual_sequence": [
+    {
+      "phase": "maintenance",
+      "result": "verified_no_flash; prepare_only",
+      "uart_opened": false,
+      "original_failed_operation_and_consumed_plan": "logically unchanged",
+      "ha_observer_before_upgrade": "byte unchanged"
+    },
+    {
+      "phase": "HA recovery acknowledgment",
+      "result": "GET-only setup reached radio_detect; original unknown receipt/pending/plan retained in separate audit; current pending and plan null; awaiting fresh preparation",
+      "new_operation_submitted": false,
+      "uart_opened": false
+    },
+    {
+      "phase": "fresh remote Prepare",
+      "submissions": 1,
+      "result": "confirmed; new request and new plan bound to exact reviewed target and candidate"
+    },
+    {
+      "phase": "separate Install",
+      "submissions": 1,
+      "result": "confirmed",
+      "application_verified": true,
+      "recovery": null
+    },
+    {
+      "phase": "explicit Initialize",
+      "submissions": 1,
+      "result": "confirmed; HA reached radio_handoff without creating hub"
+    },
+    {
+      "phase": "separate Handoff",
+      "submissions": 1,
+      "result": "confirmed; network_ready; HA create_entry"
+    }
+  ],
+  "application_postflight": {
+    "evidence": "Confirmed source-bound worker receipt requires independently correlated VERSION/CAPS/STATUS predicates",
+    "version_and_caps": "Sonoff board, firmware0.14 and proto3",
+    "caps_baud": 460800,
+    "status_at_postflight": {
+      "armed": 0,
+      "ack": 0
+    },
+    "raw_reply_mappings_persisted": false,
+    "separate_uart_probe_performed": false
+  },
+  "final_normal_state": {
+    "ready": true,
+    "simulated": false,
+    "controls_enabled": false,
+    "output_mode": "disabled",
+    "physical_device_registry_entries": 0,
+    "livolo_ha_hubs": 2,
+    "existing_simulator_hub_retained": true,
+    "new_physical_hub_created": true,
+    "radio_mode": "Normal receiver/ACK ownership; not disarmed",
+    "runtime": "Dedicated test service left running with normal physical ownership",
+    "existing_simulator_entity_ids_present": 3
+  },
+  "history": {
+    "original_install": "unknown/recovery_required receipt preserved; exact prior consumed plan retained",
+    "new_install": "confirmed/application_verified",
+    "initialize": "confirmed",
+    "handoff": "confirmed/network_ready"
+  },
+  "diagnostics": {
+    "invalid_rx": 252,
+    "rx_gaps": 0,
+    "ack_failures": 0,
+    "interpretation": "Unresolved receive counter, not a measure of RF qualification. Source increments invalid_rx for RX-envelope or packet-decode rejection; observed cause not established."
+  },
+  "final_operator_evidence_sha256": "7b0a9c73641d9e8425d8ebf19c44cbcc3f4a77af6f5f6d8afbc26de6c96e9aa8",
+  "limitations": [
+    "One reviewed CP210x Sonoff unit only; other hardware variants unqualified.",
+    "No saved raw postflight replies or full firmware image readback.",
+    "No pairing, one-/two-gang switch control, RF quality, firmware rollback or additional lifecycle test performed in this run.",
+    "Final normal RX/ACK behavior differs from disarmed application postflight.",
+    "The unexplained invalid_rx counter needs separate investigation before RF acceptance.",
+    "Existing production HA at10.1.1.40 and other radios were untouched.",
+    "Existing simulator hub and its three named entity IDs remain present; no separate pre-install registry snapshot supports a final byte-for-byte registry comparison."
+  ],
+  "publication_enabled": false,
+  "public_firmware_qualified": false,
+  "remaining_release_gates": [
+    "Other supported boards still require physical qualification and applicable migration/recovery tests.",
+    "Complete scoped switch control and remaining firmware updater/recovery acceptance.",
+    "Final full-release inventory, notice/channel presentation and provenance acceptance."
+  ],
+  "independent_final_snapshot_review": {
+    "sha256_matches": true,
+    "normal_readiness_versions_disabled_controls_and_operation_history_match": true,
+    "reviewer": "Release Engineer"
+  }
+}

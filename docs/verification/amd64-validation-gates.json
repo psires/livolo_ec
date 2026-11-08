@@ -17,7 +17,7 @@
     "platform": "linux/amd64",
     "storage_root": "/storage/livolo-testbed",
     "existing_ha_installation": "Unchanged; outside this testbed's scope",
-    "radio": "Dedicated Sonoff: remote known-sniffer entry and matching loader Prepare passed; separate Install timed out before flash authorization and remains fenced in recovery",
+    "radio": "Dedicated Sonoff0.14 installed through HA and handed to normal service; output controls disabled, no paired devices; exact-unit experimental scope",
     "supervisor_available": false
   },
   "gates": [
@@ -71,13 +71,13 @@
     },
     {
       "id": "dedicated_radio_identity_and_recovery",
-      "status": "identity_and_historical_policy_reviewed_recovery_diagnosis_in_progress",
+      "status": "exact_unit_identity_and_explicit_preflash_reconciliation_passed_full_recovery_qualification_incomplete",
       "required_evidence": "Confirm physical transfer, exact board/revision, USB topology/identity, current firmware, ownership and reviewed recovery path before an explicitly scoped hardware trial",
       "constraints": "No automatic protocol commands or flash; writes only through the reviewed explicit action. Do not reuse ZB-GW04 policy or firmware."
     },
     {
       "id": "sonoff_ha_firmware_installation",
-      "status": "actual_install_preflash_loader_timeout_recovery_required",
+      "status": "exact_unit_actual_ha_install_and_handoff_passed_remaining_qualification_incomplete",
       "required_evidence": "Exact-board provider and loader/security policy, reviewed private candidate and recovery artifacts, actual HA inspect/explicit install, independent application VERSION/CAPS/STATUS, explicit new-network initialization/handoff, and scoped failure/recovery checks on the clean AMD64 image",
       "constraints": "No fabricated gateway baseline for the starting sniffer. Cancellation without a baseline cannot claim restored sniffer or gateway service. Recovery needs its own explicit action and passive sniffer verification. Keep firmware qualified:false until the relevant tests pass.",
       "firmware_source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
@@ -87,11 +87,12 @@
       "candidate_offline_board_version_layout_check": "independently passed by Release Engineer",
       "known_sniffer_recovery_sha256": "c9d5bb865ab6734c9c739a36bcc4a71139ab7fcc01090e5a55371f1378e1896d",
       "original_factory_readback_available": false,
-      "actual_trial_record": "docs/verification/sonoff-intel-ha-trial-20261108.json"
+      "actual_trial_record": "docs/verification/sonoff-intel-ha-trial-20261108.json",
+      "actual_success_record": "docs/verification/sonoff-intel-ha-success-20261108.json"
     },
     {
       "id": "sonoff_remote_bootloader_entry",
-      "status": "actual_remote_prepare_passed_installation_and_recovery_qualification_incomplete",
+      "status": "actual_remote_prepare_install_and_handoff_passed_exact_unit_only",
       "contract": "Explicit optional Prepare entry_method sonoff_sniffer_0_12 and entry_confirmed true; absent fields preserve manual entry. Fresh strict passive sniffer identity under the exact lease precedes durable permission and one fixed entry command. Complete expected loader menu is mandatory before a plan; Install remains separate.",
       "security_basis": "Private exact-unit historical unsigned/unencrypted acceptance is a reviewed expectation, not a fresh security readback. Prepare must reject any observed contradiction.",
       "failure_boundary": "No automatic replay after uncertain entry. Explicit server-gated manual reinspection may reconcile entry uncertainty only after worker cleanup; it cannot bypass possible-flash recovery.",
@@ -208,6 +209,15 @@
     "daemon_ci_checks_passed": 12,
     "ha_ci_checks_passed": 6,
     "actual_trial_record": "docs/verification/sonoff-intel-ha-trial-20261108.json",
+    "public_qualified": false
+  },
+  "combined_recovery_trial": {
+    "source_commit": "f48cf42c06a934876847013330d6929b472c45ac",
+    "image_id": "sha256:d9ecaf7d3814a90b6e10c4a23e564a2f2d40bb3244ea359201f35bbcbaeae404",
+    "integration_zip_sha256": "f72c9d9bf6502bfe231a299467604b3419cea137f1b40af8fbf69fb21c5d8a20",
+    "ci_checks_passed": 12,
+    "result": "Actual HA preparation, installation, initialization and handoff passed; output disabled",
+    "record": "docs/verification/sonoff-intel-ha-success-20261108.json",
     "public_qualified": false
   }
 }

@@ -158,8 +158,9 @@
       "path": "artifacts/sonoff-zbdongle-e-0.14.gbl",
       "sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
       "bytes": 60572,
-      "qualification": "pending physical execution",
-      "updater_eligible": false
+      "qualification": "Exact-unit experimental HA install and normal handoff passed; RF control, recovery and remaining release qualification incomplete",
+      "updater_eligible": false,
+      "physical_trial_record": "docs/verification/sonoff-intel-ha-success-20261108.json"
     },
     {
       "board": "zb-gw04-1v2",
@@ -351,5 +352,11 @@
     "existing_private_bench_staging_retained": true,
     "bench_service_interruption_scheduled": false,
     "next_step": "Identify the dedicated unit and preserve its own recoverable baseline before selecting exact-board artifacts and scheduling tests."
+  },
+  "sonoff_followup_20261108": {
+    "record": "docs/verification/sonoff-intel-ha-success-20261108.json",
+    "source_commit": "f48cf42c06a934876847013330d6929b472c45ac",
+    "public_qualified": false,
+    "invalid_rx_counter_followup": 252
   }
 }
