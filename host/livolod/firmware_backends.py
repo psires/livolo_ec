@@ -147,7 +147,7 @@ def _run_flasher(path, port, lock_fd):
             child.wait(timeout=3)
         except subprocess.TimeoutExpired:
             child.kill()
-            child.wait()
+            child.wait(timeout=3)
         raise
     if result:
         raise BundleError(
