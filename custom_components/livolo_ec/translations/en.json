@@ -50,13 +50,12 @@
     "step": {
       "init": {
         "menu_options": {
-          "add": "Register a device manually",
-          "pair": "Open or close pairing",
           "refresh": "Refresh reported state",
           "forget": "Forget a device",
-          "discover": "Detect a switch (experimental)",
           "firmware_preflight": "Check firmware update (read-only)",
-          "pair_new": "Pair new device"
+          "pair_new": "Pair new device",
+          "settings": "Settings",
+          "development": "Development"
         }
       },
       "add": {
@@ -102,7 +101,7 @@
       },
       "detected": {
         "title": "Review detected switch · Experimental",
-        "description": "Device: **{device}**. Detected outputs: **{outputs}**. Wire suffix: **{suffix}**. Check the physical button count and enter a name. This experimental detection recognizes the tested one- and two-gang pairing signatures only. Submit to register this profile. Registration does not complete physical pairing: afterwards, reopen Configure → Targeted pairing for this device once the radio is ready. Evidence must still be fresh when submitted; otherwise select the switch again.",
+        "description": "Device: **{device}**. Detected outputs: **{outputs}**. Wire suffix: **{suffix}**. Check the physical button count and enter a name. This experimental detection recognizes the tested one- and two-gang pairing signatures only. Submit to register this profile. Registration does not complete physical pairing: afterwards, reopen Configure → Development → Targeted pairing for this device once the radio is ready. Evidence must still be fresh when submitted; otherwise select the switch again.",
         "data": {
           "name": "Device name",
           "rescan": "Return to discovery without registering"
@@ -125,6 +124,21 @@
         "data": {
           "stop": "Stop this pairing session"
         }
+      },
+      "development": {
+        "title": "Development",
+        "menu_options": {
+          "add": "Register a device manually",
+          "discover": "Detect a switch (experimental)",
+          "pair": "Targeted pairing"
+        }
+      },
+      "settings": {
+        "title": "Livolo EC settings",
+        "description": "Development enables manual registration, experimental profile detection and targeted pairing for this hub. Automatic pairing, session status and cancellation remain available when it is off.",
+        "data": {
+          "development": "Development"
+        }
       }
     },
     "error": {
@@ -140,8 +154,12 @@
       "detection_failed": "Registration was rejected or could not be confirmed. Check the daemon registry before retrying. Refresh and select again if it was not added; pairing has not been opened.",
       "radio_not_ready": "The radio is not ready. Wait for it to reconnect before detecting a switch.",
       "preflight_unsupported": "Update the Livolo daemon to a release that supports firmware preflight. Switch control remains available.",
-      "commissioning_unsupported": "Update the Livolo daemon to enable automatic pairing. Advanced manual setup remains available.",
+      "commissioning_unsupported": "Update the Livolo daemon to enable automatic pairing.",
       "commissioning_failed": "The pairing action or result could not be confirmed. Check Pairing status before starting again; no automatic retry is performed."
+    },
+    "abort": {
+      "development_disabled": "Development is disabled for this hub. Enable it under Configure → Settings to use manual commissioning. Automatic pairing status and cancellation remain available.",
+      "development_disabled_after_command": "Development was disabled while a manual command was in progress. Reported outcome: {outcome}. The command was not cancelled or retried. Check the daemon state before trying again. Automatic pairing status and cancellation remain available."
     }
   },
   "entity": {

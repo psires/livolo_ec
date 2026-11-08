@@ -351,20 +351,34 @@ HA sends a notification linking to the device only after fresh physical
 confirmation. Sessions started in the web interface use the same status.
 An interrupted request is never automatically resubmitted, including after
 an HA reload. If its outcome remains uncertain, use **Cancel pairing** before
-starting again. Older daemons keep manual setup available but disable these
-automatic pairing controls. See [pairing and recovery](../docs/PAIRING.md).
+starting again. Older daemons disable automatic pairing and show an upgrade
+explanation. See [pairing and recovery](../docs/PAIRING.md).
 
 The integration's **Configure** dialog supports:
 
 - Pair a new device using the same bounded session and inspect or cancel it.
-- Register a device using its wire ID, name, output count and verified suffix.
-- Detect a switch experimentally from its observed pairing signature, review
-  its output count, and register it with a friendly name.
-- Open a targeted pairing window, or close it with a zero-second duration.
 - Request a bounded read-only state refresh.
 - Forget a host record after confirmation. This is not a physical factory reset.
+- Check firmware compatibility without installing it.
+- Change the per-hub **Development** setting under **Settings**.
 
-For detection, open **Settings → Devices & services → Livolo EC → Configure →
+Automatic pairing is the only pairing path shown by default. **Development** is
+off for existing and new hubs unless explicitly enabled; it is separate from
+HA's user-level Advanced mode. Enable it under **Configure → Settings**, then
+reopen Configure to use the **Development** submenu:
+
+- Register a device using its wire ID, name, output count and verified suffix.
+- Detect a switch experimentally, review its output count and register a name.
+- Open a targeted pairing window, or close it with a zero-second duration.
+
+Turning Development off blocks new manual submissions, including already-open
+forms and registration waiting for a discovery lookup. It does not cancel a
+command already submitted to the daemon or an existing pairing window.
+Automatic pairing status and cancel remain available. Network identities,
+entities, names and areas are preserved. HA's native **Add hub** stays in its
+normal location; no custom panel or header modification is used.
+
+With Development enabled, open **Settings → Devices & services → Livolo EC → Configure → Development →
 Detect a switch (experimental)** and put
 only the intended new switch into physical pairing mode, with pairing on the
 original EC gateway disabled. Submit the form without selecting a device to
@@ -374,13 +388,13 @@ Submit a name to register that reviewed profile. The daemon rechecks its token
 against fresh evidence from the current radio session. Changed, expired or
 conflicting evidence requires reselection. Unknown devices and older daemons
 without profile metadata retain **Use manual setup instead** and the original
-manual registration menu. This advanced detection flow requires explicit review;
+manual registration menu within Development. This detection flow requires explicit review;
 the **Pair new device** action above performs automatic selection and registration.
 
 Detection currently recognizes only the tested one- and two-gang pairing
 signatures; see [experimental detection limits](../docs/DEVICE_PROFILES.md).
 It does not qualify sockets, curtains or other switch variants. Once registered,
-wait for radio readiness and reopen **Configure → Targeted pairing** with
+wait for radio readiness and reopen **Configure → Development → Targeted pairing** with
 the selected device ID. Registration alone does not complete physical pairing.
 
 For advanced targeted pairing, register first. Manual profile fields remain explicit; suffix alone is

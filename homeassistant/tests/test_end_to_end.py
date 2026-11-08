@@ -315,6 +315,7 @@ async def test_detected_registration_through_native_api(
             "token": "detection-test-token",
             "allow_simulated": True,
         },
+        options={"development": True},
     )
     entry.add_to_hass(hass)
     loaded = False
@@ -322,6 +323,9 @@ async def test_detected_registration_through_native_api(
         assert await hass.config_entries.async_setup(entry.entry_id)
         loaded = True
         result = await hass.config_entries.options.async_init(entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "development"}
+        )
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {"next_step_id": "discover"}
         )

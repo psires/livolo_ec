@@ -19,7 +19,7 @@ from ._client import (
     network_id,
     normalize_url,
 )
-from .const import CONF_ALLOW_SIMULATED, CONF_TOKEN, CONF_URL, DOMAIN
+from .const import CONF_ALLOW_SIMULATED, CONF_DEVELOPMENT, CONF_TOKEN, CONF_URL, DOMAIN
 
 
 def connection_schema(defaults):
@@ -212,17 +212,67 @@ class LivoloOptionsFlow(OptionsFlow):
 
         @param user_input Unused menu input.
         """
+        actions = ["pair_new", "refresh", "forget", "firmware_preflight", "settings"]
+        if self._development_enabled():
+            actions.append("development")
+        return self.async_show_menu(step_id="init", menu_options=actions)
+
+    def _development_enabled(self):
+        """Read the current per-hub option, including changes from another open flow."""
+        return self.config_entry.options.get(CONF_DEVELOPMENT) is True
+
+    def _development_guard(self, *, outcome=None):
+        """End a disabled manual flow without hiding an already submitted command's result.
+
+        @param outcome Known status or unknown after an already submitted command.
+        """
+        if self._development_enabled():
+            return None
+        self._review = None
+        return self.async_abort(
+            reason=(
+                "development_disabled_after_command"
+                if outcome is not None
+                else "development_disabled"
+            ),
+            description_placeholders=(
+                {"outcome": outcome} if outcome is not None else None
+            ),
+        )
+
+    async def async_step_settings(self, user_input=None):
+        """Persist Development without replacing unrelated, possibly concurrent options.
+
+        @param user_input Explicit Development preference, or None to show settings.
+        """
+        if user_input is not None:
+            return self.async_create_entry(
+                title="",
+                data={
+                    **self.config_entry.options,
+                    CONF_DEVELOPMENT: user_input[CONF_DEVELOPMENT],
+                },
+            )
+        return self.async_show_form(
+            step_id="settings",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_DEVELOPMENT, default=self._development_enabled()
+                    ): bool
+                }
+            ),
+        )
+
+    async def async_step_development(self, user_input=None):
+        """Group manual commissioning paths behind the explicit per-hub setting.
+
+        @param user_input Unused menu input.
+        """
+        if blocked := self._development_guard():
+            return blocked
         return self.async_show_menu(
-            step_id="init",
-            menu_options=[
-                "pair_new",
-                "add",
-                "discover",
-                "pair",
-                "refresh",
-                "forget",
-                "firmware_preflight",
-            ],
+            step_id="development", menu_options=["add", "discover", "pair"]
         )
 
     async def async_step_pair_new(self, user_input=None):
@@ -381,6 +431,8 @@ class LivoloOptionsFlow(OptionsFlow):
 
         @param user_input Optional candidate selection or manual setup request.
         """
+        if blocked := self._development_guard():
+            return blocked
         self._review = None
         if user_input and user_input.get("manual"):
             return await self.async_step_add()
@@ -411,6 +463,8 @@ class LivoloOptionsFlow(OptionsFlow):
         @param candidates Unregistered observations from a fresh API snapshot.
         @param errors Form-level failures to display.
         """
+        if blocked := self._development_guard():
+            return blocked
         fields = {}
         if candidates:
             options = []
@@ -444,10 +498,13 @@ class LivoloOptionsFlow(OptionsFlow):
 
         @param user_input Chosen name or request to return to discovery.
         """
+        if blocked := self._development_guard():
+            return blocked
         if not self._review or (user_input and user_input.get("rescan")):
             return await self.async_step_discover()
         review = self._review
         errors = {}
+        submitted = False
         if user_input is not None:
             try:
                 candidates, ready = await self._discoveries()
@@ -464,6 +521,10 @@ class LivoloOptionsFlow(OptionsFlow):
                     return self._discovery_form(
                         candidates, {"base": "detection_changed"}
                     )
+                # Another options flow may disable Development during the lookup.
+                if blocked := self._development_guard():
+                    return blocked
+                submitted = True
                 await self._client().command(
                     "add",
                     {
@@ -476,9 +537,13 @@ class LivoloOptionsFlow(OptionsFlow):
                 return self.async_create_entry(
                     title="", data=dict(self.config_entry.options)
                 )
-            except CommandFailed:
+            except CommandFailed as error:
                 # A fresh selection is required after rejection or uncertain completion.
                 self._review = None
+                if blocked := self._development_guard(
+                    outcome=str(error.result.get("status", "unknown"))
+                ):
+                    return blocked
                 return self._discovery_form({}, {"base": "detection_failed"})
             except AuthenticationError:
                 errors["base"] = "invalid_auth"
@@ -486,6 +551,8 @@ class LivoloOptionsFlow(OptionsFlow):
                 errors["base"] = "incompatible"
             except LivoloError:
                 errors["base"] = "cannot_connect"
+        if blocked := self._development_guard(outcome="unknown" if submitted else None):
+            return blocked
         return self.async_show_form(
             step_id="detected",
             data_schema=vol.Schema(
@@ -512,6 +579,8 @@ class LivoloOptionsFlow(OptionsFlow):
         @param schema Validated form fields.
         @param user_input User-submitted service arguments.
         """
+        if step in ("add", "pair") and (blocked := self._development_guard()):
+            return blocked
         errors = {}
         if user_input is not None:
             data = self.config_entry.data
@@ -526,11 +595,21 @@ class LivoloOptionsFlow(OptionsFlow):
                     errors = {}
             if not errors:
                 try:
+                    if step in ("add", "pair") and (
+                        blocked := self._development_guard()
+                    ):
+                        return blocked
                     await client.command(action, payload)
                     return self.async_create_entry(
                         title="", data=dict(self.config_entry.options)
                     )
                 except CommandFailed as error:
+                    if step in ("add", "pair") and (
+                        blocked := self._development_guard(
+                            outcome=str(error.result.get("status", "unknown"))
+                        )
+                    ):
+                        return blocked
                     errors["base"] = "command_failed"
                     return self.async_show_form(
                         step_id=step,
@@ -541,7 +620,13 @@ class LivoloOptionsFlow(OptionsFlow):
                         },
                     )
                 except LivoloError:
+                    if step in ("add", "pair") and (
+                        blocked := self._development_guard(outcome="unknown")
+                    ):
+                        return blocked
                     errors["base"] = "cannot_connect"
+        if step in ("add", "pair") and (blocked := self._development_guard()):
+            return blocked
         return self.async_show_form(
             step_id=step,
             data_schema=schema,
