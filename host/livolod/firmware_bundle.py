@@ -125,11 +125,12 @@ def _read(root, relative, limit=MAX_FILE):
         ) from error
 
 
-def _manifest(bundle_dir, host_version):
+def _manifest(bundle_dir, host_version, *, engineering_policy=None):
     """Load and check a manifest before selecting any device-specific artifact.
 
     @param bundle_dir Operator-configured local bundle directory.
     @param host_version Exact radio compatibility target in major.minor form; not the package version.
+    @param engineering_policy Private bootstrap-only exact reviewed trial binding; public loaders never supply it.
     @return Resolved root and validated metadata entries.
     """
     try:
@@ -183,7 +184,12 @@ def _manifest(bundle_dir, host_version):
             _fail("Ambiguous artifact or board selection")
         ids.add(ident)
         boards.add(board)
-        if entry["role"] != "gateway" or entry["qualified"] is not True:
+        admitted = entry["qualified"] is True
+        if not admitted and engineering_policy is not None:
+            from .bootstrap_catalog import engineering_entry
+
+            admitted = engineering_entry(entry, engineering_policy)
+        if entry["role"] != "gateway" or not admitted:
             _fail("Artifact is not a qualified gateway image", "artifact_unqualified")
         if (
             entry["version"] != host_version

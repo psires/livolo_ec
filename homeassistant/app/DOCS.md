@@ -90,3 +90,68 @@ for supported profiles, failure handling and limits, and the
 [versioning guide](https://github.com/psires/livolo_ec/blob/ha-0.5.1/docs/VERSIONING.md)
 for daemon software 0.14.1 versus firmware compatibility 0.13. The software
 release contains no firmware payloads; updating the app does not flash a radio.
+
+## Guided ZB-GW04 radio setup (opt-in engineering profile)
+
+The default **Radio setup profile: disabled** keeps the existing app startup and
+routine updater. For the reviewed dedicated ZB-GW04 1v2 test unit, select that
+profile in the app Configuration and restart the app. Keep **Radio mode:
+gateway** for an existing network. Use **bootstrap** only for a new unconfigured
+network, with gateway/tag empty. This mode controls the first startup; subsequent
+transitions and an explicitly initialized network are saved in the independent
+physical setup journal. Blank initial Supervisor options do not replace an
+accepted saved network on restart.
+
+In the Livolo integration's **Configure → Set up radio**, explicitly enter setup,
+confirm dedicated use and the exact board, follow the physical BOOT/RESET
+instructions, then inspect the loader. Review the selected artifact before
+installing. Firmware application verification and resuming the normal network
+are separate actions: only a successful normal daemon restore reports the
+network ready. Closing the dialog does not resume the daemon. Existing switch
+registrations, gateway/tag, and HA entities remain associated with the same
+network. The Web UI is optional and is stopped while the normal radio service is
+quiesced; setup uses the authenticated native API.
+
+Before any installation attempt, **Cancel setup** can return to the intact
+application. Follow the physical BOOT/RESET instructions on the confirmation
+screen first. Cancellation independently verifies the preserved loader, runs the
+intact application once, checks its saved version, then attempts normal network
+restore. It does not require a firmware catalog or transfer an image. If the
+application runs but this app cannot restore the network, the result requests a
+compatible app rollback; it does not claim readiness. A possible write, unknown
+installation, changed attachment, or unresolved previous updater recovery
+prevents cancellation from clearing the safety fence.
+
+The engineering profile additionally requires a protected, server-provisioned
+`/data/bootstrap-policy.json` containing the reviewed exact-unit target and
+loader policy. This evidence is prepared with the candidate deployment; selecting
+a board in the UI does not manufacture loader security facts. A missing or stale
+policy blocks setup. The currently reviewed evidence applies to the existing
+tested unit, not arbitrary stock radios. The policy binds the attachment, so
+reattachment or a host restart requires renewed review; a stale plan cannot be
+reused. This remains an engineering test path until the exact packaged workflow
+has been qualified.
+
+The app uses `/share/livolo-radio-locks` for cooperative, per-device ownership,
+independent of its database path. All cooperating Livolo deployments must use
+that same protected directory and canonical host USB metadata. The normal radio
+owner, setup worker and fixed flashing helper retain the guard through handoff;
+workers also inherit the actual deployment database and firmware guards. This
+supports a radio explicitly dedicated to Livolo. It does not prove global absence
+of noncooperating or privileged software, and does not stop ZHA or unrelated
+integrations. Known conflicts must be removed before setup.
+
+For the current 0.14 engineering candidate, the private catalog is fixed at
+`/data/bootstrap-firmware` and explicitly records `qualified: false`. Its exact
+board, version, artifact SHA-256, source commit and manual-trial evidence must
+match the protected policy's `engineering` record and the reviewed source
+allowlist. The loader policy binds the same evidence and exact unit. All existing
+path, hash, GBL layout, application-only and notice checks still apply. Normal
+firmware loaders and public release validation continue to reject this artifact;
+the candidate's ordinary bundled catalog remains empty. Native review marks this
+path **Engineering test only**, rather than claiming a qualified public release.
+
+Successful network handoff ends the temporary attachment fence. Normal reconnect
+and host restart may renew attachment metadata while retaining the configured USB
+topology, interface and board/bridge profile. Only another setup operation needs
+the engineering policy's exact attachment to be reviewed again.

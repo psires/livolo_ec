@@ -228,6 +228,7 @@ class NativeAPI:
         queue_size=4,
         max_clients=32,
         send_timeout=5,
+        provisioning=None,
     ):
         """Prepare an authenticated listener and its in-process event epoch.
 
@@ -238,6 +239,7 @@ class NativeAPI:
         @param queue_size Maximum queued full snapshots per WebSocket client.
         @param max_clients Maximum simultaneous event subscribers.
         @param send_timeout Maximum seconds to wait for a client write.
+        @param provisioning Optional physical setup controller, separate from network identity.
         """
         if (
             not isinstance(token, str)
@@ -249,6 +251,7 @@ class NativeAPI:
         if queue_size < 1 or max_clients < 1 or send_timeout <= 0:
             raise ValueError("API delivery limits must be positive")
         self.service, self.host, self.port = service, host, port
+        self.provisioning = provisioning
         self.credential = ("Bearer " + token).encode("ascii")
         self.epoch = uuid.uuid4().hex
         self.sequence = -1
@@ -283,6 +286,14 @@ class NativeAPI:
             return web.json_response(
                 {"error": "Query parameters are not supported"}, status=400
             )
+        if (
+            self.service is None
+            and request.path != "/health"
+            and not request.path.startswith("/api/v1/provisioning/")
+        ):
+            return web.json_response(
+                {"error": "Radio setup active; network unavailable"}, status=503
+            )
         response = await handler(request)
         if not response.prepared:
             response.headers["Cache-Control"] = "no-store"
@@ -306,6 +317,10 @@ class NativeAPI:
                 web.get("/api/v1/commands/{request_id}", self.result),
             ]
         )
+        if self.provisioning is not None:
+            from .bootstrap_api import BootstrapAPI
+
+            app.add_routes(BootstrapAPI(self.provisioning).routes())
         self.runner = web.AppRunner(app, access_log=None, shutdown_timeout=2)
         try:
             await self.runner.setup()
@@ -315,9 +330,27 @@ class NativeAPI:
             await self.runner.cleanup()
             raise
         self.port = self.runner.addresses[0][1]
-        self.service.change_listeners.add(self.changed)
+        if self.service is not None:
+            self.service.change_listeners.add(self.changed)
         self.flush()
         self.tick()
+
+    async def attach(self, service):
+        """Switch observed network service without changing setup identity or listener.
+
+        @param service New normally configured Service, or None during explicit setup.
+        """
+        if self.service is not None:
+            self.service.change_listeners.discard(self.changed)
+        self.service = None
+        await asyncio.gather(*(self.drop(ws) for ws in tuple(self.clients)))
+        self.service = service
+        self.data = self.encoded = None
+        self.epoch = uuid.uuid4().hex
+        self.sequence = -1
+        if service is not None:
+            service.change_listeners.add(self.changed)
+            self.flush()
 
     def changed(self):
         """Coalesce synchronous service mutations into one snapshot per loop iteration."""
@@ -335,7 +368,7 @@ class NativeAPI:
         if self.scheduled is not None:
             self.scheduled.cancel()
             self.scheduled = None
-        if self.closed:
+        if self.closed or self.service is None:
             return
         data = native_snapshot(self.service)
         if data == self.data:
@@ -432,6 +465,8 @@ class NativeAPI:
             or not isinstance(value["payload"], dict)
         ):
             return web.json_response({"error": "Invalid command envelope"}, status=400)
+        if self.service is None:
+            return web.json_response({"error": "Radio setup active"}, status=503)
         return web.json_response(self.service.submit(value["action"], value["payload"]))
 
     async def preflight_firmware(self, request):
@@ -487,6 +522,8 @@ class NativeAPI:
             )
         ):
             return web.json_response({"error": "Invalid firmware envelope"}, status=400)
+        if self.service is None:
+            return web.json_response({"error": "Radio setup active"}, status=503)
         return web.json_response(self.service.start_firmware_update(value))
 
     async def result(self, request):
@@ -538,7 +575,7 @@ class NativeAPI:
             await ws.prepare(request)
         finally:
             self.connecting -= 1
-        if self.closed:
+        if self.closed or self.service is None:
             await self.drop(ws)
             return ws
         # No await between the snapshot and registration. Any subsequent change
@@ -568,7 +605,8 @@ class NativeAPI:
     async def close(self):
         """Remove observations and close subscribers before the service store closes."""
         self.closed = True
-        self.service.change_listeners.discard(self.changed)
+        if self.service is not None:
+            self.service.change_listeners.discard(self.changed)
         for handle in (self.timer, self.scheduled):
             if handle is not None:
                 handle.cancel()

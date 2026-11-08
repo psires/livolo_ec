@@ -1,0 +1,12 @@
+configuration:
+  radio_setup_profile:
+    name: Radio setup profile
+    description: >-
+      Leave disabled for normal operation. Select ZB-GW04 1v2 only for the reviewed
+      dedicated radio, then restart the app to enable native guided setup.
+  radio_mode:
+    name: Radio mode
+    description: >-
+      Initial mode only. Use gateway for an existing network or bootstrap for a new
+      unconfigured radio. After setup, the durable journal controls the saved mode.
+      Closing the setup dialog does not resume normal operation.

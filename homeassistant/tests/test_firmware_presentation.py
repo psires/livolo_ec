@@ -73,6 +73,7 @@ def test_unmeasured_progress_and_untrusted_text_are_not_rendered(percent):
 @pytest.mark.parametrize(
     "reason,expected",
     [
+        ("guided_setup_required", "Configure → Set up radio"),
         ("artifact_missing", "empty catalog does not mean"),
         ("backend_unavailable", "required flashing helper"),
         ("bootloader_install_required", "separate board-specific procedure"),

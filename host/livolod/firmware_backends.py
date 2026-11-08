@@ -110,12 +110,13 @@ def _preflight(port, candidate):
     return version
 
 
-def _run_flasher(path, port, lock_fd):
+def _run_flasher(path, port, lock_fd, guard_fds=()):
     """Run the pinned Gecko helper with fixed arguments and a bounded lifetime.
 
     @param path Private staged application-only GBL path, already validated.
     @param port Exact configured serial device path; never a discovered first match.
     @param lock_fd Held radio guard inherited by the helper until it exits.
+    @param guard_fds Additional held deployment guards inherited by a setup helper.
     """
     command = [
         sys.executable,
@@ -137,7 +138,7 @@ def _run_flasher(path, port, lock_fd):
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        pass_fds=(lock_fd,),
+        pass_fds=tuple(dict.fromkeys((lock_fd,) + tuple(guard_fds))),
     )
     try:
         result = child.wait(timeout=120)

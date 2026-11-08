@@ -104,6 +104,57 @@ pairing, USB hotplug or automatic upgrades. See the
 
 ## Manual integration installation
 
+### Guided radio setup (development preview)
+
+The development source includes a native **Set up radio** flow for an existing
+hub under **Settings → Devices & services → Livolo EC → Configure**. For a new
+hub, select **Set up radio firmware first** when entering the daemon API URL and
+token. This preview requires the matching app and firmware catalog; it is not
+part of the published 0.5.2 integration described above.
+
+The initial profile is experimental and specific to the reviewed **ZB-GW04 1v2
+with its preserved Gecko bootloader**. It does not establish conversion from
+factory firmware or support for other boards. In the app Configuration, choose
+**Radio setup profile: zb-gw04-1v2** and restart the app once. Leave **Radio mode:
+gateway** for an existing hub; **bootstrap** starts setup for an unconfigured
+radio. Setup is disabled by default. The selected adapter must be dedicated to
+Livolo; detected ownership conflicts block setup without stopping other apps.
+
+For an existing hub, explicitly enter setup to pause switch control. Select and
+identify the exact board. Keep USB power connected, hold **BOOT**, press and
+release **RESET**, hold BOOT for three seconds, then release. **Inspect** checks
+the bootloader without installing firmware. Review the offered board and firmware
+version, confirm installation, then refresh to follow the recorded operation.
+If the review expires, return to selection and explicitly inspect again.
+Private engineering images are labelled **Engineering test only; not a qualified
+public firmware release** in the review and installation confirmation. This
+annotation does not enable installation or bypass the daemon's protected policy.
+
+After firmware verification, explicitly resume normal operation. Existing hub
+credentials, network identity, paired devices and HA entity identities are
+retained. For an unconfigured radio, a separate confirmation initializes a new
+network. HA creates the new hub only after the normal API and ready snapshot
+agree on that network; successful firmware transfer alone is insufficient.
+
+Before installation, **Cancel setup** can return an existing hub to its verified
+previous firmware. Follow the cancellation screen's BOOT/RESET instructions, then
+explicitly confirm cancellation. The daemon checks the bootloader and previous
+firmware directly; no prior inspection or firmware catalog is required.
+Cancellation after possible writes or uncertain recovery is blocked. If the
+previous firmware cannot run with the current app, restoring the matching app
+version may be needed before the hub is ready. Cancelling a new unconfigured
+radio creates no HA hub.
+
+Closing the dialog leaves setup active. Reopening it, reloading HA or losing an
+HTTP reply resumes observation of the saved request; it never automatically
+replays an installation. A lost result remains unresolved until the daemon can
+report it. Simulated endpoints cannot install physical firmware, even when the
+integration's simulator option is enabled. The normal firmware update entity
+continues to use its separate API; adapters requiring guided setup direct users
+to **Configure → Set up radio**.
+
+### Published ZIP installation
+
 Download the official [0.5.2 integration ZIP](https://github.com/psires/livolo_ec/releases/download/ha-0.5.2/livolo-ec-ha-0.5.2.zip)
 and verify it against the [release checksums](https://github.com/psires/livolo_ec/releases/download/ha-0.5.2/SHA256SUMS).
 Back up the existing integration files, then extract the ZIP into the HA

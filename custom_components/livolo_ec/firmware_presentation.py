@@ -5,6 +5,7 @@ import re
 
 
 REASONS = {
+    "guided_setup_required": "Open Livolo EC → Configure → Set up radio to install firmware for this adapter.",
     "bundle_missing": "The firmware catalog is missing. Restore a reviewed catalog in the Livolo app, then refresh this report.",
     "artifact_missing": "No compatible image is available in the configured catalog. An empty catalog does not mean the radio is up to date.",
     "bundle_invalid": "The firmware catalog could not be validated. Correct the catalog in the Livolo app, then refresh.",

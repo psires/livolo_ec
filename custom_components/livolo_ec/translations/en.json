@@ -8,7 +8,8 @@
         "data": {
           "url": "API URL",
           "token": "API token",
-          "allow_simulated": "Allow a simulator (testing only)"
+          "allow_simulated": "Allow a simulator (testing only)",
+          "setup_radio": "Set up radio firmware first"
         }
       },
       "reconfigure": {
@@ -28,6 +29,74 @@
           "token": "API token",
           "allow_simulated": "Allow a simulator (testing only)"
         }
+      },
+      "radio_setup": {
+        "title": "Radio setup status",
+        "description": "{reason}. Refresh checks the existing operation without repeating an installation.\n\nFor a supported ZB-GW04 1v2, open the Livolo app’s Configuration, select Radio setup profile: zb-gw04-1v2, then restart the app once. Keep Radio mode: gateway for an existing hub; choose bootstrap for a new, unconfigured radio. This needs an app release and firmware catalog that support guided setup.",
+        "data": {
+          "refresh": "Refresh status",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_enter": {
+        "title": "Enter radio setup",
+        "description": "Entering setup pauses switch control. Existing paired devices, names and network settings are retained. No firmware is installed at this step.\n\nClosing the dialog leaves setup active. Use Cancel setup to return to the existing hub. Network: **{network}**.",
+        "data": {
+          "confirmed": "Enter setup and pause normal radio operation"
+        }
+      },
+      "radio_select": {
+        "title": "Inspect the selected radio",
+        "description": "Select your **ZB-GW04 1v2** and confirm its board label. This experimental setup supports only the reviewed board with its preserved Gecko bootloader; conversion from factory firmware is not supported here. Use a radio dedicated to Livolo.\n\nKeep USB power connected. Hold **BOOT**, press and release **RESET**, keep holding BOOT for **three seconds**, then release. Submit to inspect the bootloader after Livolo has paused normal operation. Inspection does not install firmware.\n\nTo return without installing, choose Cancel setup and follow its instructions. Closing this dialog leaves setup active.",
+        "data": {
+          "target_id": "Radio and exact board",
+          "board_confirmed": "I checked that this is the selected ZB-GW04 1v2 board",
+          "bootloader_ready": "I completed the BOOT/RESET procedure; inspect this radio",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_review": {
+        "title": "Review radio firmware installation",
+        "description": "**{qualification}**\n\nBoard: **{board}**. Firmware: **{version}**. Installation replaces the radio’s application firmware. Your network and paired devices are retained. Keep USB power connected throughout.\n\nThe review is valid for two minutes. If it expires or the radio changes, select Return to radio selection and inspect again. After installation, HA verifies the firmware before offering to resume normal operation. You can still cancel before installation.",
+        "data": {
+          "confirmed": "I understand the qualification above; install this reviewed firmware",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "cancel_setup": "Cancel setup / resume the existing hub safely",
+          "inspect_again": "Return to radio selection for a new inspection"
+        }
+      },
+      "radio_progress": {
+        "title": "Radio setup progress",
+        "description": "Status: **{status}**. Stage: **{stage}**.\n\n{progress}\n\n{reason}\n\nRefresh checks this operation. Closing the dialog or restarting HA does not cancel it or repeat installation. If the result is unknown or recovery is required, check it before trying again. A completed transfer still needs verification.",
+        "data": {
+          "refresh": "Refresh progress",
+          "review_again": "Return to radio selection and inspect again",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_initialize": {
+        "title": "Initialize a new Livolo network",
+        "description": "The firmware is verified. Create a new network with generated settings and no paired devices. HA shows the network before starting normal operation.\n\nThis does not replace an existing network or create the HA hub yet.",
+        "data": {
+          "confirmed": "Initialize a new network with generated settings",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_handoff": {
+        "title": "Resume normal radio operation",
+        "description": "The firmware is verified. Resume normal operation using network **{network}**. HA checks that the radio is ready on this network before finishing setup.",
+        "data": {
+          "confirmed": "Resume normal operation with this network",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_cancel": {
+        "title": "Cancel radio setup safely",
+        "description": "{instructions}\n\nCancellation is unavailable after possible firmware writes or an uncertain result. If the previous firmware cannot run with this app version, restoring the matching app version may be necessary. Closing the dialog alone does not cancel setup.",
+        "data": {
+          "confirmed": "I completed the instructions above; cancel setup and return to the previous state"
+        }
       }
     },
     "error": {
@@ -37,13 +106,16 @@
       "invalid_url": "Enter a valid HTTP or HTTPS URL and token.",
       "simulation_disabled": "This endpoint is a simulator. Enable simulation explicitly for testing.",
       "command_failed": "The command was not confirmed. Check daemon status before retrying.",
-      "confirm_required": "Confirm that you want to forget this device."
+      "confirm_required": "Confirm that you want to forget this device.",
+      "bootstrap_unavailable": "Radio setup is unavailable or the request result could not be read. Reconnect and refresh the existing request; do not start another flash.",
+      "bootstrap_incompatible": "The physical setup service, target, image or network identity changed or is incompatible. No replacement hub will be created. Inspect the existing operation before continuing."
     },
     "abort": {
       "already_configured": "This Livolo EC network is already configured.",
       "wrong_network": "This endpoint belongs to a different EC network.",
       "reauth_successful": "Authentication updated.",
-      "reconfigure_successful": "Connection updated."
+      "reconfigure_successful": "Connection updated.",
+      "bootstrap_cancelled": "Radio setup was cancelled without creating a hub."
     }
   },
   "options": {
@@ -55,7 +127,8 @@
           "firmware_preflight": "Radio firmware (read-only)",
           "pair_new": "Pair new device",
           "settings": "Settings",
-          "development": "Development"
+          "development": "Development",
+          "radio_setup": "Set up radio"
         }
       },
       "add": {
@@ -139,6 +212,74 @@
         "data": {
           "development": "Development"
         }
+      },
+      "radio_setup": {
+        "title": "Radio setup status",
+        "description": "{reason}. Refresh checks the existing operation without repeating an installation.\n\nFor a supported ZB-GW04 1v2, open the Livolo app’s Configuration, select Radio setup profile: zb-gw04-1v2, then restart the app once. Keep Radio mode: gateway for an existing hub; choose bootstrap for a new, unconfigured radio. This needs an app release and firmware catalog that support guided setup.",
+        "data": {
+          "refresh": "Refresh status",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_enter": {
+        "title": "Enter radio setup",
+        "description": "Entering setup pauses switch control. Existing paired devices, names and network settings are retained. No firmware is installed at this step.\n\nClosing the dialog leaves setup active. Use Cancel setup to return to the existing hub. Network: **{network}**.",
+        "data": {
+          "confirmed": "Enter setup and pause normal radio operation"
+        }
+      },
+      "radio_select": {
+        "title": "Inspect the selected radio",
+        "description": "Select your **ZB-GW04 1v2** and confirm its board label. This experimental setup supports only the reviewed board with its preserved Gecko bootloader; conversion from factory firmware is not supported here. Use a radio dedicated to Livolo.\n\nKeep USB power connected. Hold **BOOT**, press and release **RESET**, keep holding BOOT for **three seconds**, then release. Submit to inspect the bootloader after Livolo has paused normal operation. Inspection does not install firmware.\n\nTo return without installing, choose Cancel setup and follow its instructions. Closing this dialog leaves setup active.",
+        "data": {
+          "target_id": "Radio and exact board",
+          "board_confirmed": "I checked that this is the selected ZB-GW04 1v2 board",
+          "bootloader_ready": "I completed the BOOT/RESET procedure; inspect this radio",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_review": {
+        "title": "Review radio firmware installation",
+        "description": "**{qualification}**\n\nBoard: **{board}**. Firmware: **{version}**. Installation replaces the radio’s application firmware. Your network and paired devices are retained. Keep USB power connected throughout.\n\nThe review is valid for two minutes. If it expires or the radio changes, select Return to radio selection and inspect again. After installation, HA verifies the firmware before offering to resume normal operation. You can still cancel before installation.",
+        "data": {
+          "confirmed": "I understand the qualification above; install this reviewed firmware",
+          "dedicated_radio": "This radio is dedicated to Livolo and is not used by ZHA, Zigbee2MQTT or another application",
+          "cancel_setup": "Cancel setup / resume the existing hub safely",
+          "inspect_again": "Return to radio selection for a new inspection"
+        }
+      },
+      "radio_progress": {
+        "title": "Radio setup progress",
+        "description": "Status: **{status}**. Stage: **{stage}**.\n\n{progress}\n\n{reason}\n\nRefresh checks this operation. Closing the dialog or restarting HA does not cancel it or repeat installation. If the result is unknown or recovery is required, check it before trying again. A completed transfer still needs verification.",
+        "data": {
+          "refresh": "Refresh progress",
+          "review_again": "Return to radio selection and inspect again",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_initialize": {
+        "title": "Initialize a new Livolo network",
+        "description": "The firmware is verified. Create a new network with generated settings and no paired devices. HA shows the network before starting normal operation.\n\nThis does not replace an existing network or create the HA hub yet.",
+        "data": {
+          "confirmed": "Initialize a new network with generated settings",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_handoff": {
+        "title": "Resume normal radio operation",
+        "description": "The firmware is verified. Resume normal operation using network **{network}**. HA checks that the radio is ready on this network before finishing setup.",
+        "data": {
+          "confirmed": "Resume normal operation with this network",
+          "cancel_setup": "Cancel setup / resume the existing hub safely"
+        }
+      },
+      "radio_cancel": {
+        "title": "Cancel radio setup safely",
+        "description": "{instructions}\n\nCancellation is unavailable after possible firmware writes or an uncertain result. If the previous firmware cannot run with this app version, restoring the matching app version may be necessary. Closing the dialog alone does not cancel setup.",
+        "data": {
+          "confirmed": "I completed the instructions above; cancel setup and return to the previous state"
+        }
       }
     },
     "error": {
@@ -155,11 +296,14 @@
       "radio_not_ready": "The radio is not ready. Wait for it to reconnect before detecting a switch.",
       "preflight_unsupported": "Update the Livolo daemon to a release that supports firmware preflight. Switch control remains available.",
       "commissioning_unsupported": "Update the Livolo daemon to enable automatic pairing.",
-      "commissioning_failed": "The pairing action or result could not be confirmed. Check Pairing status before starting again; no automatic retry is performed."
+      "commissioning_failed": "The pairing action or result could not be confirmed. Check Pairing status before starting again; no automatic retry is performed.",
+      "bootstrap_unavailable": "Radio setup is unavailable or the request result could not be read. Reconnect and refresh the existing request; do not start another flash.",
+      "bootstrap_incompatible": "The physical setup service, target, image or network identity changed or is incompatible. No replacement hub will be created. Inspect the existing operation before continuing."
     },
     "abort": {
       "development_disabled": "Development is disabled for this hub. Enable it under Configure → Settings to use manual commissioning. Automatic pairing status and cancellation remain available.",
-      "development_disabled_after_command": "Development was disabled while a manual command was in progress. Reported outcome: {outcome}. The command was not cancelled or retried. Check the daemon state before trying again. Automatic pairing status and cancellation remain available."
+      "development_disabled_after_command": "Development was disabled while a manual command was in progress. Reported outcome: {outcome}. The command was not cancelled or retried. Check the daemon state before trying again. Automatic pairing status and cancellation remain available.",
+      "bootstrap_cancelled": "Radio setup was cancelled without creating a hub."
     }
   },
   "entity": {

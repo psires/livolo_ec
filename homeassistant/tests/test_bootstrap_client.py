@@ -1,0 +1,281 @@
+"""Bound and validate physical-bootstrap HTTP messages without retrying operations."""
+
+from copy import deepcopy
+import json
+
+from aiohttp import ClientSession, web
+import pytest
+
+from livolo_ec_client import Client, IncompatibleError
+from livolo_ec_client.bootstrap import (
+    BootstrapClient,
+    BootstrapError,
+    MAX_RESPONSE_BYTES,
+    operation_data,
+)
+
+pytestmark = pytest.mark.usefixtures("socket_enabled")
+
+
+def envelope(data=None, **changes):
+    """Create a physical-service protocol envelope for isolated HTTP tests.
+
+    @param data Public response fields.
+    @param changes Envelope modifications for negative cases.
+    """
+    return dict(
+        schema=1,
+        instance_id="instance-1",
+        simulated=False,
+        operation="provision",
+        ok=True,
+        data=data or {},
+        **changes,
+    )
+
+
+def info():
+    """Provide explicit capabilities without claiming a ready normal network."""
+    return dict(
+        mode="bootstrap",
+        profile="zb-gw04-1v2",
+        physical_install_supported=True,
+        prepare_supported=True,
+        enter_supported=False,
+        initialize_supported=False,
+        cancel_supported=True,
+        baseline_available=True,
+        expected_network_id="2a992b12:a7",
+        active_request_id=None,
+        latest_request_id=None,
+        blocked_reason=None,
+    )
+
+
+@pytest.mark.parametrize("chunked", [False, True])
+async def test_oversized_http_body_is_bounded_without_content_length(
+    aiohttp_server, chunked
+):
+    """Declared and streamed oversized JSON stop at a fixed response limit.
+
+    @param aiohttp_server Local HTTP server factory.
+    @param chunked Whether the server omits Content-Length.
+    """
+    body = json.dumps(envelope(dict(info(), extra="x" * MAX_RESPONSE_BYTES))).encode()
+
+    async def respond(request):
+        """Stream or return the oversized test body without touching a device.
+
+        @param request Local HTTP request.
+        """
+        if not chunked:
+            return web.Response(body=body, content_type="application/json")
+        response = web.StreamResponse(headers={"Content-Type": "application/json"})
+        await response.prepare(request)
+        await response.write(body)
+        await response.write_eof()
+        return response
+
+    app = web.Application()
+    app.router.add_get("/api/v1/provisioning/info", respond)
+    server = await aiohttp_server(app)
+    async with ClientSession() as session:
+        with pytest.raises(IncompatibleError, match="too large"):
+            await BootstrapClient(
+                Client(session, str(server.make_url("")), "secret")
+            ).info()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"simulated": True},
+        {"schema": True},
+        {"instance_id": "replacement"},
+        {"operation": "update"},
+    ],
+)
+async def test_fake_or_replaced_service_never_supplies_capability(
+    aiohttp_server, change
+):
+    """A physical client rejects simulated metadata and changed service identity.
+
+    @param aiohttp_server Local HTTP server factory.
+    @param change Invalid physical envelope field.
+    """
+
+    async def respond(request):
+        """Return one deliberately incompatible capability envelope.
+
+        @param request Local read request.
+        """
+        return web.json_response(dict(envelope(info()), **change))
+
+    app = web.Application()
+    app.router.add_get("/api/v1/provisioning/info", respond)
+    server = await aiohttp_server(app)
+    async with ClientSession() as session:
+        with pytest.raises(IncompatibleError):
+            await BootstrapClient(
+                Client(session, str(server.make_url("")), "secret")
+            ).info("instance-1")
+
+
+async def test_missing_result_stays_uncertain_and_never_reposts(aiohttp_server):
+    """A durable lookup miss after a connection failure cannot trigger a new physical request.
+
+    @param aiohttp_server Isolated HTTP server factory.
+    """
+    calls = []
+
+    async def respond(request):
+        """Record the exact method and return the stable missing-result envelope.
+
+        @param request Incoming local request.
+        """
+        calls.append((request.method, request.path))
+        assert request.headers["Authorization"] == "Bearer secret"
+        return web.json_response(
+            dict(envelope(), ok=False, error="unknown_operation"), status=404
+        )
+
+    app = web.Application()
+    app.router.add_route("*", "/{tail:.*}", respond)
+    server = await aiohttp_server(app)
+    async with ClientSession() as session:
+        with pytest.raises(BootstrapError, match="unknown_operation"):
+            await BootstrapClient(
+                Client(session, str(server.make_url("")), "secret")
+            ).operation("request-1", "instance-1")
+    assert calls == [("GET", "/api/v1/provisioning/operations/request-1")]
+
+
+@pytest.mark.parametrize(
+    "chosen",
+    [
+        {"gateway": 12345678, "tag": "a7"},
+        {"gateway": "2a992b12", "tag": 12},
+        {"gateway": "00000000", "tag": "a7"},
+        {"gateway": "2a992b12", "tag": "ff"},
+    ],
+)
+async def test_network_fields_cannot_be_coerced_or_reserved(chosen):
+    """Invalid initialization identities fail before any HTTP request.
+
+    @param chosen Invalid new-network configuration.
+    """
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, "http://example.invalid", "secret"))
+        with pytest.raises((ValueError, IncompatibleError)):
+            await client.submit(
+                "handoff",
+                dict(
+                    request_id="request-1",
+                    instance_id="instance-1",
+                    install_request_id="install-1",
+                    confirmed=True,
+                    network=chosen,
+                ),
+                "instance-1",
+            )
+    result = dict(
+        request_id="request-1",
+        kind="initialize",
+        status="confirmed",
+        stage="network_initialized",
+        network=chosen,
+    )
+    with pytest.raises(IncompatibleError):
+        operation_data(result, "instance-1")
+
+
+async def test_prepare_requires_dedication_and_exact_board_before_http():
+    """Missing installation consent cannot reach the inspection endpoint."""
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, "http://example.invalid", "secret"))
+        with pytest.raises(ValueError, match="confirmation"):
+            await client.submit(
+                "prepare",
+                dict(
+                    request_id="request-1",
+                    instance_id="instance-1",
+                    target_id="radio-1",
+                    candidate_id="image-1",
+                    dedicated=False,
+                    board_confirmed=True,
+                ),
+                "instance-1",
+            )
+
+
+@pytest.mark.parametrize("flag", [True, False, "true"])
+async def test_engineering_annotation_survives_all_read_models(aiohttp_server, flag):
+    """Engineering qualification survives every response model and rejects non-boolean flags.
+
+    @param aiohttp_server Isolated HTTP server factory.
+    @param flag Valid boolean qualification or invalid truthy substitute.
+    """
+    plan = dict(
+        plan_id="plan-1",
+        instance_id="instance-1",
+        target_id="target-1",
+        candidate_id="image-1",
+        profile="zb-gw04-1v2",
+        version="0.14",
+        artifact_sha256="a" * 64,
+        expires_at=2_000_000_000,
+        requires_confirmation=True,
+        engineering_only=flag,
+    )
+    target = dict(
+        target_id="target-1",
+        board="zb-gw04-1v2",
+        candidate_id="image-1",
+        version="0.14",
+        artifact_sha256="a" * 64,
+        label="Test radio",
+        requires_bootloader=True,
+        engineering_only=flag,
+    )
+    operation = dict(
+        request_id="request-1",
+        kind="prepare",
+        status="confirmed",
+        stage="prepared",
+        plan=plan,
+        engineering_only=flag,
+    )
+    responses = {
+        "info": dict(info(), engineering_only=flag),
+        "targets": {"targets": [target]},
+        "operations/request-1": operation,
+    }
+
+    async def respond(request):
+        """Return the annotated physical API model requested by the client.
+
+        @param request Read-only local HTTP request.
+        """
+        return web.json_response(envelope(responses[request.match_info["tail"]]))
+
+    app = web.Application()
+    app.router.add_get("/api/v1/provisioning/{tail:.*}", respond)
+    server = await aiohttp_server(app)
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, str(server.make_url("")), "secret"))
+        if type(flag) is not bool:
+            for call, args in (
+                (client.info, ()),
+                (client.targets, ("instance-1",)),
+                (client.operation, ("request-1", "instance-1")),
+            ):
+                with pytest.raises(IncompatibleError, match="qualification"):
+                    await call(*args)
+        else:
+            assert (await client.info())["engineering_only"] is flag
+            assert (await client.targets("instance-1"))["targets"][0][
+                "engineering_only"
+            ] is flag
+            result = await client.operation("request-1", "instance-1")
+            assert result["engineering_only"] is flag
+            assert result["plan"]["engineering_only"] is flag

@@ -10,6 +10,8 @@ startup: services
 boot: auto
 init: false
 uart: true
+map:
+  - share:rw
 ingress: true
 ingress_port: 8099
 panel_icon: mdi:light-switch
@@ -29,13 +31,17 @@ options:
   output_mode: experimental_phase
   web_enabled: true
   firmware_catalog: bundled
+  radio_setup_profile: disabled
+  radio_mode: gateway
 schema:
   serial_port: device(subsystem=tty)
   serial_baudrate: list(115200|230400|460800|921600)
-  gateway: match(^[0-9a-fA-F]{8}$)
-  tag: match(^[0-9a-fA-F]{2}$)
+  gateway: match(^([0-9a-fA-F]{8})?$)
+  tag: match(^([0-9a-fA-F]{2})?$)
   api_token: password
   ha_origin: url
   output_mode: list(disabled|experimental_phase)
   web_enabled: bool
   firmware_catalog: list(bundled|local)
+  radio_setup_profile: list(disabled|zb-gw04-1v2)
+  radio_mode: list(gateway|bootstrap)

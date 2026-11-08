@@ -21,6 +21,7 @@ from ._client import (
 )
 from .const import CONF_ALLOW_SIMULATED, CONF_DEVELOPMENT, CONF_TOKEN, CONF_URL, DOMAIN
 from .firmware_presentation import guidance, job_summary, public_code
+from .bootstrap_flow import BootstrapFlowMixin
 
 
 def connection_schema(defaults):
@@ -44,7 +45,7 @@ def connection_schema(defaults):
     )
 
 
-class LivoloConfigFlow(ConfigFlow, domain=DOMAIN):
+class LivoloConfigFlow(BootstrapFlowMixin, ConfigFlow, domain=DOMAIN):
     """Connect to an existing daemon; never open or flash serial during discovery."""
 
     VERSION = 1
@@ -65,6 +66,10 @@ class LivoloConfigFlow(ConfigFlow, domain=DOMAIN):
             try:
                 data = dict(user_input)
                 data[CONF_URL] = normalize_url(data[CONF_URL])
+                setup_radio = data.pop("setup_radio", False)
+                if step == "user" and setup_radio:
+                    self._bootstrap_settings = data
+                    return await self.async_step_radio_setup()
                 client = Client(
                     async_get_clientsession(self.hass), data[CONF_URL], data[CONF_TOKEN]
                 )
@@ -101,7 +106,15 @@ class LivoloConfigFlow(ConfigFlow, domain=DOMAIN):
             except ValueError:
                 errors["base"] = "invalid_url"
         return self.async_show_form(
-            step_id=step, data_schema=connection_schema(self._defaults), errors=errors
+            step_id=step,
+            data_schema=(
+                connection_schema(self._defaults).extend(
+                    {vol.Optional("setup_radio", default=False): bool}
+                )
+                if step == "user"
+                else connection_schema(self._defaults)
+            ),
+            errors=errors,
         )
 
     async def async_step_user(self, user_input=None):
@@ -153,7 +166,7 @@ class LivoloConfigFlow(ConfigFlow, domain=DOMAIN):
         return LivoloOptionsFlow()
 
 
-class LivoloOptionsFlow(OptionsFlow):
+class LivoloOptionsFlow(BootstrapFlowMixin, OptionsFlow):
     """Use the daemon's device registry and bounded pairing windows."""
 
     def __init__(self):
@@ -213,7 +226,14 @@ class LivoloOptionsFlow(OptionsFlow):
 
         @param user_input Unused menu input.
         """
-        actions = ["pair_new", "refresh", "forget", "firmware_preflight", "settings"]
+        actions = [
+            "pair_new",
+            "refresh",
+            "forget",
+            "firmware_preflight",
+            "radio_setup",
+            "settings",
+        ]
         if self._development_enabled():
             actions.append("development")
         return self.async_show_menu(step_id="init", menu_options=actions)

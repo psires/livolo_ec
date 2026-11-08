@@ -1,9 +1,9 @@
-"""Unregistered ZB-GW04 application-only worker with injected physical I/O.
+"""Internal ZB-GW04 application-only adapter with injected physical I/O.
 
-No CLI, API or app startup calls this module. Target inspection and postflight
-providers are deliberately not implemented here. A future parent must establish
-physical ownership and supervise this worker; a file lock alone cannot exclude
-unrelated apps. This is not an eligibility declaration or stock-reset workflow.
+The opt-in bootstrap worker supplies the physical provider, exact-unit policy,
+durable permissions and inherited guards. This adapter alone does not authorize
+physical installation or implement a stock-reset workflow. Normal update and
+standalone eligibility remain separate from the guided engineering setup path.
 """
 
 from dataclasses import dataclass
@@ -21,6 +21,7 @@ from .firmware_worker import validate_guard
 BOARD = "zb-gw04-1v2"
 APP_BAUD = 460800
 LOADER_BAUD = 115200
+# This module alone makes no physical eligibility declaration.
 PHYSICAL_INSTALL_SUPPORTED = False
 
 

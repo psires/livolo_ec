@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import stat
 import secrets
+import sys
 
 from livolod.config import parse
 
@@ -30,17 +31,30 @@ def configuration(options, data_path=Path("/data")):
     catalog = options.get("firmware_catalog", "bundled")
     if catalog not in ("bundled", "local"):
         raise ValueError("firmware_catalog must be bundled or local")
+    profile = options.get("radio_setup_profile", "disabled")
+    mode = options.get("radio_mode", "gateway")
+    if profile not in ("disabled", "zb-gw04-1v2") or mode not in (
+        "gateway",
+        "bootstrap",
+    ):
+        raise ValueError("Invalid radio setup profile or mode")
+    if profile == "disabled" and mode != "gateway":
+        raise ValueError("Select an explicit radio setup profile before bootstrap mode")
+    selected = {"gateway": options["gateway"].lower(), "tag": options["tag"].lower()}
+    if not selected["gateway"] and not selected["tag"] and profile != "disabled":
+        selected = None
+        if mode != "bootstrap":
+            raise ValueError("An unconfigured radio requires bootstrap mode")
     raw = {
-        "network": {
-            "gateway": options["gateway"].lower(),
-            "tag": options["tag"].lower(),
-        },
+        "network": selected,
         "serial_port": options["serial_port"],
         "serial_baudrate": int(options["serial_baudrate"]),
         "database": str(data_path / "state.sqlite3"),
         "mqtt": {"enabled": False},
         "devices": [],
-        "output_mode": options.get("output_mode", "experimental_phase"),
+        "output_mode": (
+            options.get("output_mode", "experimental_phase") if selected else "disabled"
+        ),
         "api": {
             "enabled": True,
             "host": "0.0.0.0",
@@ -65,21 +79,28 @@ def configuration(options, data_path=Path("/data")):
     return raw
 
 
-def prepare_data(data_path, raw, uid=10001, gid=10001):
+def prepare_data(data_path, raw, uid=10001, gid=10001, filename="daemon.json"):
     """Prepare app-owned files without following links during privileged startup.
 
     @param data_path Existing private data directory.
     @param raw Validated non-secret daemon configuration.
     @param uid Runtime daemon user ID.
     @param gid Runtime daemon group ID.
+    @param filename Fixed generated config name, selected by the wrapper only.
     @return Absolute path to the generated config file.
     """
+    if filename not in ("daemon.json", "bootstrap.json"):
+        raise ValueError("Invalid generated config name")
     directory = os.open(data_path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     descriptors = []
     temporary = ".daemon-" + secrets.token_hex(12)
     try:
         for name in (
             "daemon.json",
+            "bootstrap.json",
+            "bootstrap.sqlite3",
+            "bootstrap.sqlite3.lock",
+            "bootstrap.sqlite3-journal",
             "state.sqlite3",
             "state.sqlite3-wal",
             "state.sqlite3-shm",
@@ -110,7 +131,8 @@ def prepare_data(data_path, raw, uid=10001, gid=10001):
             stream.flush()
             os.fsync(stream.fileno())
             os.fchown(stream.fileno(), uid, gid)
-        os.replace(temporary, "daemon.json", src_dir_fd=directory, dst_dir_fd=directory)
+        os.replace(temporary, filename, src_dir_fd=directory, dst_dir_fd=directory)
+        os.fsync(directory)
         os.fchown(directory, uid, gid)
     finally:
         for descriptor in descriptors:
@@ -120,14 +142,107 @@ def prepare_data(data_path, raw, uid=10001, gid=10001):
         except FileNotFoundError:
             pass
         os.close(directory)
-    return Path(data_path) / "daemon.json"
+    return Path(data_path) / filename
+
+
+def bootstrap_settings(options, raw, data_path=Path("/data")):
+    """Build opt-in server settings; no HTTP field can select a path or security policy.
+
+    @param options Supervisor-controlled explicit profile and initial mode.
+    @param raw Non-secret daemon configuration with optional accepted network.
+    @param data_path Existing persistent app data directory.
+    """
+    if options.get("radio_setup_profile", "disabled") == "disabled":
+        return None
+    if raw["serial_baudrate"] != 460800 or not raw["serial_port"].startswith("/dev/"):
+        raise ValueError("ZB-GW04 setup requires a selected /dev serial port at 460800")
+    if raw["network"] is not None:
+        parse(raw)
+    elif (
+        Path(raw["database"]).exists()
+        and not (data_path / "bootstrap.sqlite3").exists()
+    ):
+        raise ValueError("Existing gateway state requires its original gateway and tag")
+    policy = None
+    try:
+        descriptor = os.open(
+            data_path / "bootstrap-policy.json", os.O_RDONLY | os.O_NOFOLLOW
+        )
+    except FileNotFoundError:
+        pass
+    else:
+        with os.fdopen(descriptor, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_nlink != 1
+                or metadata.st_mode & 0o022
+            ):
+                raise ValueError("Bootstrap policy must be a protected regular file")
+            data = stream.read(65537)
+        if len(data) > 65536:
+            raise ValueError("Oversized bootstrap policy")
+        policy = json.loads(data)
+        if (
+            not isinstance(policy, dict)
+            or not {"schema", "target", "loader"} <= set(policy)
+            or set(policy) - {"schema", "target", "loader", "engineering"}
+            or policy["schema"] != 1
+        ):
+            raise ValueError("Invalid bootstrap policy")
+    return dict(
+        serial_port=os.path.realpath(raw["serial_port"]),
+        port_aliases=list(
+            dict.fromkeys((raw["serial_port"], os.path.realpath(raw["serial_port"])))
+        ),
+        database=raw["database"],
+        journal=str(data_path / "bootstrap.sqlite3"),
+        catalog=(
+            str(data_path / "bootstrap-firmware")
+            if policy and policy.get("engineering") is not None
+            else raw.get(
+                "firmware_bundle_dir",
+                str(Path(__import__("livolod").__file__).parent / "firmware"),
+            )
+        ),
+        lease_directory="/share/livolo-radio-locks",
+        loader_policy=policy,
+        mode=options.get("radio_mode", "gateway"),
+        network=raw["network"],
+    )
+
+
+def prepare_shared_leases(path, uid=10001, gid=10001):
+    """Prepare the host-shared cooperative guard directory without following links.
+
+    @param path Fixed shared lease directory under the Supervisor share mount.
+    @param uid Runtime owner ID used consistently by cooperating deployments.
+    @param gid Runtime group ID.
+    """
+    path = Path(path)
+    try:
+        path.mkdir(mode=0o700)
+    except FileExistsError:
+        pass
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        metadata = os.fstat(descriptor)
+        if metadata.st_uid not in (0, uid) or metadata.st_mode & 0o077:
+            raise ValueError(
+                "Shared radio lease directory must be private and owned by Livolo"
+            )
+        os.fchown(descriptor, uid, gid)
+    finally:
+        os.close(descriptor)
 
 
 def main():
     """Prepare private data and serial group, then drop privileges permanently."""
     options = json.loads(Path("/data/options.json").read_text())
     raw = configuration(options)
-    parse(raw)
+    settings = bootstrap_settings(options, raw)
+    if settings is None:
+        parse(raw)
     port = Path(raw["serial_port"])
     serial_gid = None
     try:
@@ -140,7 +255,15 @@ def main():
         pass
     os.environ["LIVOLO_API_TOKEN"] = options["api_token"]
     os.umask(0o077)
-    config_path = prepare_data(Path("/data"), raw)
+    if settings is None:
+        config_path = prepare_data(Path("/data"), raw)
+    else:
+        prepare_shared_leases(settings["lease_directory"])
+        config_path = prepare_data(
+            Path("/data"),
+            {"daemon": raw, "bootstrap": settings},
+            filename="bootstrap.json",
+        )
     # When absent at boot, grant the platform dialout group so hotplug can recover.
     import grp
 
@@ -151,7 +274,19 @@ def main():
     os.setgroups(sorted(groups))
     os.setgid(10001)
     os.setuid(10001)
-    os.execvp("livolod", ["livolod", "--config", str(config_path)])
+    if settings is None:
+        os.execvp("livolod", ["livolod", "--config", str(config_path)])
+    else:
+        os.execvp(
+            sys.executable,
+            [
+                sys.executable,
+                "-m",
+                "livolod.bootstrap_runtime",
+                "--config",
+                str(config_path),
+            ],
+        )
 
 
 if __name__ == "__main__":

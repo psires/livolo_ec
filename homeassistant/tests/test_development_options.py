@@ -86,6 +86,7 @@ async def test_default_and_per_hub_persistence_preserve_latest_options(
         "refresh",
         "forget",
         "firmware_preflight",
+        "radio_setup",
         "settings",
     }
     result = await hass.config_entries.options.async_configure(
