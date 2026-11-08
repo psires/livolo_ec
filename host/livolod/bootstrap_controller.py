@@ -4,6 +4,7 @@ import asyncio
 from copy import deepcopy
 import hashlib
 import json
+import logging
 import secrets
 import time
 import uuid
@@ -14,6 +15,30 @@ from .bootstrap_catalog import bootstrap_candidate
 
 PROFILE = "zb-gw04-1v2"
 PLAN_LIFETIME = 120
+LOG = logging.getLogger(__name__)
+
+
+def failure_location(error):
+    """Describe unexpected failure frames without messages, paths, source or locals.
+
+    @param error Exception whose traceback remains private to this process.
+    @return Bounded list of project module/function/line identifiers for server logs.
+    """
+    frames = []
+    trace = error.__traceback__
+    while trace is not None:
+        module = trace.tb_frame.f_globals.get("__name__", "")
+        function = trace.tb_frame.f_code.co_name
+        if (
+            isinstance(module, str)
+            and module.startswith("livolod.")
+            and all(
+                c.isascii() and (c.isalnum() or c in "_.") for c in module + function
+            )
+        ):
+            frames.append(f"{module[:80]}.{function[:80]}:{trace.tb_lineno}")
+        trace = trace.tb_next
+    return frames[-8:]
 
 
 class BootstrapError(ValueError):
@@ -627,6 +652,19 @@ class BootstrapController:
             if kind == "handoff":
                 self.runtime.normal_confirmed()
         except BaseException as error:
+            if not hasattr(error, "code") and not isinstance(
+                error, asyncio.CancelledError
+            ):
+                # Never log exception text/args, source lines, absolute filenames or
+                # locals: they can contain API credentials and private job contents.
+                LOG.error(
+                    "Unexpected setup failure kind=%s stage=%s request_id=%s type=%s frames=%s",
+                    kind,
+                    job["stage"],
+                    job["request_id"],
+                    type(error).__name__[:80],
+                    failure_location(error),
+                )
             uncertain = kind in ("install", "handoff", "enter") or (
                 kind == "cancel" and job["stage"] != "accepted"
             )

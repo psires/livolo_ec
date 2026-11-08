@@ -103,6 +103,9 @@ class Service:
         self.ready = False
         self.simulated = simulated
         self.gateway = None
+        # A failed UART close retains exclusion until explicit operator recovery
+        # or process exit; setup must not start another owner in this process.
+        self._unclosed_radio_guard = None
         self.phase_client = None
         self.scheduler = None
         self.state_sequences.clear()
@@ -1986,8 +1989,24 @@ class Service:
             catalog.cancel()
             commissioning.cancel()
             radio.cancel()
-            await asyncio.gather(catalog, commissioning, radio, return_exceptions=True)
+            drain = asyncio.gather(
+                catalog, commissioning, radio, return_exceptions=True
+            )
+            cancelled = False
+            while not drain.done():
+                try:
+                    await asyncio.shield(drain)
+                except asyncio.CancelledError:
+                    cancelled = True
+            results = drain.result()
+            radio_error = results[-1]
+            if isinstance(radio_error, BaseException) and not isinstance(
+                radio_error, asyncio.CancelledError
+            ):
+                raise LinkError("Radio cleanup could not be verified") from radio_error
             self.commissioning.finish("unknown", "daemon_stopped")
+            if cancelled:
+                raise asyncio.CancelledError
 
     async def _run_radio(self):
         """Keep the gateway reconciled across failures until shutdown is requested."""
@@ -2042,64 +2061,27 @@ class Service:
             finally:
                 self.ready = False
                 waiters = [t for t in (stop_task, reconfigure_task, firmware_task) if t]
-                for task in tasks + waiters:
-                    task.cancel()
-                await asyncio.gather(*tasks, *waiters, return_exceptions=True)
-                try:
-                    self.commissioning.radio_ended(expected_reconfigure)
-                    self.finish_pairing("unknown", "radio session ended")
-                    while not self.commands.empty():
-                        _, _, request_id, _, _ = self.commands.get_nowait()
-                        self.result(
-                            request_id,
-                            "rejected",
-                            error="radio session ended before execution",
-                        )
-                    self.seen.clear()
-                    self.state_received.clear()
-                    self.snapshot()
-                except (OSError, sqlite3.Error):
-                    # A failed journal must never skip disarming/closing the
-                    # adapter or leave an owner task running without a timer.
-                    self.stop.set()
-                    self.pairing = None
-                    self.schedule.clear()
-                    LOG.exception("Could not persist radio session shutdown")
-                try:
-                    if self.gateway:
-                        verified = False
-                        try:
-                            if self.firmware_manager.requested.is_set():
-                                try:
-                                    if self.stop.is_set():
-                                        raise LinkError(
-                                            "Shutdown before firmware handoff"
-                                        )
-                                    await self.firmware_manager.preflight(self.gateway)
-                                    await self.gateway.command("DISARM")
-                                    status = key_values(
-                                        await self.gateway.command("STATUS")
-                                    )
-                                    if (
-                                        status.get("armed") != "0"
-                                        or status.get("ack") != "0"
-                                    ):
-                                        raise LinkError("Radio disarm was not verified")
-                                    verified = True
-                                except (OSError, LinkError, CommandError):
-                                    self.firmware_manager.failed(
-                                        "Radio handoff could not be verified",
-                                        uncertain=False,
-                                    )
-                                    self.firmware_manager.requested.clear()
-                        finally:
-                            await self.gateway.close()
-                            self.gateway = None
-                        handoff = verified
-                finally:
-                    if not handoff and guard is not None:
+                cleanup = asyncio.create_task(
+                    self._close_radio_session(
+                        tasks + waiters, expected_reconfigure, guard
+                    )
+                )
+                cancelled = False
+                while not cleanup.done():
+                    try:
+                        await asyncio.shield(cleanup)
+                    except asyncio.CancelledError:
+                        # A parent cancellation must not interrupt draining old
+                        # owners or release the guard while their UART is open.
+                        self.stop.set()
+                        cancelled = True
+                handoff = cleanup.result()
+                if cancelled:
+                    # Cancellation can race a completed, verified handoff. No
+                    # update worker will take that descriptor in this branch.
+                    if handoff and guard is not None:
                         os.close(guard)
-                        guard = None
+                    raise asyncio.CancelledError
             if handoff:
                 await self.firmware_manager.execute(guard)
                 continue
@@ -2109,3 +2091,74 @@ class Service:
                 except asyncio.TimeoutError:
                     pass
                 delay = min(delay * 2, 30)
+
+    async def _close_radio_session(self, tasks, expected_reconfigure, guard):
+        """Drain session owners and close UART before releasing or transferring its guard.
+
+        The caller shields this task and observes its completion even when the
+        normal owner is cancelled again. A timed-out setup remains fenced while
+        cleanup is unfinished; it must never declare quiescence prematurely.
+        @param tasks Session tasks and event waiters to cancel and fully drain.
+        @param expected_reconfigure Whether this shutdown follows an ordinary reconfiguration.
+        @param guard Held firmware ownership descriptor, or None if acquisition failed.
+        @return True only when the caller must transfer the still-held guard to the updater.
+        """
+        handoff = False
+        try:
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                self.commissioning.radio_ended(expected_reconfigure)
+                self.finish_pairing("unknown", "radio session ended")
+                while not self.commands.empty():
+                    _, _, request_id, _, _ = self.commands.get_nowait()
+                    self.result(
+                        request_id,
+                        "rejected",
+                        error="radio session ended before execution",
+                    )
+                self.seen.clear()
+                self.state_received.clear()
+                self.snapshot()
+            except (OSError, sqlite3.Error):
+                self.stop.set()
+                self.pairing = None
+                self.schedule.clear()
+                LOG.exception("Could not persist radio session shutdown")
+            if self.gateway and self.firmware_manager.requested.is_set():
+                try:
+                    if self.stop.is_set():
+                        raise LinkError("Shutdown before firmware handoff")
+                    await self.firmware_manager.preflight(self.gateway)
+                    await self.gateway.command("DISARM")
+                    status = key_values(await self.gateway.command("STATUS"))
+                    if status.get("armed") != "0" or status.get("ack") != "0":
+                        raise LinkError("Radio disarm was not verified")
+                    handoff = True
+                except (OSError, LinkError, CommandError):
+                    self.firmware_manager.failed(
+                        "Radio handoff could not be verified", uncertain=False
+                    )
+                    self.firmware_manager.requested.clear()
+        finally:
+            try:
+                if self.gateway:
+                    try:
+                        await self.gateway.close()
+                    except BaseException:
+                        handoff = False
+                        self.stop.set()
+                        self._unclosed_radio_guard = guard
+                        raise
+                    else:
+                        self.gateway = None
+            finally:
+                handoff = handoff and not self.stop.is_set()
+                if (
+                    not handoff
+                    and guard is not None
+                    and self._unclosed_radio_guard != guard
+                ):
+                    os.close(guard)
+        return handoff

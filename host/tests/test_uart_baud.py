@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from livolod.config import parse
 from livolod.firmware_update import UpdatePort
@@ -52,6 +52,31 @@ class BaudConfiguration(unittest.TestCase):
 
 
 class BaudService(unittest.IsolatedAsyncioTestCase):
+    async def test_reader_removal_error_still_closes_serial(self):
+        """A failing event-loop cleanup cannot skip closing the physical descriptor."""
+        gateway = object.__new__(Gateway)
+        gateway.closed = False
+        gateway.command = AsyncMock(return_value="OK")
+        gateway.serial = Mock()
+        gateway.loop = Mock()
+        gateway.loop.remove_reader.side_effect = RuntimeError("fixture reader failure")
+        with self.assertRaisesRegex(RuntimeError, "reader failure"):
+            await gateway.close()
+        gateway.serial.close.assert_called_once()
+        self.assertTrue(gateway.closed)
+
+    async def test_failed_serial_close_does_not_mark_gateway_closed(self):
+        """Failed descriptor closure remains visible to the lifetime owner."""
+        gateway = object.__new__(Gateway)
+        gateway.closed = False
+        gateway.command = AsyncMock(return_value="OK")
+        gateway.serial = Mock()
+        gateway.loop = Mock()
+        gateway.serial.close.side_effect = OSError("fixture close failure")
+        with self.assertRaises(OSError):
+            await gateway.close()
+        self.assertFalse(gateway.closed)
+
     async def test_factory_and_capability_check_before_arming(self):
         """Use the configured rate and reject a contradictory adapter before ARM."""
         config = replace(parse(json.loads(EXAMPLE.read_text())), serial_baudrate=460800)

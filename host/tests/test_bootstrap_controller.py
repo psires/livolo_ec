@@ -326,3 +326,23 @@ class ControllerTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["network_ready"])
         self.runtime.handoff.assert_not_awaited()
         self.assertEqual(self.calls, [])
+
+    async def test_unexpected_failure_logs_location_without_private_error_contents(
+        self,
+    ):
+        """Server diagnostics identify generic failures without disclosing exception secrets."""
+        secret = "fixture-private-token /private/credential-file"
+        self.worker.run.side_effect = OSError(secret)
+        with self.assertLogs("livolod.bootstrap_controller", level="ERROR") as captured:
+            result = await self.prepare()
+        self.assertEqual(result["status"], "rejected")
+        self.assertEqual(result["error"], "operation_failed")
+        self.assertIsNone(result["plan_id"])
+        logged = "\n".join(captured.output)
+        self.assertIn("kind=prepare", logged)
+        self.assertIn("stage=accepted", logged)
+        self.assertIn("type=OSError", logged)
+        self.assertIn("livolod.bootstrap_controller._execute:", logged)
+        self.assertNotIn(secret, logged)
+        self.assertNotIn("credential-file", logged)
+        self.assertFalse(self.store.meta("installation_attempted", False))

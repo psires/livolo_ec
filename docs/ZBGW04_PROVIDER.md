@@ -41,6 +41,22 @@ The parent must supervise those descendants and retain/reconcile ownership on
 timeouts. Closing a handle is not proof that a helper exited. Normal service
 handoff must inherit or retain ownership without a release/reacquire gap.
 
+Normal-service teardown drains its session tasks and closes UART before releasing
+the deployment firmware lock. That cleanup has its own supervised task: repeated
+cancellation of the normal owner cannot skip it, release the lock early, or report
+setup quiescence while old consumers remain active. A setup timeout leaves pending
+cleanup fenced rather than allowing inspection to compete with it.
+If UART closure fails, the service retains its firmware guard and propagates the
+cleanup failure; setup does not claim quiescence or permit another owner. Recovery
+requires resolving that owner, rather than clearing its lock file.
+
+Unexpected setup exceptions retain their durable failure result and emit a bounded
+server diagnostic with operation, stage, request ID, exception class and project
+function/line locations. Exception messages, source text, absolute paths and local
+variables are omitted because they can contain credentials. A generic failure at
+`accepted` is not proof that no inspection reached UART; inspect ownership and
+receipts before deciding on recovery, and never automatically replay the request.
+
 Each inspection opens serial with inactive DTR/RTS, pyserial exclusive mode and
 no flow control. It checks the opened character-device number before requesting
 kernel `TIOCEXCL`. Busy/open/exclusion failures stop inspection. The descriptor

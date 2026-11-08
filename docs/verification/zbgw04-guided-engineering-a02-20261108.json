@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "attempt": "a02",
+  "scope": "Exact-unit guided cancellation and failed installation preparation engineering trial",
+  "status": "preparation_failed_original_service_restored",
+  "board": "zb-gw04-1v2",
+  "units_tested": 1,
+  "operator": "Tech Lead/root, with owner-operated BOOT and RESET",
+  "candidate": {
+    "source_commit": "3c3c582b817e82d22d759b7e6321139ef8b917e2",
+    "source_image_id": "sha256:65717616aa666b38dfad18b4a02f1139833977b9ae660db02927c6627b3ca048",
+    "ha_installed_image_id": "sha256:a541737ae3a11953313d734d0dae5b377dc8266c070851ac418c22e377d61546",
+    "private_app_version": "0.6.0-dev.20261108.a02",
+    "daemon_version": "0.15.0",
+    "integration_version": "0.6.0",
+    "firmware_compatibility_version": "0.14",
+    "actually_running_firmware": "0.13"
+  },
+  "operator_reported_results": {
+    "fresh_host_local_backup_and_baseline_capture": "passed",
+    "ha_installed_image_filesystem_and_runtime_equivalence": "passed",
+    "actual_dongle_metadata_across_two_fresh_containers_before_outage": "passed; no UART opened by the metadata probes",
+    "same_ha_entry_reconfiguration": "passed",
+    "candidate_normal_service_on_preserved_network_with_0_13": "passed",
+    "first_actual_ha_guided_cancel": "confirmed network_ready with actual firmware 0.13",
+    "post_cancel_registry_verification": "passed with the explicitly recorded candidate capability transition",
+    "second_actual_ha_setup_entry": "passed; bootstrap mode and radio selection observed",
+    "second_inspect_prepare": "rejected at accepted with operation_failed",
+    "installation_plan_created": false,
+    "subsequent_guided_cancel": "rejected at accepted with operation_failed",
+    "quiesced_candidate_lock_observation": "Main daemon still held the firmware lock; database lock was unheld and no worker child remained",
+    "emergency_run_intact_0_13_after_stopping_candidate": "passed; board/version independently checked by manual runner and RF disarmed",
+    "firmware_image_written": false,
+    "original_software_restoration": "passed; strict comparison completed after HA persisted refreshed capability flags"
+  },
+  "candidate_registry_comparison": {
+    "original_strict_failures_retained": true,
+    "only_changed_entity": "Existing same-entry Livolo firmware update entity",
+    "changed_field": "supported_features",
+    "original_mask": 21,
+    "candidate_masks_observed": [
+      20,
+      4
+    ],
+    "explanation": "Guided-only installation removes INSTALL. RELEASE_NOTES is present only while notes are a string; the refreshed empty normal catalog leaves PROGRESS only.",
+    "separate_versioned_validator": "Accepts 21 to 4 only with missing/null notes, or 21 to 20 only with string notes, under exact guided-only metadata and same-entity gates",
+    "other_scoped_registry_rows_and_fields": "unchanged except the existing modified_at exclusion",
+    "final_original_restoration_requirement": "Strict original comparison, including supported_features"
+  },
+  "independent_release_engineering_investigation": {
+    "ordinary_offline_full_cycle": "passed on exact installed ARM64 image with real catalog, payload staging, controller, journal, normal service, worker subprocess, locks, IPC and reaping; UART/provider boundary simulated",
+    "delayed_cleanup_offline_cycle": "reproduced accepted/operation_failed preparation rejection on the same installed image",
+    "observed_exception": "BlockingIOError during BootstrapWorker firmware-lock acquisition",
+    "race": "Normal-service shutdown can be cancelled while awaiting child-task cleanup, before reaching serial and firmware-lock cleanup",
+    "live_radio_access_by_release_engineer": false,
+    "corrected_source_and_replacement_build": "Accompanying source fix verified offline; replacement build and further live qualification remain pending"
+  },
+  "evidence_boundary": {
+    "failed_jobs_and_prior_attempt_evidence_retained": true,
+    "host_receipts_remain_on_ha": true,
+    "sensitive_backups_or_derived_receipts_exported": false,
+    "live_results_attribution": "Reported by Tech Lead; offline reproduction independently run by Release Engineer"
+  },
+  "qualification": {
+    "guided_installation_qualified": false,
+    "public_firmware_download_qualified": false,
+    "rf_control_tested_in_this_attempt": false,
+    "public_catalog_changed": false,
+    "release_published": false,
+    "next_gate": "Fix and independently test cancellation-safe cleanup and close-error handling, then build a separate candidate before any further live trial"
+  },
+  "final_restoration_reported_by_operator": {
+    "original_app_and_core_images_running": true,
+    "original_integration_version": "0.5.2",
+    "actual_firmware_version": "0.13",
+    "normal_radio_ready": true,
+    "same_ha_entry_data_options_and_identifiers": true,
+    "all_scoped_device_entity_area_rows_match_except_preexisting_modified_at_exclusion": true,
+    "firmware_entity_supported_features_restored": 21,
+    "original_idle_flasher_running": true,
+    "both_engineering_apps_stopped": true,
+    "trial_observer_archived_and_removed": true,
+    "firmware_image_written_during_attempt": false,
+    "detailed_receipt": "Protected HA-local final-restoration receipt; not exported"
+  },
+  "post_restoration_cleanup_reported_by_operator": {
+    "full_data_archives_for_both_stopped_engineering_apps_retained_on_ha": true,
+    "archive_readability_and_sqlite_integrity_checks": "passed, including both state databases and the a02 bootstrap journal",
+    "both_engineering_apps_uninstalled_after_archiving": true,
+    "only_the_two_engineering_local_app_contexts_removed": true,
+    "supervisor_store_reloaded": true,
+    "protected_backups_failure_logs_journals_and_context_archives_retained": true,
+    "historical_state_note": "Both apps were stopped at final restoration; subsequent cleanup archived and removed them",
+    "further_live_operations_in_this_window": false
+  },
+  "source_fix_validation": {
+    "unix_full_host_tests_passed": 487,
+    "release_engineer_focused_local_tests_passed": 52,
+    "release_engineer_focused_native_linux_arm64_tests_passed": 52,
+    "old_exact_arm64_image_reproduced_failure": true,
+    "fixed_source_on_native_arm64_completes_real_catalog_cycle": true,
+    "deterministic_regression_checks": "Lock remains held while consumers drain and UART closes, releases after successful cleanup, and remains held with failure propagated if UART closure fails",
+    "safe_diagnostics": "Unexpected failures log bounded operation/type/project-function locations without exception messages, absolute paths or locals",
+    "test_portability_correction": "Existing firmware timeout test now waits for the real post-ACK event before timing out; production timeout and failure classification unchanged",
+    "corrected_code_deployed_to_ha": false,
+    "hardware_qualification_claimed": false
+  }
+}

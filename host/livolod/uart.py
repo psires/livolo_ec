@@ -165,6 +165,8 @@ class Gateway:
         except (LinkError, CommandError):
             pass  # MCU lease is the independent fallback.
         finally:
-            self.closed = True
-            self.loop.remove_reader(self.serial.fileno())
-            self.serial.close()
+            try:
+                self.loop.remove_reader(self.serial.fileno())
+            finally:
+                self.serial.close()
+                self.closed = True

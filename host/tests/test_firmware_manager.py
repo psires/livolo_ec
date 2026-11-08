@@ -310,6 +310,26 @@ c.emit('transferred')
         guard = radio_guard(self.config.database)
         original = asyncio.create_subprocess_exec
         spawned = []
+        acknowledged = asyncio.Event()
+        original_persist = self.manager.persist
+        original_wait = asyncio.wait
+
+        def persisted_boundary():
+            """Observe the real child's post-ACK event after normal durable persistence."""
+            original_persist()
+            if self.manager.job.get("stage") == "preflight":
+                acknowledged.set()
+
+        async def timeout_after_ack(tasks, *, timeout, return_when):
+            """Start the test timeout only after the actual critical IPC handshake.
+
+            @param tasks Production communication and stop tasks.
+            @param timeout Original manager timeout, checked without racing cold imports.
+            @param return_when Production completion policy forwarded unchanged.
+            """
+            self.assertEqual(timeout, 0.2)
+            await asyncio.wait_for(acknowledged.wait(), 5)
+            return await original_wait(tasks, timeout=0.02, return_when=return_when)
 
         async def launch(*args, **kwargs):
             """Replace only the worker executable with an isolated hung child.
@@ -320,7 +340,7 @@ c.emit('transferred')
             process = await original(
                 sys.executable,
                 "-c",
-                "from livolod.firmware_worker import Channel; import time; Channel('update-1').before('flash'); time.sleep(60)",
+                "from livolod.firmware_worker import Channel; import time; channel=Channel('update-1'); channel.before('flash'); channel.emit('preflight'); time.sleep(60)",
                 **kwargs,
             )
             spawned.append(process)
@@ -329,6 +349,8 @@ c.emit('transferred')
         with (
             patch("livolod.firmware_manager.asyncio.create_subprocess_exec", launch),
             patch("livolod.firmware_manager.WORKER_TIMEOUT", 0.2),
+            patch("livolod.firmware_manager.asyncio.wait", timeout_after_ack),
+            patch.object(self.manager, "persist", side_effect=persisted_boundary),
         ):
             await self.manager.execute(guard)
         self.assertIsNotNone(spawned[0].returncode)
