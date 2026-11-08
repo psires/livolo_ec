@@ -305,3 +305,27 @@ versions and creates the final release candidate. Any resulting source/version
 changes require checks against that final commit before artifact promotion.
 Passing these software checks alone does not close the full-release firmware
 and hardware qualification gates above.
+
+## Integration-only maintenance 0.5.2
+
+The owner authorized releasing the reviewed HA changes and updating the existing
+HA installation while preserving paired devices and leaving radio firmware
+unchanged. The Tech Lead and Release Engineer selected the 0.5.1 maintenance
+line for integration 0.5.2. Its bundled client implementation stays at 0.5.1;
+app 0.5.1, daemon 0.14.1 and firmware compatibility 0.13 are not republished or
+updated. The independent 0.6.0 all-board candidate remains unchanged.
+
+The explicit `integration-only` HA manifest scope produces the assembled
+integration, provenance and checksums only. It does not build an app, daemon,
+container or firmware payload and does not relax the firmware gate for releases
+that include an app. This is a scoped maintenance exception, not a complete
+project release or new radio qualification.
+
+Source acceptance is pinned to `25e61e5054e4a066edefa04c9810f6b060e9bdaa`:
+266 HA tests pass against the maintenance daemon. Publication must also verify
+exact-source CI, matching canonical/HACS component bytes and public installer
+upgrade preservation. Live installation must have a fresh rollback backup and
+before/after paired-device, HA identity, options and running-version checks.
+Verify the pairing UI without starting pairing or controlling/removing devices.
+Rollback replaces only the integration files and restarts HA; it must not restore
+an older daemon database. Record publication and deployment outcomes separately.
