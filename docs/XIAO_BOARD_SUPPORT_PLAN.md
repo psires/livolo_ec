@@ -270,7 +270,9 @@ tested host settings. Three cycles began at 41 ms uptime and remained responsive
 for seven seconds with no watchdog or I/O errors. After a separate five-second
 closed interval, the first reopened sample reported 31 ms uptime and a USB reset
 reason, supporting a reopen-associated reset rather than an immediate close-only
-reset. The exact OS/control-line trigger and original stall cause remain unproven.
+reset. At that stage the OS/control-line trigger and original stall cause were
+unproven; the subsequent controlled comparison below isolates a host-side fix
+for the tested reopen reset.
 Exclusive ownership and known-idle state are required before opening the port;
 a post-open status check cannot preserve state that opening already reset.
 
@@ -281,3 +283,59 @@ Gateway control stays disabled. Watchdog, sustained serial/radio load, timing,
 pairing and updater qualification remain open gates. Existing radios, services
 and HA are outside this bring-up's modification scope. No experimental image is
 included in a release or an automatic-update catalog.
+
+### Stability investigation, November 8
+
+A traced channel-26 comparison on the unchanged passive-diagnostic images
+received all 20 C6 test frames on MG24, with valid original FCS. C6 received
+19 of 20 MG24 test frames, missing sequence 17. MG24 also counted one frame
+error; other receive-reason counters were zero. Both radios stopped cleanly.
+The strict result remains **failed**. Unrelated traffic was present, and syscall
+tracing adds host timing overhead; this does not establish a packet-loss rate
+or explain the earlier channel-11 errors.
+
+The C6 USB comparison kept firmware unchanged. Stock pyserial 3.5 cleared DTR
+and RTS separately and reset uptime to 41 ms on each of three opens. A combined
+`TIOCMBIC(DTR|RTS)` preserved uptime through all three sessions and both
+five-second closed gaps, with zero watchdog or I/O error counters. This operation
+is now used only by the experimental XIAO bench tools, with explicit identity
+checks and no stock fallback. See the [USB comparison](XIAO_C6_SERIAL.md) for
+the trace, reference-manual mechanism and kernel/electrical evidence limits.
+
+A separate C6 `xiao-usb-1` change yields one RTOS tick after at most 256 consumed
+input bytes. Native tests of the actual application loop demonstrate the
+previous scheduling gap under continuously ready, reply-free input and verify
+bounded yielding and parser recovery afterward. This is a robustness fix;
+neither it nor the host-open comparison establishes the cause of the historical
+intermittent USB stall. Watchdog policy, console and stack settings are unchanged.
+
+A temporary MG24 `xiao-reject-1` image then collected rejected bytes separately
+in one 30-second receive-only window. It reported 18 CRC-error packet statuses,
+retaining the first eight and counting ten omitted samples. All eight retained
+samples had invalid original FCS under an independent software check. All 274
+normal MG24 receive events had valid original FCS; C6 delivered 208 events.
+Both boards received two native reports from `46715621` and four from `66780945`.
+Other MG24 receive-reason counters were zero. The strict assessment remains
+**failed**, and rejected bytes never entered normal receive events.
+
+This classifies the sampled captured bytes, not the cause of corruption. It does
+not retroactively classify the earlier 33/58 errors or prove that all rejected
+traffic is ambient noise. Six strong, application-checksum-valid target-source
+payloads in the same window were seen only by C6; these forwarded/non-native
+reports preserve an unresolved reception discrepancy. The temporary image was
+removed afterward, and all 1,572,864 bytes of MG24 flash matched the saved
+pre-test image exactly. Its normal CRC policy remains unchanged.
+
+The C6 scheduling candidate passed one RF-off target check with 6,400 newline
+bytes and a 1,025-byte overlength input, followed by valid-command recovery and
+a seven-second hold. Accepted host bytes matched firmware read counters exactly;
+uptime continued, with zero watchdog, I/O or pending-output errors and no RF
+activity. Full readback matched the candidate and preserved every byte outside
+application erase pages `0x10000..0x40000`. Final health confirmed `xiao-usb-1`
+with RF off; the port was closed and unowned. This short paced test does not
+qualify sustained load or establish the historical stall's cause.
+
+The [stability verification record](verification/xiao-stability-20261108.json)
+retains artifact hashes, measured results, preservation checks and open gates.
+Pairing and control remain on hold. Existing radios, services and HA were not
+changed, and no experimental firmware was added to a release or update catalog.

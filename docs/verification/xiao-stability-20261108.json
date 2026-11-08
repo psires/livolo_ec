@@ -1,0 +1,348 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "base_commit": "5f2c16ee84a420448ad31df8251e442dff408489",
+  "firmware_version": "0.14",
+  "scope": "New XIAO stability investigation only; pairing and control remain disabled",
+  "release_or_catalog_modified": false,
+  "controlled_radio_test": {
+    "receipt_sha256": "af799714d9a0b047b666d83b8ea0cac0aa6db4f16a4ccd7d1b4e737751f03c0d",
+    "assessment": "failed",
+    "traced": true,
+    "channel": 26,
+    "expected_frames_per_direction": 20,
+    "mg24_to_c6_received": 19,
+    "mg24_to_c6_missing_sequences": [
+      17
+    ],
+    "c6_to_mg24_received": 20,
+    "mg24_original_fcs_valid_frames": 66,
+    "mg24_frame_error_events": 1,
+    "mg24_other_reason_counters": 0,
+    "c6_reported_drops": 0,
+    "both_clean_stop": true,
+    "limitations": [
+      "Unrelated traffic was present on channel 26.",
+      "Host syscall tracing adds timing overhead.",
+      "Known-frame reception does not explain channel 11 rejected frames or establish sustained reliability."
+    ]
+  },
+  "c6_reopen_comparison": {
+    "firmware_build": "xiao-rx-1",
+    "same_firmware_both_arms": true,
+    "rf_off": true,
+    "opens_per_arm": 3,
+    "hold_seconds": 7,
+    "closed_gap_seconds": 5,
+    "arms": {
+      "stock": {
+        "receipt_sha256": "800f75e3636c463424e0e6859b47a1a03da25057b260b9cc3fe5ea242cb33357",
+        "completed": true,
+        "uptime_pairs_ms": [
+          [
+            41,
+            7051
+          ],
+          [
+            41,
+            7051
+          ],
+          [
+            41,
+            7051
+          ]
+        ],
+        "reset_reasons": [
+          11
+        ],
+        "watchdog_and_io_error_counters_zero": true,
+        "trace_sha256": [
+          "139421fd70628fe90a2fbb9d284f40ee3de62878e2c1a7c03437064d3d1f2242"
+        ]
+      },
+      "combined": {
+        "receipt_sha256": "6cb082c9f20df7b73d8ae15ab5489794578d8e919a5deda114cdb911ba7a4b0f",
+        "completed": true,
+        "uptime_pairs_ms": [
+          [
+            75011,
+            82021
+          ],
+          [
+            87081,
+            94091
+          ],
+          [
+            99151,
+            106161
+          ]
+        ],
+        "reset_reasons": [
+          11
+        ],
+        "watchdog_and_io_error_counters_zero": true,
+        "trace_sha256": [
+          "6dc2e53ae8804be7dd0ecad133b17bedba0b410efb4c2e443e68214f2291f6f6"
+        ]
+      }
+    },
+    "conclusion": "Combined DTR|RTS clear preserved uptime in all tested sessions; stock separate clears reset on every open.",
+    "limits": [
+      "Userspace ioctl traces do not show kernel-internal state or electrical transitions.",
+      "The unchanged reset_reason=11 in combined sessions describes the previous boot.",
+      "This resolves the tested reopen-reset mechanism, not the historical intermittent stall or all USB behavior."
+    ]
+  },
+  "c6_scheduling_change": {
+    "build": "xiao-usb-1",
+    "input_byte_budget": 256,
+    "yield_ticks": 1,
+    "watchdog_console_stack_policy_changed": false,
+    "native_proof": "The unchanged actual app loop consumed 6,400 immediately ready newline bytes with no voluntary delay; the new regression fails against baseline and passes with the bounded yield.",
+    "native_regressions": [
+      "4,096 newline bytes with bounded yielding and PING recovery",
+      "4,096 overlength bytes with bounded yielding and PING recovery",
+      "Existing blocked-output radio timeout and passive-TX rejection"
+    ],
+    "artifact": {
+      "ec_xiao_c6_experimental.bin": {
+        "bytes": 196368,
+        "sha256": "4433fec66f8325661bac0c056f972d6c0302b753f3ffc28d7c31fc0eb6a24b9c"
+      },
+      "ec_xiao_c6_experimental.elf": {
+        "bytes": 3415548,
+        "sha256": "a3cc56ee170b3cf2837970042d76ec9821a1a807053fc7f24eef92db2f955ed3"
+      },
+      "ec_xiao_c6_experimental.map": {
+        "bytes": 2778180,
+        "sha256": "3e037b6ef7cc0d436a965111f7934660e76d07e9f4b53c0ae8ff83c3dd7db5d8"
+      },
+      "sdkconfig-c6-usb": {
+        "bytes": 57515,
+        "sha256": "b861c86d15078700003f7e20b4c9f8cc330fee746bee50e3ce6f4ea34e130420"
+      },
+      "c6-usb-disassembly.txt": {
+        "bytes": 2873779,
+        "sha256": "ce773836a55da2b466c3cfb10f12083ad23f76845ea4d9aa9e46bebbbbc22244"
+      },
+      "sdkconfig_unchanged": true,
+      "app_offset": "0x10000",
+      "image_end_exclusive": "0x3ff10",
+      "erase_end_exclusive": "0x40000"
+    },
+    "hardware_validation": {
+      "receipt_sha256": "2f680dfd6f2abbf94f9a7edaef7e4eed87e02256067f87fc1414a71679fd26be",
+      "probe_sha256": "d46c0aaaac4ec53eeb5bbe3064a50eb24faf4351869363688def0f78367e71d7",
+      "passed": true,
+      "noncommand_bytes": 7425,
+      "phases": [
+        {
+          "label": "newlines",
+          "accepted": 6400
+        },
+        {
+          "label": "overlength",
+          "accepted": 1025
+        }
+      ],
+      "samples": [
+        {
+          "label": "baseline",
+          "uptime_ms": 12211,
+          "read_bytes": 91,
+          "comparison": null
+        },
+        {
+          "label": "newlines",
+          "uptime_ms": 12501,
+          "read_bytes": 6547,
+          "comparison": {
+            "uptime_delta_ms": 290,
+            "host_delta_ms": 288.9255660120398,
+            "read_bytes_delta": 6456,
+            "accepted_delta": 6456
+          }
+        },
+        {
+          "label": "overlength",
+          "uptime_ms": 12571,
+          "read_bytes": 7628,
+          "comparison": {
+            "uptime_delta_ms": 70,
+            "host_delta_ms": 71.06759399175644,
+            "read_bytes_delta": 1081,
+            "accepted_delta": 1081
+          }
+        },
+        {
+          "label": "after_hold",
+          "uptime_ms": 19581,
+          "read_bytes": 7668,
+          "comparison": {
+            "uptime_delta_ms": 7010,
+            "host_delta_ms": 7009.236951998901,
+            "read_bytes_delta": 40,
+            "accepted_delta": 40
+          }
+        }
+      ],
+      "watchdog_io_and_pending_zero": true,
+      "rf_inactive_and_all_rf_counters_zero": true,
+      "hold_seconds": 7,
+      "limitations": "Short paced parser/recovery check, not sustained-load qualification or proof of the historical stall cause."
+    },
+    "historical_stall_cause_established": false,
+    "flash_preservation": {
+      "before_sha256": "b7abf700f33423f67964dbcc4df4ba9faf5a1f0bfb6fbf3b87f52e22b2ced44c",
+      "after_sha256": "03108017c3ef5660e829cb44a2751c5fd63e35550a364306b011a8ffac0c0459",
+      "full_bytes": 4194304,
+      "candidate_sha256": "4433fec66f8325661bac0c056f972d6c0302b753f3ffc28d7c31fc0eb6a24b9c",
+      "candidate_exact": true,
+      "outside_authorized_erase_pages_exact": true,
+      "protected_before_sha256": "2f43309416aec799d7b3818b993ad54b8ecfa2bee52bd32f57ac545d2da3fbb6",
+      "protected_after_sha256": "2f43309416aec799d7b3818b993ad54b8ecfa2bee52bd32f57ac545d2da3fbb6",
+      "trailing_erase_page_ff": true,
+      "erase_start": "0x10000",
+      "erase_end_exclusive": "0x40000",
+      "receipt_sha256": "3a77f3d9df46eb546be5e6b0b81fa67125480227ff641f4a0d9e102d2fd341ae",
+      "esptool_version": "5.6.0",
+      "flash_mode_frequency_size": "keep",
+      "whole_chip_erase": false
+    },
+    "final_health": {
+      "receipt_sha256": "89c95cce4a089b887a7fc42878c3d1d787d645cc9246973fa35ec65fdece352f",
+      "after_intentional_rom_readback_reset": true,
+      "passed": true,
+      "uptime_ms": 48601,
+      "reset_reason": 11,
+      "rf_active": false,
+      "watchdog_io_and_pending_zero": true,
+      "port_closed": true,
+      "port_has_no_owner": true
+    }
+  },
+  "mg24_private_diagnostic": {
+    "build": "xiao-reject-1",
+    "normal_build": "xiao-rx-2",
+    "temporary_crc_policy": "Ignore CRC errors only to retain rejected samples separately; never publish them as normal crc=1 receive events",
+    "receive_only_channel": 11,
+    "max_untrusted_records": 8,
+    "max_record_bytes": 128,
+    "readout_only_after_idle": true,
+    "baseline_rebuild_byte_identical": true,
+    "artifact": {
+      "bytes": 80048,
+      "sha256": "8eb02722205f89e8f5fc6e26cc0bec8565f4f4bae91fb73d16f226e2792ceace",
+      "load_address": "0x08006000",
+      "image_end_exclusive": "0x80198b0",
+      "erase_end_exclusive": "0x801a000",
+      "restore_baseline_sha256": "5fbf1df2bb430ed8a4de05ed176213b9169d8386f10e816a5ee156b7194fb80d",
+      "restore_union_erase_range": [
+        "0x08006000",
+        "0x0801a000"
+      ]
+    },
+    "restore_plan": {
+      "pre_private_full_sha256": "308a2a6f13e3d13395a88b2c6776cda09b72d2177b29f876fc1bc1990ade3da1",
+      "restore_pages_bytes": 81920,
+      "restore_pages_sha256": "d87fd0263a0556afb5fb97327676eccc79e43781256676dc780e935d5998cd7e",
+      "range": [
+        "0x08006000",
+        "0x0801a000"
+      ],
+      "matches_approved_baseline_plus_erased_tail": true
+    },
+    "hardware_results": {
+      "receipt_sha256": "66c86df039d6b89a4c99b878ed6d9f459bed1dea4fa2d42abb77a4c08c242658",
+      "assessment": "failed",
+      "duration_seconds": 30,
+      "window_completed": true,
+      "crc_error_status_records_seen": 18,
+      "records_stored": 8,
+      "records_omitted": 10,
+      "stored_original_fcs_invalid": 8,
+      "stored_original_fcs_valid": 0,
+      "stored_mac_payloads_also_seen_on_c6": 0,
+      "other_reason_counters_zero": true,
+      "receivers": {
+        "mg24": {
+          "target_counts": {
+            "46715621": 2,
+            "66780945": 4
+          },
+          "rx_events": 274,
+          "invalid_mac_fcs": 0,
+          "unexpected_tx_events": 0,
+          "original_fcs_available": true,
+          "integrity_basis": "Independent software check of original captured FCS",
+          "independently_checked_original_fcs_frames": 274
+        },
+        "c6": {
+          "target_counts": {
+            "46715621": 2,
+            "66780945": 4
+          },
+          "rx_events": 208,
+          "invalid_mac_fcs": 0,
+          "unexpected_tx_events": 0,
+          "original_fcs_available": false,
+          "integrity_basis": "Hardware-valid callback only; original radio FCS stripped",
+          "independently_checked_original_fcs_frames": 0
+        }
+      },
+      "limits": [
+        "The first-eight sample is not representative of every rejected packet.",
+        "Invalid FCS in captured bytes does not identify whether corruption originated at a transmitter, in the RF environment or in the receiver.",
+        "No trusted source identity is inferred from rejected bytes.",
+        "Earlier 33 and 58 errors cannot be retrospectively classified.",
+        "Strict assessment remains failed; no capture acceptance rules were relaxed."
+      ],
+      "unresolved_comparison": {
+        "c6_only_application_checksum_valid_target_source_payloads": 6,
+        "rssi_range_dbm": [
+          -38,
+          -35
+        ],
+        "native_source_equals_subject": false,
+        "interpretation": "Five forwarded opcode07 reports and one opcode09 report remain absent from MG24 accepted captures; no CRC-error sample matches their MAC payloads."
+      }
+    },
+    "restoration": {
+      "sequence_receipt_sha256": "03e9e4d020855ae95c2650c69eb3390d6cc52859f207505eb1c8df3104627017",
+      "full_flash_bytes": 1572864,
+      "whole_flash_equal_to_preimage": true,
+      "full_sha256": "308a2a6f13e3d13395a88b2c6776cda09b72d2177b29f876fc1bc1990ade3da1",
+      "restored_build": "xiao-rx-2"
+    }
+  },
+  "offline_checks": {
+    "native_sanitizers": "AddressSanitizer and UndefinedBehaviorSanitizer; -Wall -Wextra -Werror",
+    "native_suites": [
+      "experimental protocol/RF core",
+      "C6 actual USB loop including scheduler regression",
+      "MG24 reason counters and private reject/core/parser tests"
+    ],
+    "public_host_bench_tests": 49,
+    "host_gateway_refusal_subcases": 32,
+    "python_style": "Black24.8.0",
+    "c_style": "clang-format18.1.8 with repository Linux-kernel style",
+    "release_engineer_review": "Independent source, artifact, probe and raw evidence review; publication checked against exact per-file SHA256 manifests."
+  },
+  "status": "Tested C6 reopen reset fixed; bounded input scheduling repaired and validated; MG24 sampled rejected bytes fail CRC; original stall and RF reception discrepancies remain unresolved",
+  "preservation": {
+    "existing_radios_changed": false,
+    "existing_services_changed": false,
+    "home_assistant_accessed_or_changed": false,
+    "pairing_or_control_performed": false,
+    "mg24_restored_whole_flash_exact": true,
+    "c6_only_authorized_application_pages_changed": true,
+    "raw_snapshots_and_private_receipts_committed": false
+  },
+  "remaining_gates": [
+    "Original intermittent C6 USB stall has not been causally reproduced or shown resolved.",
+    "Strong application-checksum-valid C6-only target-source reports remain unexplained.",
+    "Traced synthetic test missed one of 20 MG24-to-C6 frames; no RF loss cause established.",
+    "Sustained USB/radio behavior, timing, pairing and control remain unqualified."
+  ]
+}
