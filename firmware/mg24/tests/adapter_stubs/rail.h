@@ -21,7 +21,8 @@ typedef struct {
 	unsigned unused;
 } RAIL_CsmaConfig_t;
 typedef struct {
-	unsigned packetStatus, packetBytes;
+	unsigned packetStatus;
+	uint16_t packetBytes;
 } RAIL_RxPacketInfo_t;
 typedef struct {
 	int rssi;
@@ -53,8 +54,25 @@ typedef struct {
 #define RAIL_Idle(h, m, w) ((void)(h), (void)(m), (void)(w))
 #define RAIL_GetRadioState(h) ((void)(h), RAIL_RF_STATE_IDLE)
 #define RAIL_Init(c, cb) ((void)(c), (void)(cb), (void *)1)
-#define RAIL_StartRx(h, ch, c)                                                 \
-	((void)(h), (void)(ch), (void)(c), test_start_result)
+/** @brief Return the fixture's selected RX-start status without radio effects.
+ * @param handle Unused mock RAIL instance.
+ * @param channel Unused channel, with the SDK's uint16_t argument type.
+ * @param scheduler_info Unused borrowed scheduler information.
+ * @param result Status selected by the including test fixture.
+ * @return The selected status, also safe for callers that discard it.
+ */
+static inline RAIL_Status_t test_start_rx(RAIL_Handle_t handle,
+					  uint16_t channel,
+					  const void *scheduler_info,
+					  RAIL_Status_t result)
+{
+	(void)handle;
+	(void)channel;
+	(void)scheduler_info;
+	return result;
+}
+
+#define RAIL_StartRx(h, ch, c) test_start_rx((h), (ch), (c), test_start_result)
 #define RAIL_ConfigRxOptions(h, m, v) ((void)(h), (void)(m), (void)(v), 0)
 #define RAIL_SetRxFifo(h, p, s) ((void)(h), (void)(p), (void)(s), 0)
 #define RAIL_SetTxFifo(h, p, o, s) ((void)(h), (void)(p), (void)(o), (s))
