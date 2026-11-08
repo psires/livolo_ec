@@ -86,10 +86,13 @@ static size_t reply(struct ec_experimental *state, char *out, size_t capacity)
 			"command_slots=0 request_cache=0 lease_max=0 "
 			"session_bytes=0 channel=11 baud=%u board=%s "
 			"fw_version=" EC_VERSION " update=none experimental=1 "
-			"gateway=0 radio_tx=%s%s build=%s",
+			"gateway=0 radio_tx=%s%s%s build=%s",
 			state->baud, state->board,
 			state->radio_command ? RADIO_TX_CAPABILITY : "0",
 			state->radio_command ? RADIO_DIAGNOSTICS : "",
+			state->radio_command && state->adapter_diagnostics
+				? " adapter_diag=handoff_v1"
+				: "",
 			state->build);
 		if (length < 0 || (size_t)length >= sizeof(body))
 			return 0;

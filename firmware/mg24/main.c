@@ -6,6 +6,7 @@
 #include "api/application_properties.h"
 #include "transport.h"
 #include "../version.h"
+#include <stdatomic.h>
 #ifdef EC_RF_DIAGNOSTICS
 #include "rf.h"
 extern const struct ec_rf_ops ec_mg24_rf_ops;
@@ -15,8 +16,56 @@ extern const struct ec_rf_ops ec_mg24_rf_ops;
 #endif
 
 #define RX_SIZE 2048u
+#define TX_IRQ_BUDGET 8u
+#define INPUT_BUDGET 64u
+_Static_assert(ATOMIC_INT_LOCK_FREE == 2,
+	       "UART ISR requires lock-free ownership");
 static volatile uint8_t rx[RX_SIZE];
 static volatile unsigned head, tail, lost;
+static const char *tx_buffer;
+static size_t tx_sent;
+static atomic_uint tx_pending;
+
+/** @brief Feed only ready UART slots without delaying higher-priority radio IRQs. */
+void USART0_TX_IRQHandler(void)
+{
+	unsigned length =
+		atomic_load_explicit(&tx_pending, memory_order_acquire);
+
+	if (!length) {
+		USART_IntDisable(USART0, USART_IEN_TXBL);
+		return;
+	}
+	for (unsigned budget = 0; budget < TX_IRQ_BUDGET && tx_sent < length;
+	     budget++) {
+		if (!(USART0->STATUS & USART_STATUS_TXBL))
+			break;
+		USART0->TXDATA = (uint8_t)tx_buffer[tx_sent++];
+	}
+	if (tx_sent == length) {
+		USART_IntDisable(USART0, USART_IEN_TXBL);
+		/* The UART now owns copied bytes; physical wire completion is later. */
+		atomic_store_explicit(&tx_pending, 0, memory_order_release);
+	}
+}
+
+/** @brief Give one complete output record to the UART while preserving its bytes.
+ * @param data Immutable record storage, retained until tx_pending becomes zero.
+ * @param length Record bytes, at most the main response buffer capacity.
+ * @note Main is the sole publisher and must acquire zero tx_pending first.
+ * Publication may race a stale TX IRQ: the complete record is visible before
+ * arming, and an empty IRQ always disarms itself. No IRQ waits for UART space.
+ */
+static void serial_output_start(const char *data, size_t length)
+{
+	if (!length)
+		return;
+	tx_buffer = data;
+	tx_sent = 0;
+	atomic_store_explicit(&tx_pending, (unsigned)length,
+			      memory_order_release);
+	USART_IntEnable(USART0, USART_IEN_TXBL);
+}
 
 /* The preserved Gecko loader finds this through vector slot 13. */
 const ApplicationProperties_t sl_app_properties = {
@@ -34,7 +83,9 @@ const ApplicationProperties_t sl_app_properties = {
 /** @brief Drain USART0 into a bounded RX ring; never execute commands in IRQ. */
 void USART0_RX_IRQHandler(void)
 {
-	uint32_t flags = USART_IntGet(USART0);
+	uint32_t flags =
+		USART_IntGet(USART0) & (USART_IF_RXDATAV | USART_IF_RXOF |
+					USART_IF_FERR | USART_IF_PERR);
 
 	if (flags & (USART_IF_RXOF | USART_IF_FERR | USART_IF_PERR))
 		lost = 1;
@@ -71,6 +122,9 @@ static void serial_init(void)
 	USART_IntEnable(USART0, USART_IEN_RXDATAV | USART_IEN_RXOF |
 					USART_IEN_FERR | USART_IEN_PERR);
 	NVIC_EnableIRQ(USART0_RX_IRQn);
+	/* Lowest priority prevents output service from preempting radio IRQs. */
+	NVIC_SetPriority(USART0_TX_IRQn, (1u << __NVIC_PRIO_BITS) - 1);
+	NVIC_EnableIRQ(USART0_TX_IRQn);
 }
 
 /** @brief Keep RF off until a bounded RFSTART or receive-only RFLISTEN request.
@@ -80,7 +134,10 @@ int main(void)
 {
 	struct ec_experimental parser;
 	char response[640];
-	size_t pending = 0, sent = 0;
+	size_t pending;
+#ifdef EC_RF_DIAGNOSTICS
+	unsigned prefer_event = 0;
+#endif
 
 	CHIP_Init();
 #ifdef EC_RF_DIAGNOSTICS
@@ -98,10 +155,12 @@ int main(void)
 #ifdef EC_RF_DIAGNOSTICS
 	ec_rf_setup(&ec_mg24_rf_ops);
 	parser.radio_command = ec_rf_command;
-	parser.build = "xiao-queue-1";
+	parser.build = "xiao-uart-1";
+	parser.adapter_diagnostics = 1;
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 	parser.radio_command = ec_mg24_reject_command;
 	parser.build = "xiao-reject-1";
+	parser.adapter_diagnostics = 0;
 #endif
 #endif
 	for (;;) {
@@ -116,24 +175,42 @@ int main(void)
 			ec_experimental_byte(&parser, 0, response,
 					     sizeof(response));
 		}
-		if (sent < pending) {
-			if (USART0->STATUS & USART_STATUS_TXBL)
-				USART0->TXDATA = response[sent++];
-			continue;
+		pending =
+			atomic_load_explicit(&tx_pending, memory_order_acquire);
+#ifdef EC_RF_DIAGNOSTICS
+		if (!pending && prefer_event) {
+			pending = ec_rf_event(response, sizeof(response));
+			prefer_event = 0;
+			serial_output_start(response, pending);
+			if (pending)
+				continue;
 		}
-		pending = sent = 0;
-		if (tail != head) {
+#endif
+		for (unsigned budget = 0; budget < INPUT_BUDGET && tail != head;
+		     budget++) {
 			uint8_t byte = rx[tail];
+			size_t length;
 
+			/* Only newline can produce output; retain the owned record. */
+			if (byte == '\n' && pending)
+				break;
 			tail = (tail + 1) & (RX_SIZE - 1);
-			pending = ec_experimental_byte(&parser, byte, response,
-						       sizeof(response));
-			sent = 0;
+			length = ec_experimental_byte(&parser, byte, response,
+						      sizeof(response));
+			if (length) {
+				pending = length;
+				serial_output_start(response, length);
+#ifdef EC_RF_DIAGNOSTICS
+				prefer_event = 1;
+#endif
+				break;
+			}
 		}
 #ifdef EC_RF_DIAGNOSTICS
 		if (!pending) {
 			pending = ec_rf_event(response, sizeof(response));
-			sent = 0;
+			prefer_event = 0;
+			serial_output_start(response, pending);
 		}
 #endif
 	}

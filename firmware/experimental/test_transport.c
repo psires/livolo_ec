@@ -4,6 +4,21 @@
 #include <stdio.h>
 #include <string.h>
 
+/** @brief Supply a harmless RF hook for explicit capability-negotiation tests.
+ * @param command Complete diagnostic request, unused by this fixture.
+ * @param out Response body storage.
+ * @param capacity Available bytes including NUL.
+ * @return Complete fixed reply length, or zero when it does not fit.
+ */
+static size_t radio_reply(const char *command, char *out, size_t capacity)
+{
+	int length;
+
+	(void)command;
+	length = snprintf(out, capacity, "OK fixture=1");
+	return length > 0 && (size_t)length < capacity ? (size_t)length : 0;
+}
+
 /** @brief Feed a complete request through the actual byte parser.
  * @param state Parser to exercise.
  * @param input NUL-terminated request bytes.
@@ -47,6 +62,19 @@ int main(void)
 	assert(strstr(output,
 		      "update=none experimental=1 gateway=0 radio_tx=0"));
 	assert(!strstr(output, "queue_diag="));
+	assert(!strstr(output, "adapter_diag="));
+	state.adapter_diagnostics = 1;
+	assert(feed(&state, "1 CAPS\n", output));
+	assert(!strstr(output, "adapter_diag="));
+	state.radio_command = radio_reply;
+	assert(feed(&state, "1 CAPS\n", output));
+	assert(strstr(output, "adapter_diag=handoff_v1"));
+	assert(feed(&state, "1 RFADAPTER\n", output));
+	assert(!strcmp(output, "RSP 1 OK fixture=1\n"));
+	state.adapter_diagnostics = 0;
+	assert(feed(&state, "1 CAPS\n", output));
+	assert(!strstr(output, "adapter_diag="));
+	ec_experimental_init(&state, "seeed-xiao-mg24", "test", 115200);
 	for (size_t i = 0; i < sizeof(mutating) / sizeof(mutating[0]); i++) {
 		assert(feed(&state, mutating[i], output));
 		assert(strstr(output, "ERR UNSUPPORTED"));

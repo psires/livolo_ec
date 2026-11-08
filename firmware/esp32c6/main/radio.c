@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 #include "rf.h"
 #include "health.h"
+#include "adapter.h"
 #include "driver/gpio.h"
 #include "esp_ieee802154.h"
 #include "esp_timer.h"
@@ -45,6 +46,7 @@ static int start(unsigned channel)
 {
 	if (channel != 11 && channel != 26)
 		return -1;
+	ec_c6_adapter_reset();
 	selected_channel = 0;
 	if (!initialized) {
 		gpio_config_t pins = {
@@ -105,7 +107,7 @@ static int power_dbm(void)
 }
 
 const struct ec_rf_ops ec_c6_rf_ops = {
-	now_us, start, stop, send, poll, power_dbm, ec_c6_health,
+	now_us, start, stop, send, poll, power_dbm, ec_c6_health, ec_c6_adapter,
 };
 
 /** @brief Copy valid MAC bytes, then always release the driver's RX buffer.
@@ -115,13 +117,30 @@ const struct ec_rf_ops ec_c6_rf_ops = {
 void IRAM_ATTR esp_ieee802154_receive_done(uint8_t *frame,
 					   esp_ieee802154_frame_info_t *info)
 {
-	if (frame && info && frame[0] >= 3 && frame[0] <= 127)
+	ec_c6_adapter_count(EC_C6_ADAPTER_RX_DONE);
+	if (frame && info && frame[0] >= 3 && frame[0] <= 127) {
+		ec_c6_adapter_count(EC_C6_ADAPTER_CORE_CALLS);
 		ec_rf_receive(frame + 1, frame[0] - 2, 0, info->rssi, info->lqi,
 			      now_us());
-	else
+	} else {
+		ec_c6_adapter_count(EC_C6_ADAPTER_RX_INVALID);
+		if (!frame)
+			ec_c6_adapter_count(EC_C6_ADAPTER_RX_NULL);
 		ec_rf_drop();
+	}
 	if (frame)
-		esp_ieee802154_receive_handle_done(frame);
+		ec_c6_adapter_count(esp_ieee802154_receive_handle_done(frame) ==
+						    ESP_OK
+					    ? EC_C6_ADAPTER_RX_RELEASE_OK
+					    : EC_C6_ADAPTER_RX_RELEASE_FAIL);
+}
+
+/** @brief Count the SDK's already-enabled SFD indications in ISR context.
+ * This is not a unique-packet count or an identification of a CRC failure.
+ */
+void IRAM_ATTR esp_ieee802154_receive_sfd_done(void)
+{
+	ec_c6_adapter_count(EC_C6_ADAPTER_SFD_EVENT);
 }
 
 /** @brief Publish TX completion separately from any independent air reception.
@@ -136,7 +155,10 @@ void IRAM_ATTR esp_ieee802154_transmit_done(const uint8_t *frame,
 	(void)frame;
 	(void)info;
 	if (ack)
-		esp_ieee802154_receive_handle_done(ack);
+		ec_c6_adapter_count(esp_ieee802154_receive_handle_done(ack) ==
+						    ESP_OK
+					    ? EC_C6_ADAPTER_ACK_RELEASE_OK
+					    : EC_C6_ADAPTER_ACK_RELEASE_FAIL);
 	ec_rf_tx_complete(1);
 }
 

@@ -15,6 +15,8 @@ struct ec_experimental {
 	const char *board;
 	const char *build;
 	unsigned baud;
+	/* Opt in only when the RF hook implements idle RFADAPTER handoff snapshots. */
+	unsigned adapter_diagnostics;
 	/* Optional RF-only diagnostic handler: command -> bounded response body. */
 	size_t (*radio_command)(const char *command, char *out,
 				size_t capacity);

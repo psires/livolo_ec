@@ -11,6 +11,21 @@ static const uint8_t *borrowed;
 static size_t borrowed_length;
 static uint8_t transmitted[125];
 static char response[1024];
+static unsigned adapter_reads;
+
+/** @brief Expose a fixed snapshot to detect accidental callback admission.
+ * @param out Snapshot response storage.
+ * @param capacity Available bytes including NUL.
+ * @return Complete response length, or zero without partial success.
+ */
+static size_t adapter_snapshot(char *out, size_t capacity)
+{
+	int length;
+
+	adapter_reads++;
+	length = snprintf(out, capacity, "OK fixture=unchanged");
+	return length > 0 && (size_t)length < capacity ? (size_t)length : 0;
+}
 
 /** @brief Supply a controllable wrapping microsecond clock.
  * @return Current mock time, modulo 2^32.
@@ -535,6 +550,62 @@ static void test_passive_expiry_and_failure(void)
 	assert(starts == 1 && !sends);
 }
 
+/** @brief Fence adapter observations until confirmed stop and complete event drain. */
+static void test_adapter_snapshot_gate(void)
+{
+	struct ec_rf_ops observed = ops;
+	uint8_t packet[39] = { 0x01, 0x88 };
+	unsigned old_polls, old_stops;
+
+	reset();
+	command("RFADAPTER", 0);
+	assert(strstr(response, "RF_ADAPTER_UNSUPPORTED"));
+	observed.adapter = adapter_snapshot;
+	ec_rf_setup(&observed);
+	adapter_reads = 0;
+	command("RFADAPTER extra", 0);
+	assert(!adapter_reads);
+	old_polls = polls;
+	command("RFADAPTER", 1);
+	assert(adapter_reads == 1 && !starts && !stops &&
+	       polls == old_polls + 1);
+	assert(!ec_rf_command("RFADAPTER", response, 4));
+	command("RFADAPTER", 1);
+	assert(!strcmp(response, "OK fixture=unchanged"));
+	assert(adapter_reads == 3);
+	command("RFLISTEN 1234abcd", 1);
+	command("RFADAPTER", 0);
+	assert(strstr(response, "RF_ADAPTER_NOT_IDLE"));
+	ec_rf_receive(packet, sizeof(packet), 0, -40, 100, clock_us);
+	command("RFSTOP", 1);
+	command("RFADAPTER", 0);
+	assert(adapter_reads == 3);
+	assert(ec_rf_event(response, sizeof(response)));
+	command("RFADAPTER", 1);
+	assert(adapter_reads == 4);
+	command("RFSTART 1234abcd", 1);
+	command("RFTX 1234abcd 0 39 0 0", 1);
+	command("RFADAPTER", 0);
+	clock_us += 20000;
+	ec_rf_poll();
+	command("RFADAPTER", 0);
+	assert(adapter_reads == 4);
+	assert(ec_rf_event(response, sizeof(response)));
+	old_polls = polls;
+	old_stops = stops;
+	command("RFADAPTER", 1);
+	assert(adapter_reads == 5 && polls == old_polls + 1 &&
+	       stops == old_stops);
+	ec_rf_setup(&observed);
+	command("RFLISTEN abcdef12", 1);
+	stop_result = -1;
+	command("RFSTOP", 0);
+	command("RFADAPTER", 0);
+	assert(strstr(response, "RF_ADAPTER_NOT_IDLE"));
+	assert(adapter_reads == 5);
+	reset();
+}
+
 /** @brief Execute portable RF safety regressions without initializing hardware.
  * @return Zero when all bounded diagnostic invariants hold.
  */
@@ -551,6 +622,7 @@ int main(void)
 	test_adapter_failures();
 	test_passive_window();
 	test_passive_expiry_and_failure();
+	test_adapter_snapshot_gate();
 	puts("experimental RF bounds and ownership: PASS");
 	return 0;
 }

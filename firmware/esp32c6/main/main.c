@@ -55,7 +55,8 @@ void app_main(void)
 #ifdef EC_RF_DIAGNOSTICS
 	ec_rf_setup(&ec_c6_rf_ops);
 	parser.radio_command = ec_rf_command;
-	parser.build = "xiao-usb-2";
+	parser.build = "xiao-rxdiag-1";
+	parser.adapter_diagnostics = 1;
 #endif
 	for (;;) {
 #ifdef EC_RF_DIAGNOSTICS

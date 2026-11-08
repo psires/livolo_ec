@@ -45,6 +45,16 @@ int ec_rf_events_pending(void)
 		       atomic_load_explicit(&tail, memory_order_relaxed);
 }
 
+/** @brief Permit observations only when callbacks and queued events are quiescent.
+ * @return Nonzero before first start, or after confirmed stop and complete core
+ * drain, including a fault whose adapter has stopped successfully.
+ */
+static int snapshot_idle(void)
+{
+	return quiescent && !atomic_load(&active) && !atomic_load(&busy) &&
+	       !ec_rf_events_pending();
+}
+
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 int ec_rf_diagnostic_idle(void)
 {
@@ -170,9 +180,18 @@ size_t ec_rf_command(const char *command, char *out, size_t capacity)
 	}
 	if (!count || word)
 		goto done;
+	if (count == 1 && !strcmp(words[0], "RFADAPTER")) {
+		if (!snapshot_idle()) {
+			response = "ERR RF_ADAPTER_NOT_IDLE";
+			goto done;
+		}
+		if (radio->adapter)
+			return radio->adapter(out, capacity);
+		response = "ERR RF_ADAPTER_UNSUPPORTED";
+		goto done;
+	}
 	if (count == 1 && !strcmp(words[0], "RFQUEUE")) {
-		if (!quiescent || atomic_load(&active) || atomic_load(&busy) ||
-		    ec_rf_events_pending()) {
+		if (!snapshot_idle()) {
 			response = "ERR RF_QUEUE_NOT_IDLE";
 			goto done;
 		}

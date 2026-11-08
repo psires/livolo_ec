@@ -28,6 +28,10 @@ struct ec_rf_ops {
 	int (*power_dbm)(void);
 	/* Optional read-only board diagnostics; zero suppresses an incomplete reply. */
 	size_t (*health)(char *out, size_t capacity);
+	/* Optional pure adapter handoff snapshot; called only after quiescent drain.
+	 * Must not access hardware, clear counters or change radio ownership.
+	 */
+	size_t (*adapter)(char *out, size_t capacity);
 };
 
 /** @brief Install board operations without initializing or enabling the radio.
@@ -43,6 +47,8 @@ void ec_rf_setup(const struct ec_rf_ops *ops);
  * excludes pending serial output and is modulo 2^32 us, not pure ring dwell.
  * Age requires adapter ticks and now_us to share a clock and less than one full
  * timer wrap between the timestamp and dequeue. Reading does not clear evidence.
+ * RFADAPTER uses the same idle gate for a pure board handoff snapshot; its
+ * response declares the adapter-specific counter epoch, which may differ.
  * @param command Complete command after the numeric request ID.
  * @param out Response body storage, not including the UART RSP prefix.
  * @param capacity Available response bytes including NUL.

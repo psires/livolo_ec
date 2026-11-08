@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 #include "rf.h"
 #include "health.h"
+#include "adapter.h"
 #include "em_gpio.h"
 #include "rail.h"
 #include "rail_ieee802154.h"
@@ -25,12 +26,16 @@ static uint8_t rx_fifo[2048] __attribute__((aligned(4)));
  */
 static void event(RAIL_Handle_t handle, RAIL_Events_t events)
 {
-	if (events & RAIL_EVENT_RX_PACKET_RECEIVED)
+	if (events & RAIL_EVENT_RX_PACKET_RECEIVED) {
+		ec_mg24_adapter_count(EC_MG24_ADAPTER_RX_EVENT);
 		if (RAIL_HoldRxPacket(handle) ==
 		    RAIL_RX_PACKET_HANDLE_INVALID) {
 			ec_mg24_health_count(EC_MG24_HOLD_FAILED);
 			ec_rf_drop();
+		} else {
+			ec_mg24_adapter_count(EC_MG24_ADAPTER_HOLD_OK);
 		}
+	}
 	if (events & RAIL_EVENT_RX_FIFO_OVERFLOW)
 		ec_mg24_health_count(EC_MG24_FIFO_OVERFLOW);
 	if (events & RAIL_EVENT_RX_FRAME_ERROR)
@@ -100,6 +105,7 @@ static int start(unsigned channel)
 	selected_channel = 0;
 	/* Core only calls start while inactive; failed attempts also reset counts. */
 	ec_mg24_health_reset();
+	ec_mg24_adapter_reset();
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 	ec_mg24_reject_reset();
 #endif
@@ -185,6 +191,18 @@ static int send(const uint8_t *mac, size_t length, unsigned cca)
 #endif
 }
 
+/** @brief Release one existing packet handle and retain the returned status.
+ * @param packet RAIL handle obtained by the current poll iteration.
+ * The diagnostic does not retry, add drops, or change the original copy path.
+ */
+static void release_packet(RAIL_RxPacketHandle_t packet)
+{
+	ec_mg24_adapter_count(RAIL_ReleaseRxPacket(radio, packet) ==
+					      RAIL_STATUS_NO_ERROR
+				      ? EC_MG24_ADAPTER_RELEASE_OK
+				      : EC_MG24_ADAPTER_RELEASE_FAIL);
+}
+
 /** @brief Drain at most four held frames per pass, releasing every packet handle. */
 static void poll(void)
 {
@@ -202,6 +220,8 @@ static void poll(void)
 			radio, RAIL_RX_PACKET_HANDLE_OLDEST_COMPLETE, &info);
 		if (packet == RAIL_RX_PACKET_HANDLE_INVALID)
 			break;
+		if (i == 3)
+			ec_mg24_adapter_count(EC_MG24_ADAPTER_POLL_BUDGET);
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 		if (info.packetStatus == RAIL_RX_PACKET_READY_CRC_ERROR) {
 			struct ec_mg24_reject_metadata metadata = {
@@ -225,7 +245,7 @@ static void poll(void)
 			}
 			copied = RAIL_PeekRxPacket(radio, packet, bytes, wanted,
 						   0);
-			RAIL_ReleaseRxPacket(radio, packet);
+			release_packet(packet);
 			ec_mg24_reject_record(&metadata, bytes, copied);
 			ec_rf_drop();
 			continue;
@@ -243,18 +263,21 @@ static void poll(void)
 			reason = EC_MG24_REASON_COUNT;
 		if (reason == EC_MG24_REASON_COUNT) {
 			RAIL_CopyRxPacket(bytes, &info);
-			RAIL_ReleaseRxPacket(radio, packet);
+			ec_mg24_adapter_count(EC_MG24_ADAPTER_COPY_CALLS);
+			release_packet(packet);
 			if (!(bytes[0] & 0x80) &&
-			    bytes[0] + 1 == info.packetBytes)
+			    bytes[0] + 1 == info.packetBytes) {
+				ec_mg24_adapter_count(
+					EC_MG24_ADAPTER_CORE_CALLS);
 				ec_rf_receive(bytes + 1, bytes[0] - 2, 1,
 					      details.rssi, details.lqi, ticks);
-			else {
+			} else {
 				ec_mg24_health_count(
 					EC_MG24_PACKET_LAYOUT_INVALID);
 				ec_rf_drop();
 			}
 		} else {
-			RAIL_ReleaseRxPacket(radio, packet);
+			release_packet(packet);
 			ec_mg24_health_count(reason);
 			ec_rf_drop();
 		}
@@ -278,4 +301,9 @@ static int power_dbm(void)
 
 const struct ec_rf_ops ec_mg24_rf_ops = {
 	now_us, start, stop, send, poll, power_dbm, ec_mg24_health,
+#ifdef EC_RF_REJECT_DIAGNOSTICS
+	NULL,
+#else
+	ec_mg24_adapter,
+#endif
 };
