@@ -177,11 +177,18 @@ unavailable; an advertised but missing or malformed response fails cleanup.
 These observations do not relax the strict pass criteria above. See the
 [queue contract](XIAO_QUEUE_DIAGNOSTICS.md).
 
+For `adapter_diag=handoff_v1`, cleanup independently collects RFADAPTER after
+confirmed stop and reconciles receive-callback accounting. A queue-query failure
+does not suppress this evidence. Legacy absence is explicit; malformed or
+inconsistent advertised evidence fails the run. The
+[adapter contract](XIAO_ADAPTER_DIAGNOSTICS.md) explains counter epochs and why
+SFD, hold and release differences are not packet-loss measurements.
+
 ## Offline regression command
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tools \
-  python3 -m unittest test_xiao_rf_bench test_xiao_queue_bench -v
+  python3 -m unittest test_xiao_rf_bench test_xiao_queue_bench test_xiao_adapter_bench -v
 ```
 
 The tests exercise the actual runner with virtual time, fragmented and stalled

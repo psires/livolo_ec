@@ -1,0 +1,1433 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "base_commit": "e576e627b8ff524dfabd967bc0cfb69d3c73b894",
+  "status": "Completed bounded experimental investigation; RF qualification remains failed",
+  "scope": "Bounded MG24 UART service and board-specific receive handoff diagnostics on two experimental XIAOs",
+  "installed_images": {
+    "mg24": "xiao-uart-1",
+    "c6": "xiao-rxdiag-1",
+    "firmware_version": "0.14",
+    "protocol": 3
+  },
+  "existing_radios_or_ha_modified": false,
+  "release_or_update_catalog_modified": false,
+  "firmware_flashing_performed": true,
+  "flash_preservation": {
+    "mg24": {
+      "full_bytes": 1572864,
+      "full_sha256": "4b53cfd2f10b7d19295ed582eef99e79e8f05effa74fbdfed1ebbca31aa1adf0",
+      "candidate_bytes": 83332,
+      "candidate_sha256": "d4e390946cfa2bdb93936a0dc4419230a4785fb3417a6b245ef3f1cc4775111e",
+      "candidate_exact": true,
+      "tail_bytes": 6780,
+      "tail_sha256": "33cbc89c0e163122f32ff3c70bcdfaeb87b32ff8efd9bb4bf48f05241b37bc0c",
+      "tail_exact_fresh_backup": true,
+      "changed_bytes": 80488,
+      "every_byte_outside_actual_candidate_preserved": true,
+      "protected_bytes": 1489532,
+      "before_full_sha256": "dcc7cc0b54105742d9a0dd5ecbf382e5c6a4edbab62e47a22f756e8531d2077d",
+      "programming_payload_sha256": "7bd0b6b3bb3d7f86effa466a3207b2e460f0a7b181ac20df5d9ae9b3350b43e4",
+      "programming_payload_bytes": 90112,
+      "load_address": "0x8006000",
+      "erase_end_exclusive": "0x801c000"
+    },
+    "c6": {
+      "full_bytes": 4194304,
+      "full_sha256": "4e8ff55105d8f446570dad9e09501faf32d8d18ccfe74bfb57fb4c28da781b3c",
+      "candidate_bytes": 198064,
+      "candidate_sha256": "3458964e336927a956f5198a03854b7e3e31981f2153719b612ba70107ffec0b",
+      "candidate_exact": true,
+      "tail_bytes": 2640,
+      "tail_sha256": "445beb14c2138a9e9247739bf7ab8ebd27aea715a8842935a0f2160a541201aa",
+      "tail_exact_fresh_backup": true,
+      "changed_bytes": 153205,
+      "every_byte_outside_actual_candidate_preserved": true,
+      "protected_bytes": 3996240,
+      "before_full_sha256": "9b3cd648331ac32eb6b3db4522bd9fc7c0c35970c0bf6784b90c702d67f8833c",
+      "programming_payload_sha256": "b8aaa0ed4b2600a62e0d1066c51c0b16539ce38688fb5c66bea79ed0c4808dd5",
+      "programming_payload_bytes": 200704,
+      "load_address": "0x10000",
+      "erase_end_exclusive": "0x41000"
+    }
+  },
+  "probe_warning_limit": "MG24 debug discovery emitted retained FAULT/WAIT ACK warnings; complete main-flash readback and explicit resume succeeded.",
+  "changes": {
+    "mg24": "Bounded eight-slot TX interrupt, lowest configurable priority, existing 640-byte buffer with acquire/release ownership; continued main-loop radio service and alternating command/event progress.",
+    "adapter": "Idle-only RFADAPTER handoff_v1, 32-bit wrapping observations scoped to the last adapter start attempt; counters do not change RF acceptance, buffer release or aggregate drop policy.",
+    "c6": "Existing SDK SFD dispatch now counts indications in IRAM with lock-free atomics and DRAM storage; existing USB scheduler remains unchanged.",
+    "unchanged": [
+      "115200-baud MG24 UART and bridge firmware",
+      "seven usable receive-ring records",
+      "PHY, CRC policy and radio event masks",
+      "USB buffers, watchdog, stack and console settings",
+      "60-second RF lease, 64-TX admission budget and fixed synthetic format"
+    ]
+  },
+  "offline_checks": {
+    "native_shared_core": "PASS",
+    "mg24_native_binaries": 4,
+    "c6_native_binaries": 4,
+    "public_bench_tests": 51,
+    "private_harness_tests": 54,
+    "host_refusal_subcases": 48,
+    "python_function_documentation_files": 203,
+    "c_format": "clang-format18.1.8 PASS",
+    "python_format": "Black24.8 PASS",
+    "target_builds": "PASS; final C6 compiler warning resolved and clean rebuild reviewed"
+  },
+  "machine_checks": {
+    "mg24": "Strong UART TX vector, bounded handler with no calls, inline acquire/release instructions; priority15 cannot preempt same-domain configurable radio interrupts. Equal-priority radio latency remains possible.",
+    "c6": "Strong SFD callback and counter helper in IRAM; 36-byte counters in DRAM; inline amoadd and no new atomic helper; SDK dispatch resolves the strong hook."
+  },
+  "c6_rf_off": {
+    "passed": true,
+    "receipt_sha256": "0b9639f0d93ade0b125f0a8b9d57c6d56a0aee070a3cf831488e3a9cd547cac0",
+    "journal_sha256": "a12f8a2d4f8abc6e8efc0ed2563e5a99e0b9cdade0f9739c3f8264c324ec7f17",
+    "journal_events": 26370,
+    "journal_bytes": 10641253,
+    "accepted_bytes": 3013233,
+    "writes": 12984,
+    "health_samples": 21,
+    "unknown_lines": 0,
+    "max_request_latency_seconds": 0.011195564991794527,
+    "lifecycle_elapsed_seconds": 600.1470890640048,
+    "phases": [
+      {
+        "label": "idle",
+        "duration_seconds": 180.0235257789609,
+        "offered_bytes": 0,
+        "accepted_bytes": 0,
+        "workload_writes": 0,
+        "minimum_post_return_gap_seconds": null,
+        "submission_span_seconds": null
+      },
+      {
+        "label": "paced_newlines",
+        "duration_seconds": 120.01928141096141,
+        "offered_bytes": 1423104,
+        "accepted_bytes": 1423104,
+        "workload_writes": 5559,
+        "minimum_post_return_gap_seconds": 0.020562722987961024,
+        "submission_span_seconds": 119.72053108300315
+      },
+      {
+        "label": "paced_overlength",
+        "duration_seconds": 120.0213477530051,
+        "offered_bytes": 1145950,
+        "accepted_bytes": 1145950,
+        "workload_writes": 5590,
+        "minimum_post_return_gap_seconds": 0.020563996979035437,
+        "submission_span_seconds": 119.65744200296467
+      },
+      {
+        "label": "higher_rate_paced_newlines",
+        "duration_seconds": 30.018382631998975,
+        "offered_bytes": 442112,
+        "accepted_bytes": 442112,
+        "workload_writes": 1727,
+        "minimum_post_return_gap_seconds": 0.016499068005941808,
+        "submission_span_seconds": 29.722883994982112
+      },
+      {
+        "label": "recovery_idle",
+        "duration_seconds": 150.02476001600735,
+        "offered_bytes": 0,
+        "accepted_bytes": 0,
+        "workload_writes": 0,
+        "minimum_post_return_gap_seconds": null,
+        "submission_span_seconds": null
+      }
+    ],
+    "limitation": "Bounded paced test only; no worst-case continuously-ready input qualification or historical stall diagnosis.",
+    "queue_snapshots": 21,
+    "queue_all_zero": true,
+    "reconstructed_command_allowlist_passed": true,
+    "candidate_build": "xiao-rxdiag-1",
+    "adapter_audit": {
+      "passed": true,
+      "mode": "rf_off",
+      "raw_adapter_snapshots": 21
+    },
+    "output_accounting": {
+      "passed": true,
+      "health_samples": 21,
+      "comparisons": 20,
+      "exact_output_bytes_between_health_boundaries": 18680,
+      "total_captured_c6_line_bytes": 20120,
+      "interval": "Earlier RFHEALTH reply inclusive; later RFHEALTH reply exclusive"
+    },
+    "firmware_uptime_ms": [
+      154600,
+      754704
+    ],
+    "minimum_observed_stack_bytes": 892
+  },
+  "passive_reception": {
+    "audit_passed": true,
+    "capture_assessment": "failed",
+    "receipt_sha256": "87dc578af7d64c14482570fe79fa0993fb9f075aabcb6d76fd2948afe4456c3e",
+    "journal_sha256": "1402fc2d69bc374f4034739e04fe1507847c3a533aa986dbe99be3ce575dc251",
+    "journal_events": 14236,
+    "journal_bytes": 4039171,
+    "unknown_lines": 0,
+    "accepted_bytes": {
+      "mg24": 4773,
+      "c6": 4794
+    },
+    "c6_continuity_comparisons": 23,
+    "max_c6_uptime_host_difference_ms": 1.6765660387463868,
+    "limitation": "Audit success does not change failed capture assessments or identify causes of reception discrepancies.",
+    "schedule_completed": true,
+    "planned_windows": 12,
+    "seconds_per_window": 45,
+    "rf_off_gap_seconds": 10,
+    "channel": 11,
+    "output_accounting": {
+      "passed": true,
+      "health_samples": 24,
+      "comparisons": 23,
+      "exact_output_bytes_between_health_boundaries": 768592,
+      "total_captured_c6_line_bytes": 769998,
+      "interval": "Earlier RFHEALTH reply inclusive; later RFHEALTH reply exclusive"
+    },
+    "adapter_audit": {
+      "passed": true,
+      "mode": "passive",
+      "windows": 12,
+      "raw_adapter_snapshots": 72,
+      "prior_receipt_sha256": null,
+      "limitation": "Branch accounting and epoch continuity do not identify individual over-the-air transmission attempts or explain capture misses."
+    },
+    "stage_continuity": {
+      "passed": true,
+      "previous_journal_sha256": "a12f8a2d4f8abc6e8efc0ed2563e5a99e0b9cdade0f9739c3f8264c324ec7f17",
+      "current_journal_sha256": "1402fc2d69bc374f4034739e04fe1507847c3a533aa986dbe99be3ce575dc251",
+      "previous_label": "recovery_idle_end",
+      "current_label": "window_0_before",
+      "host_gap_ms": 165056.55612197006,
+      "device_uptime_delta_ms": 165057,
+      "uptime_host_difference_ms": 0.4438780299387872,
+      "unchanged_reset_reason": "11",
+      "accepted_input_bytes_between_health_samples": 124,
+      "device_read_bytes_between_health_samples": 124,
+      "limitation": "Requires separate complete per-session audits and host boot continuity evidence."
+    },
+    "totals": {
+      "mg24": {
+        "received": 6154,
+        "delivered": 6119,
+        "full": 35,
+        "rx_line_bytes": 735059,
+        "native": {
+          "66780945/0001": 318,
+          "46715621/0002": 39
+        },
+        "max_high_water": 7,
+        "max_age_us": 112060,
+        "median_window_max_age_us": 56770.5,
+        "overflow_windows": [
+          2,
+          5,
+          6,
+          7
+        ],
+        "frame_errors": 637
+      },
+      "c6": {
+        "received": 5963,
+        "delivered": 5963,
+        "full": 0,
+        "rx_line_bytes": 721976,
+        "native": {
+          "66780945/0001": 316,
+          "46715621/0002": 40
+        },
+        "max_high_water": 5,
+        "max_age_us": 19475,
+        "median_window_max_age_us": 19258.0,
+        "overflow_windows": []
+      }
+    },
+    "windows": [
+      {
+        "index": 0,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 63,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 550,
+            "delivered_frames": 550,
+            "queue_full": 0,
+            "high_water": 6,
+            "max_age_us": 57717,
+            "adapter_counters": {
+              "rx_event": 550,
+              "hold_ok": 550,
+              "copy_calls": 550,
+              "release_ok": 550,
+              "release_fail": 0,
+              "core_calls": 550,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 531,
+            "delivered_frames": 531,
+            "queue_full": 0,
+            "high_water": 5,
+            "max_age_us": 19234,
+            "adapter_counters": {
+              "sfd_event": 636,
+              "rx_done": 531,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 531,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 531
+            }
+          }
+        }
+      },
+      {
+        "index": 1,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 62,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 567,
+            "delivered_frames": 562,
+            "queue_full": 5,
+            "high_water": 7,
+            "max_age_us": 80646,
+            "adapter_counters": {
+              "rx_event": 567,
+              "hold_ok": 567,
+              "copy_calls": 567,
+              "release_ok": 567,
+              "release_fail": 0,
+              "core_calls": 567,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 528,
+            "delivered_frames": 528,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 18624,
+            "adapter_counters": {
+              "sfd_event": 641,
+              "rx_done": 528,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 528,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 528
+            }
+          }
+        }
+      },
+      {
+        "index": 2,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 64,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 559,
+            "delivered_frames": 559,
+            "queue_full": 0,
+            "high_water": 5,
+            "max_age_us": 55824,
+            "adapter_counters": {
+              "rx_event": 559,
+              "hold_ok": 559,
+              "copy_calls": 559,
+              "release_ok": 559,
+              "release_fail": 0,
+              "core_calls": 559,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 538,
+            "delivered_frames": 538,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 19282,
+            "adapter_counters": {
+              "sfd_event": 644,
+              "rx_done": 538,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 538,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 538
+            }
+          }
+        }
+      },
+      {
+        "index": 3,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 61,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 547,
+            "delivered_frames": 547,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 48295,
+            "adapter_counters": {
+              "rx_event": 547,
+              "hold_ok": 547,
+              "copy_calls": 547,
+              "release_ok": 547,
+              "release_fail": 0,
+              "core_calls": 547,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 517,
+            "delivered_frames": 517,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 19366,
+            "adapter_counters": {
+              "sfd_event": 622,
+              "rx_done": 517,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 517,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 517
+            }
+          }
+        }
+      },
+      {
+        "index": 4,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 68,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 559,
+            "delivered_frames": 550,
+            "queue_full": 9,
+            "high_water": 7,
+            "max_age_us": 110912,
+            "adapter_counters": {
+              "rx_event": 559,
+              "hold_ok": 559,
+              "copy_calls": 559,
+              "release_ok": 559,
+              "release_fail": 0,
+              "core_calls": 559,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 544,
+            "delivered_frames": 544,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 19103,
+            "adapter_counters": {
+              "sfd_event": 660,
+              "rx_done": 544,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 544,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 544
+            }
+          }
+        }
+      },
+      {
+        "index": 5,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 59,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 553,
+            "delivered_frames": 546,
+            "queue_full": 7,
+            "high_water": 7,
+            "max_age_us": 102827,
+            "adapter_counters": {
+              "rx_event": 553,
+              "hold_ok": 553,
+              "copy_calls": 553,
+              "release_ok": 553,
+              "release_fail": 0,
+              "core_calls": 553,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 523,
+            "delivered_frames": 523,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 19039,
+            "adapter_counters": {
+              "sfd_event": 618,
+              "rx_done": 523,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 523,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 523
+            }
+          }
+        }
+      },
+      {
+        "index": 6,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 88,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 657,
+            "delivered_frames": 643,
+            "queue_full": 14,
+            "high_water": 7,
+            "max_age_us": 112060,
+            "adapter_counters": {
+              "rx_event": 657,
+              "hold_ok": 657,
+              "copy_calls": 657,
+              "release_ok": 657,
+              "release_fail": 0,
+              "core_calls": 657,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 674,
+            "delivered_frames": 674,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 19392,
+            "adapter_counters": {
+              "sfd_event": 783,
+              "rx_done": 674,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 674,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 674
+            }
+          }
+        }
+      },
+      {
+        "index": 7,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 35,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 426,
+            "delivered_frames": 426,
+            "queue_full": 0,
+            "high_water": 7,
+            "max_age_us": 62075,
+            "adapter_counters": {
+              "rx_event": 426,
+              "hold_ok": 426,
+              "copy_calls": 426,
+              "release_ok": 426,
+              "release_fail": 0,
+              "core_calls": 426,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 407,
+            "delivered_frames": 407,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 19385,
+            "adapter_counters": {
+              "sfd_event": 444,
+              "rx_done": 407,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 407,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 407
+            }
+          }
+        }
+      },
+      {
+        "index": 8,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 55,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 487,
+            "delivered_frames": 487,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 44633,
+            "adapter_counters": {
+              "rx_event": 487,
+              "hold_ok": 487,
+              "copy_calls": 487,
+              "release_ok": 487,
+              "release_fail": 0,
+              "core_calls": 487,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 493,
+            "delivered_frames": 493,
+            "queue_full": 0,
+            "high_water": 3,
+            "max_age_us": 18870,
+            "adapter_counters": {
+              "sfd_event": 560,
+              "rx_done": 493,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 493,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 493
+            }
+          }
+        }
+      },
+      {
+        "index": 9,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 24,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 447,
+            "delivered_frames": 447,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 41681,
+            "adapter_counters": {
+              "rx_event": 447,
+              "hold_ok": 447,
+              "copy_calls": 447,
+              "release_ok": 447,
+              "release_fail": 0,
+              "core_calls": 447,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 429,
+            "delivered_frames": 429,
+            "queue_full": 0,
+            "high_water": 3,
+            "max_age_us": 19475,
+            "adapter_counters": {
+              "sfd_event": 461,
+              "rx_done": 429,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 429,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 429
+            }
+          }
+        }
+      },
+      {
+        "index": 10,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 29,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 398,
+            "delivered_frames": 398,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 50600,
+            "adapter_counters": {
+              "rx_event": 398,
+              "hold_ok": 398,
+              "copy_calls": 398,
+              "release_ok": 398,
+              "release_fail": 0,
+              "core_calls": 398,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 383,
+            "delivered_frames": 383,
+            "queue_full": 0,
+            "high_water": 4,
+            "max_age_us": 18700,
+            "adapter_counters": {
+              "sfd_event": 419,
+              "rx_done": 383,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 383,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 383
+            }
+          }
+        }
+      },
+      {
+        "index": 11,
+        "strict_assessment": "failed",
+        "mg24_frame_errors": 29,
+        "boards": {
+          "mg24": {
+            "accepted_before_queue": 404,
+            "delivered_frames": 404,
+            "queue_full": 0,
+            "high_water": 5,
+            "max_age_us": 41089,
+            "adapter_counters": {
+              "rx_event": 404,
+              "hold_ok": 404,
+              "copy_calls": 404,
+              "release_ok": 404,
+              "release_fail": 0,
+              "core_calls": 404,
+              "poll_budget": 0
+            }
+          },
+          "c6": {
+            "accepted_before_queue": 396,
+            "delivered_frames": 396,
+            "queue_full": 0,
+            "high_water": 3,
+            "max_age_us": 19380,
+            "adapter_counters": {
+              "sfd_event": 430,
+              "rx_done": 396,
+              "rx_invalid": 0,
+              "rx_null": 0,
+              "rx_release_ok": 396,
+              "rx_release_fail": 0,
+              "ack_release_ok": 0,
+              "ack_release_fail": 0,
+              "core_calls": 396
+            }
+          }
+        }
+      }
+    ],
+    "native_payload_absences": [
+      {
+        "window_1based": 1,
+        "observed_on": "mg24",
+        "absent_on": "c6",
+        "payload_sha256": "1ed35ce675923176a941097b261806ed20d3dc17b353f8845d000d8dbc323a11",
+        "source_subject": "66780945",
+        "suffix": "0001",
+        "seconds_after_start": 15.39757486799499,
+        "seconds_before_end": 29.639831079985015,
+        "interior_one_second": true,
+        "missing_receiver_queue_full": 0,
+        "original_fcs_available": true
+      },
+      {
+        "window_1based": 1,
+        "observed_on": "mg24",
+        "absent_on": "c6",
+        "payload_sha256": "094ffc567df308bb7ceea485919495a12009d59f343649f1778503ff1defe5a1",
+        "source_subject": "66780945",
+        "suffix": "0001",
+        "seconds_after_start": 32.19061060901731,
+        "seconds_before_end": 12.846795338962693,
+        "interior_one_second": true,
+        "missing_receiver_queue_full": 0,
+        "original_fcs_available": true
+      },
+      {
+        "window_1based": 1,
+        "observed_on": "mg24",
+        "absent_on": "c6",
+        "payload_sha256": "717c5f3a8ed0a77fde83a4bf00c11a966e9e653c14f43fc590f7b65df5892585",
+        "source_subject": "66780945",
+        "suffix": "0001",
+        "seconds_after_start": 37.990911399014294,
+        "seconds_before_end": 7.046494548965711,
+        "interior_one_second": true,
+        "missing_receiver_queue_full": 0,
+        "original_fcs_available": true
+      },
+      {
+        "window_1based": 1,
+        "observed_on": "c6",
+        "absent_on": "mg24",
+        "payload_sha256": "2f40299cc768d898e4b069ca6aba33e5786b153889d7af8dc0575d0848926741",
+        "source_subject": "46715621",
+        "suffix": "0002",
+        "seconds_after_start": 37.97405985300429,
+        "seconds_before_end": 7.063346094975714,
+        "interior_one_second": true,
+        "missing_receiver_queue_full": 0,
+        "original_fcs_available": false
+      },
+      {
+        "window_1based": 8,
+        "observed_on": "c6",
+        "absent_on": "mg24",
+        "payload_sha256": "42379e4375f44403f22fd79ec2a2da1fe318bea1efdac579f7b3d8a156f2c1af",
+        "source_subject": "66780945",
+        "suffix": "0001",
+        "seconds_after_start": 20.86856325500412,
+        "seconds_before_end": 24.183698298002128,
+        "interior_one_second": true,
+        "missing_receiver_queue_full": 0,
+        "original_fcs_available": false
+      }
+    ],
+    "native_payload_absence_limits": "ThreeMG-only and twoC6-only native-role payloads, all in zero-overflow windows, all survive1s common-host-boundary trim. MG-only originals have independently recomputedFCS; C6-only originals unavailable. No missing-waveform RSSI, physical transmitter, collision, or anonymous-frame-error correspondence inferred.",
+    "burst_pressure": {
+      "rx_only_minimum_wire_seconds": 63.80720486111111,
+      "common_host_seconds": 540.4818284340436,
+      "overflow_window_bursts": [
+        {
+          "window_1based": 2,
+          "delivered_records": 16,
+          "serialized_bytes": 2064,
+          "minimum_wire_us": 179166.66666666666,
+          "first_poll_ticks": 56454100,
+          "last_poll_ticks": 56552923,
+          "classes_by_mac_length": {
+            "51": 3,
+            "3": 7,
+            "55": 1,
+            "59": 1,
+            "48": 3,
+            "10": 1
+          }
+        },
+        {
+          "window_1based": 5,
+          "delivered_records": 14,
+          "serialized_bytes": 2467,
+          "minimum_wire_us": 214149.30555555556,
+          "first_poll_ticks": 243477015,
+          "last_poll_ticks": 243565177,
+          "classes_by_mac_length": {
+            "39": 2,
+            "3": 1,
+            "53": 7,
+            "64": 4
+          }
+        },
+        {
+          "window_1based": 6,
+          "delivered_records": 15,
+          "serialized_bytes": 2180,
+          "minimum_wire_us": 189236.11111111112,
+          "first_poll_ticks": 311556424,
+          "last_poll_ticks": 311654531,
+          "classes_by_mac_length": {
+            "3": 6,
+            "52": 1,
+            "53": 1,
+            "55": 5,
+            "64": 2
+          }
+        },
+        {
+          "window_1based": 7,
+          "delivered_records": 11,
+          "serialized_bytes": 2110,
+          "minimum_wire_us": 183159.72222222222,
+          "first_poll_ticks": 369541055,
+          "last_poll_ticks": 369641032,
+          "classes_by_mac_length": {
+            "58": 11
+          }
+        }
+      ],
+      "interpretation": "Recorded delivered bursts within100ms ofMGpoll timestamps require179\u2013214ms serialization at115200 8N1 in the four overflow windows. This is compatible with transient queue pressure despite low average serialized output. Burst records are only the delivered subset, and poll timestamps are not over-air arrival times. No exact dropped payload, ISR stall, or universal baud/queue fix inferred."
+    },
+    "comparison_limit": "Same12x45s schedule, different observed traffic. PriorMG6223received/6213delivered/full10, current6154/6119/full35. RX-output wire floors63.06s vs63.81s are similar, but native66780945 counts changed35\u2192318 onMG and46715621 counts162\u219239. Offered burst timing/content cannot be assumed equal. Native source-model evidence remains separate; this run neither establishes improvement nor proves regression caused byIRQ scheduling.",
+    "domain_findings_sha256": "823b63c25d4add69b94b5496fad2a945823e4c956d5b902bd2c60e7bda54e3f3"
+  },
+  "synthetic_reception": {
+    "audit_passed": true,
+    "strict_passed": false,
+    "receipt_sha256": "c4bde99bf337ff0c617d8db7bb2b38225ef1fedb5b87b37af59711ca5464009c",
+    "journal_sha256": "b98465f59e1d10986d7c77d2713ae306d197d96d67602aa735ce58ac88752f76",
+    "journal_events": 5687,
+    "journal_bytes": 1397485,
+    "accepted_bytes": {
+      "mg24": 13043,
+      "c6": 13207
+    },
+    "unknown_lines": 0,
+    "c6_continuity_comparisons": 23,
+    "windows": [
+      {
+        "index": 0,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 81,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "mg24": 81,
+          "c6": 50
+        }
+      },
+      {
+        "index": 1,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 85,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "c6": 53,
+          "mg24": 85
+        }
+      },
+      {
+        "index": 2,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 19,
+            "missing_sequences": [
+              35
+            ],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 77,
+        "mg24_frame_errors": 3,
+        "rx_events": {
+          "mg24": 77,
+          "c6": 49
+        }
+      },
+      {
+        "index": 3,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 79,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "c6": 48,
+          "mg24": 79
+        }
+      },
+      {
+        "index": 4,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 86,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "mg24": 86,
+          "c6": 54
+        }
+      },
+      {
+        "index": 5,
+        "strict_passed": true,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 84,
+        "mg24_frame_errors": 0,
+        "rx_events": {
+          "c6": 52,
+          "mg24": 84
+        }
+      },
+      {
+        "index": 6,
+        "strict_passed": false,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 80,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "mg24": 80,
+          "c6": 49
+        }
+      },
+      {
+        "index": 7,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 84,
+        "mg24_frame_errors": 1,
+        "rx_events": {
+          "c6": 52,
+          "mg24": 84
+        }
+      },
+      {
+        "index": 8,
+        "strict_passed": true,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 85,
+        "mg24_frame_errors": 0,
+        "rx_events": {
+          "mg24": 85,
+          "c6": 48
+        }
+      },
+      {
+        "index": 9,
+        "strict_passed": true,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 93,
+        "mg24_frame_errors": 0,
+        "rx_events": {
+          "c6": 55,
+          "mg24": 93
+        }
+      },
+      {
+        "index": 10,
+        "strict_passed": true,
+        "direction_order": [
+          "mg24",
+          "c6"
+        ],
+        "directions": {
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 87,
+        "mg24_frame_errors": 0,
+        "rx_events": {
+          "mg24": 87,
+          "c6": 53
+        }
+      },
+      {
+        "index": 11,
+        "strict_passed": false,
+        "direction_order": [
+          "c6",
+          "mg24"
+        ],
+        "directions": {
+          "c6": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          },
+          "mg24": {
+            "expected": 20,
+            "received": 20,
+            "missing_sequences": [],
+            "duplicate_sequences": {}
+          }
+        },
+        "mg24_original_fcs_valid": 79,
+        "mg24_frame_errors": 2,
+        "rx_events": {
+          "c6": 49,
+          "mg24": 79
+        }
+      }
+    ],
+    "limitation": "Full payload matches and TX completion are separate evidence; missing captures have no proven cause, and C6 original FCS is unavailable.",
+    "schedule_completed": true,
+    "planned_windows": 12,
+    "transmissions_per_board_per_window": 20,
+    "spacing_seconds": 0.2,
+    "rf_off_gap_seconds": 10,
+    "channel": 26,
+    "output_accounting": {
+      "passed": true,
+      "health_samples": 24,
+      "comparisons": 23,
+      "exact_output_bytes_between_health_boundaries": 125624,
+      "total_captured_c6_line_bytes": 127052,
+      "interval": "Earlier RFHEALTH reply inclusive; later RFHEALTH reply exclusive"
+    },
+    "adapter_audit": {
+      "passed": true,
+      "mode": "synthetic",
+      "windows": 12,
+      "raw_adapter_snapshots": 72,
+      "prior_receipt_sha256": "87dc578af7d64c14482570fe79fa0993fb9f075aabcb6d76fd2948afe4456c3e",
+      "limitation": "Branch accounting and epoch continuity do not identify individual over-the-air transmission attempts or explain capture misses."
+    },
+    "stage_continuity": {
+      "passed": true,
+      "previous_journal_sha256": "1402fc2d69bc374f4034739e04fe1507847c3a533aa986dbe99be3ce575dc251",
+      "current_journal_sha256": "b98465f59e1d10986d7c77d2713ae306d197d96d67602aa735ce58ac88752f76",
+      "previous_label": "window_11_after",
+      "current_label": "before",
+      "host_gap_ms": 195831.95193199208,
+      "device_uptime_delta_ms": 195830,
+      "uptime_host_difference_ms": -1.9519319920800626,
+      "unchanged_reset_reason": "11",
+      "accepted_input_bytes_between_health_samples": 131,
+      "device_read_bytes_between_health_samples": 131,
+      "limitation": "Requires separate complete per-session audits and host boot continuity evidence."
+    },
+    "strict_result": {
+      "passed_windows": 4,
+      "failed_windows": 8,
+      "overall_passed": false,
+      "assessments_unchanged": true
+    },
+    "totals": {
+      "mg24": {
+        "accepted": 1000,
+        "delivered": 1000,
+        "queue_full": 0,
+        "tx_done": 240,
+        "max_queue_high_water": 4,
+        "max_queue_age_us": 35702,
+        "original_fcs_valid": 1000,
+        "original_fcs_unavailable": 0,
+        "adapter": {
+          "rx_event": 1000,
+          "hold_ok": 1000,
+          "copy_calls": 1000,
+          "release_ok": 1000,
+          "release_fail": 0,
+          "core_calls": 1000,
+          "poll_budget": 0
+        }
+      },
+      "c6": {
+        "accepted": 612,
+        "delivered": 612,
+        "queue_full": 0,
+        "tx_done": 240,
+        "max_queue_high_water": 3,
+        "max_queue_age_us": 15168,
+        "original_fcs_valid": 0,
+        "original_fcs_unavailable": 612,
+        "adapter": {
+          "sfd_event": 624,
+          "rx_done": 612,
+          "rx_invalid": 0,
+          "rx_null": 0,
+          "rx_release_ok": 612,
+          "rx_release_fail": 0,
+          "ack_release_ok": 0,
+          "ack_release_fail": 0,
+          "core_calls": 612
+        }
+      }
+    },
+    "payload_results": {
+      "mg24_to_c6": {
+        "expected": 240,
+        "received": 240
+      },
+      "c6_to_mg24": {
+        "expected": 240,
+        "received": 239
+      },
+      "all480_local_tx_done_once": true,
+      "duplicate_expected_payload_observations": 0,
+      "missing": [
+        {
+          "window_1based": 3,
+          "nonce": "b560b92c",
+          "sender": "c6",
+          "receiver": "mg24",
+          "phase": 2,
+          "sequence": 35,
+          "length": 39,
+          "payload_sha256": "8eab248f1b2608aa095c45d7da03a0eaa9f18922de928052b991b52646fe7ea1",
+          "received_occurrences": 0,
+          "absent": true,
+          "local_tx_done_count": 1
+        }
+      ]
+    },
+    "missing_interpretation": "C6 local completion exists for seq35, but no independent third receiver proves its physical transmission. MG observed3 anonymous frame errors during that window, with no per-packet attribution. Clean active handoff/queue/output accounting does not explain the absent payload and does not distinguish PHY/CRC/filter/earlier SDK loss. Sender C6 receive-sideSFD residual is not evidence about MG reception of its TX.",
+    "comparison_limit": "Prior miss was MG\u2192C6; current miss is C6\u2192MG. Both runs matched479/480 requestedpayloads, but this is descriptive, not a general reliability estimate. Current matchedRSSI roughly-40..-42dBm versusprior-53..-56dBm demonstrates different received observations; no specific placement/environment cause is established. No RSSI exists for the absent payload.",
+    "domain_findings_sha256": "47fadbcd6cc539dfa2e213196c061c0f4b1a01b27ab767631893a1e9861d3b87"
+  },
+  "experimental_limits": [
+    "No pairing or control support; daemon refuses these diagnostic identities.",
+    "No production artifact eligibility or automatic firmware catalog promotion.",
+    "Counter consistency does not prove complete RF capture.",
+    "Core-forward attempts during start/stop boundaries can differ from accepted core records; mismatches remain failed evidence.",
+    "Hold/release differences and SFD/completion differences are not physical packet-loss denominators.",
+    "Timing fixture costs are simulated, not measured hardware causes.",
+    "This stage verified full programmed-image preservation; no fresh restore/rollback or power-loss recovery exercise was performed."
+  ],
+  "source_manifest_sha256": "257dc78603410b6ec56a1520dc8fc942c768ebe0dc1314aa9e681a265f818201",
+  "runtime_manifest_sha256": "3b84e2f0bde1274c18515d71b3d0ed5e1b3d6a13b846f165fbdb5b4163ca4e74",
+  "qualification": "Experimental diagnostic targets only; no pairing/control or production firmware eligibility",
+  "outcomes": {
+    "lifecycle_transport_and_programmed_byte_preservation": "PASS within the reviewed bounded tests",
+    "mg24_passive_queue_overflow": "UNRESOLVED: 35 counted drops in four windows",
+    "rf_completeness": "FAILED: bilateral passive payload absences and one synthetic capture miss",
+    "product_decision": "Freeze this experimental baseline and move active development to native HA pairing UX; no more RF windows in this stage"
+  },
+  "final_state": {
+    "rf": {
+      "mg24": {
+        "active": "0",
+        "channel": "26",
+        "mode": "synthetic",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "20",
+        "tx_done": "20",
+        "tx_failed": "0",
+        "rx": "79",
+        "dropped": "2",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      },
+      "c6": {
+        "active": "0",
+        "channel": "26",
+        "mode": "synthetic",
+        "power_dbm": "0",
+        "auto_ack": "0",
+        "retries": "0",
+        "tx_started": "20",
+        "tx_done": "20",
+        "tx_failed": "0",
+        "rx": "49",
+        "dropped": "0",
+        "queued": "0",
+        "busy": "0",
+        "fault": "0",
+        "ticks_hz": "1000000",
+        "timestamp": "callback",
+        "bad_crc": "unavailable"
+      }
+    },
+    "both_serial_ports_closed_and_unowned": true,
+    "same_host_boot": true,
+    "scoped_kernel_usb_events": 0,
+    "additional_hardware_runs": false,
+    "mg24_probe_last_verified_unowned": "After programming/full readback; no subsequent probe use in runtime tests"
+  },
+  "all_stages_output_accounting": {
+    "passed": true,
+    "health_samples": 69,
+    "comparisons": 68,
+    "exact_output_bytes_between_health_boundaries": 915727,
+    "total_captured_c6_line_bytes": 917170,
+    "interval": "Earlier RFHEALTH reply inclusive; later RFHEALTH reply exclusive"
+  },
+  "review": {
+    "roles": [
+      "ZigBee Specialist: firmware/RF interpretation",
+      "Release engineer: independent source/artifact/evidence quality",
+      "Tech Lead: integration and scope"
+    ],
+    "acceptance_sha256": "d54b535e5327129b1a09f0758031b3667dc181705de8c4bc4b2ea613e1f6118e"
+  },
+  "firmware_source_commit": "24f3d6fc1adc094f7ed16c3871bc1d2814776418",
+  "bench_source_commit": "0b25f6caad408980f15bfe4c5a21c24a634c4bfa"
+}

@@ -8,9 +8,27 @@ currently a supported Livolo gateway. This document
 tracks the remaining work; hardware findings belong to the linked verification
 records, not to the planned acceptance criteria below.
 
-The current experimental images add explicit receive-queue overflow evidence
-and bounded C6 output scheduling. RF capture qualification remains open;
-pairing and control are still gated on that work.
+The current experimental images add bounded MG24 UART interrupt service and
+receive-handoff counters on both boards. The latest bounded tests completed
+with coherent transport and recovery-access evidence, but MG24 queue overflow
+and bilateral RF capture discrepancies remain unresolved. RF qualification has
+not passed; pairing and control remain unimplemented on these targets.
+
+Owner priority update, **2026-11-08**: finish the current bounded queue/service
+and receive-diagnostics investigation, then retain both XIAOs as **experimental**
+and shift the active product milestone to Home Assistant pairing UX. A steady
+experimental baseline means reproducible builds, verified image preservation,
+retained recovery instructions and evidence, sustained transport/receive evidence with failures retained,
+and both bench radios stopped and released. It does not require claiming that
+all RF capture discrepancies are resolved. Pairing/control and inclusion in a
+production firmware catalog remain separate future qualification work.
+
+The next HA milestone makes automatic pairing the normal
+user path and hides advanced pairing behind a Development setting. The owner
+selected HA's native Configure flow and existing pairing button, retaining its
+Add hub placement. A separate experiment will assess radio flashing
+through HA. The HA specialist owns that design, the ZigBee specialist owns RF
+interpretation, and the Release Engineer owns quality and release acceptance.
 
 ## Product scope and sequence
 
@@ -485,3 +503,54 @@ unowned. Existing radios, services and HA were not modified by this work.
 Pairing, control and release/update-catalog qualification remain on hold while
 MG24 output burst pressure and the remaining RF capture discrepancies are
 investigated.
+
+### UART service and receive handoffs, November 8
+
+MG24 `xiao-uart-1` replaces blocking byte service with a bounded TX interrupt
+using the existing output buffer. Both boards expose idle-only `RFADAPTER`
+handoff snapshots; C6 `xiao-rxdiag-1` also counts the SDK's existing receive-SFD
+callback. Baud, queue capacity, PHY, CRC acceptance, event masks and USB/watchdog
+configuration are unchanged. Final target builds and interrupt placement passed
+review. Application-only installation preserved every byte outside each new
+image, including the existing tail bytes in its last erase page. This stage did
+not repeat a restore/rollback or power-loss recovery exercise.
+
+The C6 completed the ten-minute RF-off paced workload with all 3,013,233 accepted
+bytes accounted for, 21 healthy snapshots and no unknown output or observed
+reset, watchdog or I/O error. Its longest request was 11.20 ms. Uptime and byte
+accounting remained continuous across the later passive and synthetic port
+reopens. This does not identify the historical intermittent stall's cause.
+
+All twelve passive windows completed, retaining their strict **failed** results.
+MG24 accepted 6,154 records and delivered 6,119, with 35 explicit queue-full
+drops in four windows and 637 separate frame-error events. C6 accepted and
+delivered 5,963 records with no queue overflow. All delivered MG24 frames passed
+original-FCS verification. MG24's maximum queue age was 112.060 ms; C6's was
+19.475 ms, with different timestamp origins. The UART change has not eliminated
+MG24 overflow. In overflowing windows, delivered records timestamped within
+100 ms of adapter polling needed at least 179–214 ms of UART wire time.
+Traffic mix and timing differed from the prior run; neither a causal
+improvement nor a regression is established by comparing totals.
+
+All measured hold/copy/release/core handoffs reconciled, with no release failure
+or changing stopped counters. Nevertheless, five exact native payloads were
+absent on the other receiver more than one second inside zero-overflow windows:
+three seen only on MG24 and two only on C6. Both test switches were seen on both
+boards. C6-only observations lack original FCS bytes. Its 955 extra SFD
+indications are unclassified observations, not 955 lost packets or CRC failures.
+The evidence does not identify a PHY, filtering or earlier SDK cause.
+
+The final twelve synthetic windows captured 240/240 MG24 transmissions on C6
+and 239/240 C6 transmissions on MG24. All 480 local TX completions succeeded,
+with zero portable queue loss. The absent payload was sequence 35 in window
+three; three anonymous MG24 frame errors in that window cannot be assigned to
+it. MG24 reported eleven frame errors overall, with four strict passes and eight
+failures. The prior run missed a frame in the opposite direction; it does not
+establish a consistent board-specific cause.
+
+The [UART and handoff verification record](verification/xiao-mg24-service-20261108.json)
+separates accepted transport/lifecycle evidence from failed queue/RF qualification.
+Both boards ended RF-off with their serial ports closed. This closes the bounded
+experimental milestone and moves active product work to the native HA pairing
+cleanup. No additional RF windows, pairing, control, production catalog changes
+or existing-radio/HA modifications were performed.

@@ -39,6 +39,10 @@ Legacy absence is recorded as unavailable, never inferred as zero overflow;
 unknown advertised contracts or inconsistent snapshots fail the run. Measured
 queue loss still fails the strict capture assessment. See the
 [queue contract](XIAO_QUEUE_DIAGNOSTICS.md) for the exact accounting limits.
+`adapter_diag=handoff_v1` additionally requires an independent RFADAPTER read
+after confirmed stop, even when queue validation fails. The runner retains
+legacy absence and rejects malformed or inconsistent advertised snapshots;
+see the [adapter contract](XIAO_ADAPTER_DIAGNOSTICS.md).
 The tool checks admission elapsed time before observing, reserving four seconds
 for end-of-window checks and targeting STOP before 55 seconds from the first
 start request. It aborts rather than silently shortening a requested window when

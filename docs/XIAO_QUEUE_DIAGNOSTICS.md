@@ -1,7 +1,8 @@
 # Experimental XIAO queue diagnostics
 
 These diagnostics apply only to the experimental XIAO MG24 `xiao-queue-1` and
-ESP32-C6 `xiao-usb-2` builds. They do not enable gateway operation, pairing,
+ESP32-C6 `xiao-usb-2` builds and their `xiao-uart-1` / `xiao-rxdiag-1`
+successors. They do not enable gateway operation, pairing,
 automatic acknowledgements or firmware updates. Existing radio platforms and
 Home Assistant are outside the bench procedure.
 
@@ -66,6 +67,9 @@ when output is blocked. USB buffer sizes, watchdog policy, stack size and radio
 queue capacity are unchanged.
 
 MG24 continues transmitting diagnostic text through its 115200-baud UART.
+The `xiao-uart-1` candidate moves byte service to a bounded TX interrupt while
+the main loop continues radio polling; its ownership and fairness contract is
+described in the [board notes](../firmware/mg24/README.md).
 Queue telemetry makes burst pressure visible; it does not remove that physical
 output limit. Neither board is qualified for pairing or control by a host-only
 test or by a transmission-completion report alone.

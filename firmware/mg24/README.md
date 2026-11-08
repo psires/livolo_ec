@@ -22,9 +22,31 @@ USART0 uses PA8 TX/PA9 RX at 115200 8N1, through the onboard bridge. **DTR must
 be asserted** for this unit to forward serial bytes; RTS remains deasserted.
 RF builds select the board's 39 MHz HFXO with CTUNE 95 before initializing UART.
 PB4 low/PB5 high selects and enables the onboard antenna. UART RX is interrupt
-buffered; TX and parsing run in the main loop. Held RAIL RX packets are copied
+buffered; parsing runs in the main loop. Held RAIL RX packets are copied
 and released in bounded main-loop batches, retaining original FCS bytes.
 This transport is not yet qualified under sustained radio load.
+
+The `xiao-uart-1` candidate services TX from a bounded interrupt using the
+existing 640-byte output buffer. Each invocation copies at most eight ready
+hardware slots; the IRQ is configured at the lowest NVIC priority. The main
+loop continues radio polling and lease expiry while output is pending, and
+alternates command replies and RF records under competing load. The buffer
+cannot be reused until all bytes have been copied into UART hardware. Baud,
+bridge firmware and the seven-slot receive ring remain unchanged. Native timing
+fixtures reproduce a burst overflow in the previous polling loop and avoid it
+with the candidate, but their service costs are simulated, not hardware latency
+measurements. Target qualification remains separate.
+
+This candidate also advertises `adapter_diag=handoff_v1`, exposing receive,
+hold, copy, release and core-forward counters through idle-only `RFADAPTER`.
+See the [adapter contract](../../docs/XIAO_ADAPTER_DIAGNOSTICS.md). It preserves
+the health and queue diagnostics introduced below.
+
+The bounded target run completed with coherent transport and handoff accounting,
+but passive reception still lost 35 records to queue overflow in four of twelve
+windows. Native and synthetic RF capture discrepancies also remain. This is an
+experimental diagnostic baseline, not a qualified gateway; see the
+[UART/handoff verification](../../docs/verification/xiao-mg24-service-20261108.json).
 
 The `xiao-queue-1` diagnostic build preserves read-only `RFHEALTH` with separate
 32-bit modulo occurrence counts for failed packet holds, FIFO overflow, frame

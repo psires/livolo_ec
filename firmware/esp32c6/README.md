@@ -131,6 +131,21 @@ USB buffers, watchdog or PHY. See the
 and timing limits. Host-only tests do not establish complete RF capture or
 resolve the historical intermittent USB stall.
 
+The `xiao-rxdiag-1` candidate preserves that scheduler and adds
+`adapter_diag=handoff_v1`: idle-only `RFADAPTER` snapshots of receive-SFD,
+receive-done, invalid callback, buffer-release and core-forward occurrences.
+The SFD hook uses the SDK's existing dispatch and performs only a lock-free
+counter increment. It changes no PHY, CRC, event mask or USB configuration.
+See the [adapter contract](../../docs/XIAO_ADAPTER_DIAGNOSTICS.md) for accounting
+and the limits of interpreting SFD-to-completion differences.
+
+That image completed a ten-minute RF-off paced test and the twelve-window passive
+and synthetic schedules with coherent USB and adapter accounting, continuous
+uptime and no queue loss. RF capture discrepancies remain, including native
+payloads seen only by the other receiver. These results do not qualify gateway
+operation or establish the historical stall's cause; see the
+[UART/handoff verification](../../docs/verification/xiao-mg24-service-20261108.json).
+
 The experimental host [C6 serial helper](../../docs/XIAO_C6_SERIAL.md) replaces
 separate DTR/RTS clears with one combined clear. The reviewed unchanged-firmware
 comparison preserved uptime across all three combined-mode opens and both

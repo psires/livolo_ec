@@ -28,7 +28,7 @@ only the channel-26 synthetic window. Stop the current window before changing
 modes. RFSTATUS reports `mode=passive|synthetic` and the last selected channel,
 retaining both after STOP or expiry; startup is inactive with channel 26 selected.
 CAPS identifies the receive-only contract with `rx_diag=passive_v1` and the build
-tokens are `xiao-usb-2` on C6 and `xiao-queue-1` on MG24. Production gateway
+tokens are `xiao-rxdiag-1` on C6 and `xiao-uart-1` on MG24. Production gateway
 capabilities remain zero.
 
 `queue_diag=ring_v1` additionally advertises read-only `RFQUEUE` after verified
@@ -38,6 +38,12 @@ age without changing the seven usable receive slots. STOP and failed starts
 preserve this evidence; a new start refuses undrained records. See the
 [queue contract](../../docs/XIAO_QUEUE_DIAGNOSTICS.md) for counter scopes,
 wrapping and host-delivery requirements.
+
+`adapter_diag=handoff_v1` advertises idle-only `RFADAPTER` snapshots of the
+board's receive handoffs. Counts reset on adapter start attempts, which differs
+from the queue's successful-start scope. See the
+[adapter contract](../../docs/XIAO_ADAPTER_DIAGNOSTICS.md) for field definitions,
+source-derived accounting and limitations.
 
 `RFHEALTH` never starts RF. C6 reports USB, reset and watchdog diagnostics in its
 [board notes](../esp32c6/README.md); MG24 reports receive-discard reason occurrences

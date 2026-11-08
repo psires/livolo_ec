@@ -57,6 +57,12 @@ Three MCU families currently have four exact board profiles:
 | ZB-GW04 v1.2 | Silicon Labs EFR32MG21 | [MG21 guide](firmware/mg21/README.md) |
 | Official Nordic PCA10059 dongle | Nordic nRF52840 | [Nordic guide](firmware/nrf52840/README.md) |
 
+**Experimental bench targets:** Seeed XIAO MG24 and XIAO ESP32-C6 are under
+investigation for transport and raw radio reception/transmission. Their diagnostic
+firmware does not support Livolo pairing or control, and the daemon refuses it
+as a gateway. They are excluded from production firmware catalogs. See the
+[XIAO progress and limitations](docs/XIAO_BOARD_SUPPORT_PLAN.md).
+
 Support and recovery procedures are board-specific; sharing a chip does not
 make another dongle interchangeable. The public firmware catalog is currently
 empty, so initial firmware setup is still a developer-oriented step. Read the
