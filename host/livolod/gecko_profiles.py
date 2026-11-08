@@ -19,6 +19,7 @@ class GeckoProfile:
     loader_version: str
     loader_wire_versions: tuple
     menu_request: bytes
+    modem_asserted: bool
 
 
 PROFILES = MappingProxyType(
@@ -33,6 +34,7 @@ PROFILES = MappingProxyType(
             "1.9.2",
             (b"1.9.2",),
             b"\n3",
+            False,
         ),
         "sonoff-zbdongle-e": GeckoProfile(
             "sonoff-zbdongle-e",
@@ -44,6 +46,7 @@ PROFILES = MappingProxyType(
             "2.4.2",
             (b"2.04.02", b"2.4.2"),
             b"\n",
+            True,
         ),
     }
 )

@@ -212,13 +212,37 @@ class BootstrapController:
             self.candidate and not reason and not pending and not self.closed
         )
         reinspection = self._entry_reinspection()
+        maintenance = self.store.reconciliation()
+        prepare_only = bool(
+            maintenance and self.store.meta("reconciliation_requires_prepare")
+        )
         if reinspection:
             reason = ENTRY_RECOVERY
         return dict(
             mode=self.mode,
             profile=self.profile.board,
             engineering_only=self.engineering_only,
-            physical_install_supported=eligible and self.mode == "bootstrap",
+            setup_session=self.session,
+            reconciliation=(
+                {
+                    key: maintenance[key]
+                    for key in (
+                        "reconciliation_id",
+                        "request_id",
+                        "kind",
+                        "plan_id",
+                        "target_id",
+                        "resolution",
+                        "permits",
+                        "setup_session",
+                    )
+                }
+                if maintenance and maintenance["setup_session"] == self.session
+                else None
+            ),
+            physical_install_supported=eligible
+            and self.mode == "bootstrap"
+            and not prepare_only,
             prepare_supported=(eligible and self.mode == "bootstrap") or reinspection,
             manual_reinspection_supported=reinspection,
             enter_supported=eligible
@@ -226,6 +250,7 @@ class BootstrapController:
             and self.mode == "gateway",
             baseline_available=bool(self.store.meta("baseline")),
             cancel_supported=self.mode == "bootstrap"
+            and not prepare_only
             and not pending
             and not self.store.meta("installation_attempted", False)
             and (
@@ -233,6 +258,7 @@ class BootstrapController:
                 or bool(self.store.meta("baseline"))
             ),
             initialize_supported=self.mode == "bootstrap"
+            and not prepare_only
             and selected is None
             and not pending,
             expected_network_id=(
@@ -415,6 +441,8 @@ class BootstrapController:
         )
         if self.closed or (self.store.unresolved() and not reinspection):
             raise BootstrapError("operation_unresolved")
+        if self.store.meta("reconciliation_requires_prepare") and kind != "prepare":
+            raise BootstrapError("fresh_preparation_required")
         if (kind == "enter") != (self.mode == "gateway"):
             raise BootstrapError("wrong_mode")
         candidate = binding = accepted_network = None

@@ -119,7 +119,7 @@ class EntryProviderTests(unittest.TestCase):
         original_write = self.serial.write
 
         def reset():
-            """Discard only input bytes, retaining the descriptor and inactive lines."""
+            """Discard input bytes while retaining the descriptor and profile line policy."""
             self.resets.append(self.serial.baudrate)
             self.serial.pending.clear()
 
@@ -169,7 +169,7 @@ class EntryProviderTests(unittest.TestCase):
         self.assertEqual(self.serial.writes, [b"\nBOOTLOADER\n", b"\n"])
         self.assertEqual(self.resets, [921600, 115200])
         self.assertEqual(len(self.serial.events), 1)
-        self.assertEqual(self.serial.events[0][1:3], (False, False))
+        self.assertEqual(self.serial.events[0][1:3], (True, True))
         self.assertTrue(self.serial.closed)
         self.assertEqual(self.write_events[0][2], 921600)
         self.assertEqual(self.write_events[1][2], 115200)

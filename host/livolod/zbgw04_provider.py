@@ -22,6 +22,7 @@ from pathlib import Path
 import re
 import secrets
 import stat
+import struct
 import sys
 import termios
 import time
@@ -508,6 +509,21 @@ def _serial_factory(**kwargs):
     return serial.Serial(**kwargs)
 
 
+def _check_asserted_lines(fd):
+    """Verify the reviewed Sonoff open policy without changing modem lines.
+
+    @param fd Selected open descriptor after target and exclusive-ownership checks.
+    """
+    value = fcntl.ioctl(fd, termios.TIOCMGET, struct.pack("I", 0))
+    bits = struct.unpack("I", value)[0]
+    mask = termios.TIOCM_DTR | termios.TIOCM_RTS
+    _require(
+        bits & mask == mask,
+        "modem_state_mismatch",
+        "Unexpected serial control-line state",
+    )
+
+
 def _menu_pattern():
     """Use the reviewed helper's complete menu parser, never a loose version substring."""
     _require(
@@ -538,6 +554,7 @@ class ZBGW04Provider:
         menu_pattern=_menu_pattern,
         claim_exclusive=_claim_exclusive,
         sleep=time.sleep,
+        modem_check=_check_asserted_lines,
     ):
         """Freeze trusted dependencies; none are accepted from HTTP request payloads.
 
@@ -553,6 +570,7 @@ class ZBGW04Provider:
         @param menu_pattern Reviewed complete Gecko menu regex factory.
         @param claim_exclusive Kernel serial exclusion function; injectable in offline tests.
         @param sleep Bounded startup-grace wait; injectable alongside the test clock.
+        @param modem_check Read-only asserted-line check for the reviewed Sonoff policy.
         """
         target.validate()
         _require(
@@ -573,6 +591,7 @@ class ZBGW04Provider:
         self.fd_stat, self.menu_pattern = fd_stat, menu_pattern
         self.claim_exclusive = claim_exclusive
         self.sleep = sleep
+        self.modem_check = modem_check
 
     @property
     def lease_fd(self):
@@ -629,7 +648,7 @@ class ZBGW04Provider:
 
     @contextmanager
     def _port(self, port, baud, expected_baud, timeout):
-        """Open only the frozen character device with inactive modem lines.
+        """Open the frozen endpoint using its reviewed profile's initial modem states.
 
         @param port Must equal the frozen canonical endpoint.
         @param baud Must equal this action's fixed baud rate.
@@ -658,8 +677,12 @@ class ZBGW04Provider:
             dsrdtr=False,
         )
         try:
-            serial.dtr = False
-            serial.rts = False
+            asserted = gecko_profile(self.target.board).modem_asserted
+            # Configure both while closed. On the reviewed Sonoff, matching the
+            # kernel's asserted pair avoids sequential False/True transitions.
+            # This does not guarantee that kernel open/close cannot reset a board.
+            serial.dtr = asserted
+            serial.rts = asserted
             serial.port = port
             serial.open()
             info = self.fd_stat(serial.fileno())
@@ -671,6 +694,8 @@ class ZBGW04Provider:
                 "Opened descriptor is not the selected character device",
             )
             self.claim_exclusive(serial.fileno())
+            if asserted:
+                self.modem_check(serial.fileno())
             self.observe()
             self._remaining(deadline)
             yield serial, deadline

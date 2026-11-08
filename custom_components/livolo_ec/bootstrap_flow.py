@@ -128,7 +128,103 @@ class BootstrapFlowMixin:
         if entry and info["expected_network_id"] != expected:
             raise IncompatibleError("Bootstrap does not preserve this hub's network")
         await observer.bind(info["instance_id"], expected)
+        if (observer.state.get("reconciliation_ack") or {}).get("awaiting_prepare"):
+            self._radio_cancel_supported = False
         return info
+
+    async def _radio_reconcile(self, client, observer, info):
+        """Acknowledge explicit daemon authority without retrying the unknown installation.
+
+        @param client Bound physical bootstrap client.
+        @param observer Shared observer held under its lock.
+        @param info Current authenticated metadata containing optional reconciliation.
+        """
+        record = info.get("reconciliation")
+        if not record:
+            return False
+        audit = dict(observer.state.get("reconciliations") or {})
+        prior = audit.get(record["reconciliation_id"])
+        if prior:
+            if prior["record"] != record:
+                raise IncompatibleError("Bootstrap reconciliation changed")
+            return False
+        pending = observer.state.get("pending")
+        request = (
+            pending["body"]["request_id"] if pending else info["latest_request_id"]
+        )
+        if request != record["request_id"]:
+            return False
+        if info["active_request_id"] is not None or not info["prepare_supported"]:
+            raise IncompatibleError("Bootstrap reconciliation is not ready")
+        if pending and (
+            pending["operation"] != "install"
+            or pending["body"].get("plan_id") != record["plan_id"]
+            or pending["body"].get("instance_id") != info["instance_id"]
+        ):
+            raise IncompatibleError("Bootstrap reconciliation does not match intent")
+        result = await client.operation(request, info["instance_id"])
+        if (
+            result["kind"] != "install"
+            or result["status"] != "unknown"
+            or result.get("stage") != "verifying_target"
+            or result.get("error") != "inspection_timeout"
+            or result.get("profile") != "sonoff-zbdongle-e"
+            or info.get("profile") != "sonoff-zbdongle-e"
+            or result.get("recovery") != "recovery_required"
+            or any(
+                result.get(key) != record[key]
+                for key in ("request_id", "plan_id", "target_id")
+            )
+            or result.get("application_verified")
+            or result.get("network_ready")
+            or result.get("transfer_percent") is not None
+            or result.get("instance_id") != info["instance_id"]
+            or result.get("expected_network_id") != info["expected_network_id"]
+        ):
+            raise IncompatibleError(
+                "Bootstrap reconciliation does not match the unknown receipt"
+            )
+        await self._radio_accept(observer, result)
+        choices = await client.targets(info["instance_id"])
+        if not any(
+            item["target_id"] == record["target_id"] for item in choices["targets"]
+        ):
+            raise IncompatibleError("Reconciled radio is no longer offered")
+        current = await self._radio_info(client, observer)
+        if (
+            current.get("reconciliation") != record
+            or current.get("setup_session") != record["setup_session"]
+            or current["active_request_id"] is not None
+            or not current["prepare_supported"]
+            or any(
+                current[key] != info[key]
+                for key in ("latest_request_id", "expected_network_id")
+            )
+        ):
+            raise IncompatibleError(
+                "Bootstrap reconciliation changed during observation"
+            )
+        audit[record["reconciliation_id"]] = {
+            "record": record,
+            "operation": result,
+            "pending": pending,
+            "completed_requests": observer.state.get("completed_requests") or {},
+            "plan": observer.state.get("plan"),
+            "selection": observer.state.get("selection"),
+        }
+        await observer.save(
+            reconciliations=audit,
+            reconciliation_ack={"record": record, "awaiting_prepare": True},
+            pending=None,
+            dismissed_request_id=request,
+            plan=None,
+            install=None,
+            selection=None,
+            completed_requests={},
+        )
+        self._radio_reviewed_plan = None
+        self._radio_cancel_supported = False
+        return True
 
     async def _radio_accept(self, observer, result):
         """Reconcile a response against the reviewed request before advancing UI state.
@@ -147,6 +243,25 @@ class BootstrapFlowMixin:
         fields = {"last_operation": result}
         if kind == "prepare" and result["status"] == "confirmed":
             plan = result["plan"]
+            ack = state.get("reconciliation_ack") or {}
+            if ack.get("awaiting_prepare"):
+                record = ack["record"]
+                if (
+                    result["request_id"] == record["request_id"]
+                    or plan["plan_id"] == record["plan_id"]
+                    or plan["target_id"] != record["target_id"]
+                    or not pending
+                    or pending["operation"] != "prepare"
+                ):
+                    raise IncompatibleError(
+                        "A fresh preparation is required after reconciliation"
+                    )
+                fields["reconciliation_ack"] = dict(
+                    ack,
+                    awaiting_prepare=False,
+                    prepare_request_id=result["request_id"],
+                    new_plan_id=plan["plan_id"],
+                )
             selection = state.get("selection")
             if selection and any(
                 plan[key] != selection[key]
@@ -214,6 +329,8 @@ class BootstrapFlowMixin:
             _, client, observer = self._radio_clients()
             async with observer.lock:
                 info = await self._radio_info(client, observer)
+                if await self._radio_reconcile(client, observer, info):
+                    return await self._radio_select_form(observer)
                 pending = observer.state.get("pending")
                 request = (
                     pending["body"]["request_id"]
@@ -222,8 +339,7 @@ class BootstrapFlowMixin:
                 )
                 if request and (
                     request != observer.state.get("dismissed_request_id")
-                    or info.get("manual_reinspection_supported") is True
-                    and request == info["active_request_id"]
+                    or request == info["active_request_id"]
                 ):
                     previous = observer.state.get("last_operation") or {}
                     resume_completed_cancel = (
@@ -491,6 +607,17 @@ class BootstrapFlowMixin:
         """
         _, client, _ = self._radio_clients()
         info = await self._radio_info(client, observer)
+        notice = ""
+        ack = observer.state.get("reconciliation_ack") or {}
+        if ack.get("awaiting_prepare"):
+            if info.get("setup_session") != ack["record"]["setup_session"]:
+                raise IncompatibleError("Reconciled setup session changed")
+            notice = (
+                "The original installation result remains unknown in its history. "
+                "The daemon has verified that no flash was authorized for that attempt "
+                "and permits fresh preparation only. The old plan cannot be reused. "
+                "Review and confirm a new preparation below; no operation was retried."
+            )
         if not info["prepare_supported"] and not (
             getattr(self, "_radio_manual", False)
             and info.get("manual_reinspection_supported") is True
@@ -531,7 +658,10 @@ class BootstrapFlowMixin:
             fields[vol.Required("entry_confirmed", default=False)] = bool
             fields[vol.Optional("manual_setup", default=False)] = bool
             return self._radio_form(
-                "radio_detect", fields, board=BOARD_INSTRUCTIONS[info["profile"]][0]
+                "radio_detect",
+                fields,
+                board=BOARD_INSTRUCTIONS[info["profile"]][0],
+                reconciliation_notice=notice,
             )
         fields[vol.Required("bootloader_ready", default=False)] = bool
         if (
@@ -541,13 +671,17 @@ class BootstrapFlowMixin:
         ):
             fields[vol.Optional("use_buttons", default=False)] = bool
             return self._radio_form(
-                "radio_reinspect", fields, board=BOARD_INSTRUCTIONS[info["profile"]][0]
+                "radio_reinspect",
+                fields,
+                board=BOARD_INSTRUCTIONS[info["profile"]][0],
+                reconciliation_notice=notice,
             )
         return self._radio_form(
             "radio_select",
             fields,
             board=BOARD_INSTRUCTIONS[info["profile"]][0],
             instructions=BOARD_INSTRUCTIONS[info["profile"]][1],
+            reconciliation_notice=notice,
         )
 
     async def async_step_radio_select(self, user_input=None):
@@ -686,7 +820,7 @@ class BootstrapFlowMixin:
                     )
                 if operation == "install":
                     plan = observer.state.get("plan") or {}
-                    if plan.get("plan_id") != getattr(
+                    if not plan.get("plan_id") or plan["plan_id"] != getattr(
                         self, "_radio_reviewed_plan", None
                     ):
                         raise IncompatibleError(
@@ -718,6 +852,9 @@ class BootstrapFlowMixin:
         @param observer Shared observer held under its lock.
         """
         _, client, _ = self._radio_clients()
+        ack = observer.state.get("reconciliation_ack") or {}
+        if ack.get("awaiting_prepare") and operation != "prepare":
+            raise BootstrapError("fresh_preparation_required")
         bound = dict(payload, instance_id=info["instance_id"])
         confirmation_id = (
             getattr(self, "_radio_prepare_review_id", None)
@@ -757,6 +894,11 @@ class BootstrapFlowMixin:
             }.get(operation)
             if capability and info.get(capability) is not True:
                 raise BootstrapError("operation_not_supported")
+            if ack.get("awaiting_prepare") and (
+                payload.get("target_id") != ack["record"]["target_id"]
+                or info.get("setup_session") != ack["record"]["setup_session"]
+            ):
+                raise IncompatibleError("Reconciled radio or setup session changed")
             body = await observer.intent(operation, bound, confirmation_id)
             result = await client.submit(operation, body, info["instance_id"])
         await self._radio_accept(observer, result)

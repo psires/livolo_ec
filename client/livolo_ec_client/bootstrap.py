@@ -79,6 +79,37 @@ def engineering_only(value):
     return field
 
 
+def reconciliation_data(value, setup_session):
+    """Validate narrowly scoped authority for new preparation without rewriting an old result.
+
+    @param value Optional public reconciliation record from authenticated service metadata.
+    @param setup_session Current server-owned setup session, or None for legacy services.
+    """
+    if value is None:
+        return None
+    fields = {
+        "reconciliation_id",
+        "request_id",
+        "kind",
+        "plan_id",
+        "target_id",
+        "resolution",
+        "permits",
+        "setup_session",
+    }
+    if not isinstance(value, dict) or set(value) != fields:
+        raise IncompatibleError("Invalid bootstrap reconciliation")
+    result = {key: ident(value[key]) for key in fields}
+    if (
+        result["kind"] != "install"
+        or result["resolution"] != "verified_no_flash"
+        or result["permits"] != "prepare_only"
+        or result["setup_session"] != setup_session
+    ):
+        raise IncompatibleError("Unsupported or stale bootstrap reconciliation")
+    return result
+
+
 def plan_data(value, instance_id):
     """Allowlist an expiring reviewed plan bound to the current physical service.
 
@@ -304,9 +335,13 @@ class BootstrapClient:
             "active_request_id",
             "latest_request_id",
             "blocked_reason",
+            "setup_session",
         ):
             result[key] = ident(value.get(key), optional=True)
         result["expected_network_id"] = network(value.get("expected_network_id"))
+        result["reconciliation"] = reconciliation_data(
+            value.get("reconciliation"), result["setup_session"]
+        )
         return result
 
     async def targets(self, instance_id):

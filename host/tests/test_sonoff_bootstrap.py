@@ -162,6 +162,7 @@ class SonoffProviderTests(unittest.TestCase):
         self.inventory.return_value = (self.target,)
         self.provider.board_evidence = PROFILE.board_evidence
         self.provider.loader_policy = replace(self.policy, version="2.4.2")
+        self.provider.modem_check = Mock()
         self.serial.data = provider_fixture.MENU.replace(b"1.9.2", b"2.04.02")
         self.serial.rewrite = lambda raw: raw.replace(b"zb-gw04-1v2", BOARD.encode())
 
@@ -173,9 +174,16 @@ class SonoffProviderTests(unittest.TestCase):
             self.assertEqual(result["version"], "2.4.2")
             check_loader(self.target, result)
         self.assertEqual(self.serial.writes, [b"\n", b"\n"])
-        self.assertTrue(
-            all(event[1:3] == (False, False) for event in self.serial.events)
+        self.assertTrue(all(event[1:3] == (True, True) for event in self.serial.events))
+        self.assertTrue(self.serial.closed)
+
+    def test_bad_modem_readback_stops_before_protocol_write(self):
+        """A changed control-line state cannot silently fall back or send menu bytes."""
+        self.provider.modem_check.side_effect = BundleError(
+            "modem_state_mismatch", "test"
         )
+        self.fails("modem_state_mismatch", self.loader)
+        self.assertEqual(self.serial.writes, [])
         self.assertTrue(self.serial.closed)
 
     def test_unknown_menu_fails_without_fallback(self):

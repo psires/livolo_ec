@@ -29,8 +29,15 @@ For loader-only inspection after manual or software entry, Sonoff sends **newlin
 115200 baud and requires the complete Gecko menu. Only wire versions `2.04.02`
 and `2.4.2` normalize to the reviewed `2.4.2` policy. Partial menus, other
 versions/families, contradictory security text and timeouts fail closed without
-numeric probes, automatic modem-line reset or fallback. Inactive DTR/RTS at open
-is retained. The pinned upload helper runs only after this verification and the
+numeric probes, deliberate modem-line reset pulses or fallback. The reviewed
+Sonoff profile configures DTR and RTS **both asserted while the port is closed**,
+then checks both bits after opening. This matches the earlier successful stock
+serial policy and avoids the intermediate opposite line levels produced by
+sequentially clearing them. The exact test unit passed software entry, a
+60-second closed interval, reopening and return to the intact sniffer. This is
+bounded transport evidence, not proof of the original electrical reset cause or
+a guarantee that kernel open/close cannot affect a board. ZB-GW04 retains both
+lines inactive. The pinned upload helper runs only after verification and the
 existing durable flash acknowledgment.
 
 The separate Sonoff artifact record remains `qualified:false` and
@@ -56,8 +63,8 @@ identity causes zero serial writes. Once the parent commits `bootloader_entry`,
 the child writes exactly `\nBOOTLOADER\n` once, retains the same descriptor and
 lease, allows 1.1 seconds for the firmware's bounded drain/reset, switches to
 115200, clears old RX bytes and verifies the full loader menu. Total provider
-time is bounded to eight seconds. There is no modem-line reset, automatic fallback
-or implicit firmware installation.
+time is bounded to eight seconds. No deliberate modem-line reset sequence,
+automatic fallback or implicit firmware installation is requested.
 
 The protected loader policy must honestly identify its reviewed historical
 exact-unit security expectation; it is not a claim of fresh security-bit readback.
@@ -72,6 +79,49 @@ That action first checks the current loader without requiring another reset;
 manual BOOT/RESET remains a separately chosen fallback. A successful inspection
 atomically records reconciliation and a new plan while preserving the original
 request result. A failed reinspection leaves the original uncertainty intact.
+
+### Explicit maintenance after the reviewed preflash timeout
+
+The separate administrative module `livolod.bootstrap_maintenance` supports only
+the reviewed Sonoff `unknown / verifying_target / inspection_timeout` installation
+failure. There is no HTTP reconciliation endpoint. Stop the runtime and confirm
+all workers/helpers are gone before invoking it; retain journal and HA observer
+backups and the immutable original failure evidence.
+
+The command acquires the same physical, service and journal guards, checks the
+current exact attachment against the private policy and consumed plan, and
+requires no flash checkpoint, pending work, uncertain cleanup, gateway baseline,
+normal target, network or contradictory success/transfer facts. The protected
+experiment result and transcript must be operator-reviewed evidence of the
+completed entry/reopen/intact-sniffer sequence. Hashes bind those files; they are
+not hardware attestation or a substitute for reviewing the experiment.
+
+```sh
+python -m livolod.bootstrap_maintenance \
+  --config /private/runtime.json \
+  --request-id ORIGINAL_FAILED_INSTALL_ID \
+  --evidence-result /private/reopen-1/result.json \
+  --evidence-events /private/reopen-1/events.jsonl \
+  --confirm-no-flash-reconciliation
+```
+
+This appends a maintenance record, rotates the setup session and permits only a
+new explicit Prepare. The old receipt remains `unknown`, its plan remains
+consumed, and repeated lookup never replays the installation. No UART is opened.
+Evidence of the sniffer before the experiment's final close is not current-mode
+proof: the next remote Prepare must obtain fresh identity and loader evidence.
+Only a successful new Prepare clears the preparation-only restriction; Install
+then requires the newly bound plan and separate consent.
+
+`info.setup_session` identifies the current session. A current matching
+`info.reconciliation` contains `reconciliation_id`, `request_id`, `kind: install`,
+the old `plan_id`, `target_id`, `resolution: verified_no_flash`,
+`permits: prepare_only` and `setup_session`. Private evidence hashes and target
+details are not exposed. HA may acknowledge only a matching unchanged old
+receipt, plan, target and current session with no active operation, retaining its
+audit record and requiring fresh preparation consent. A later session rotation
+hides the old public reconciliation while its immutable historical binding
+continues to exclude only that exact reconciled failure from unresolved work.
 
 First use starts explicitly in bootstrap mode without opening normal gateway
 UART, creating a network or inventing a gateway baseline for the sniffer.
@@ -138,7 +188,7 @@ variables are omitted because they can contain credentials. A generic failure at
 `accepted` is not proof that no inspection reached UART; inspect ownership and
 receipts before deciding on recovery, and never automatically replay the request.
 
-Each inspection opens serial with inactive DTR/RTS, pyserial exclusive mode and
+Each inspection opens serial with the profile's DTR/RTS policy, pyserial exclusive mode and
 no flow control. It checks the opened character-device number before requesting
 kernel `TIOCEXCL`. Busy/open/exclusion failures stop inspection. The descriptor
 closes after each bounded action. `TIOCEXCL` does not evict prior opens or prevent

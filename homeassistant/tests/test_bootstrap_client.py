@@ -13,7 +13,78 @@ from livolo_ec_client.bootstrap import (
     BootstrapError,
     MAX_RESPONSE_BYTES,
     operation_data,
+    reconciliation_data,
 )
+
+
+def reconciliation():
+    """Return the exact authority for one unknown Install and one current setup session."""
+    return dict(
+        reconciliation_id="reconciliation-1",
+        request_id="install-1",
+        kind="install",
+        plan_id="plan-1",
+        target_id="radio-1",
+        resolution="verified_no_flash",
+        permits="prepare_only",
+        setup_session="session-2",
+    )
+
+
+@pytest.mark.parametrize("record", [None, reconciliation()])
+async def test_info_reconciliation_is_optional_and_bound(record):
+    """Legacy metadata stays compatible and explicit authority survives strict parsing.
+
+    @param record Absent legacy authority or an exact session-bound record.
+    """
+    metadata = info()
+    if record:
+        metadata.update(setup_session="session-2", reconciliation=record)
+    async with ClientSession() as session:
+        client = BootstrapClient(Client(session, "http://example.invalid", "secret"))
+        client._request = AsyncMock(return_value=("instance-1", metadata))
+        result = await client.info()
+    assert result["reconciliation"] == record
+    assert result["setup_session"] == ("session-2" if record else None)
+    client._request.assert_awaited_once_with(
+        "GET", "info", instance_id=None, optional=True
+    )
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"kind": "prepare"},
+        {"resolution": "verified"},
+        {"permits": "install"},
+        {"setup_session": "old-session"},
+        {"request_id": None},
+        {"plan_id": ""},
+        {"target_id": True},
+        {"reconciliation_id": "x" * 513},
+        {"extra": True},
+    ],
+)
+def test_reconciliation_rejects_ambiguous_or_stale_authority(change):
+    """No malformed, expanded or differently scoped authority can release local intent.
+
+    @param change Invalid field or unsupported authority extension.
+    """
+    with pytest.raises(IncompatibleError):
+        reconciliation_data(dict(reconciliation(), **change), "session-2")
+
+
+@pytest.mark.parametrize("field", list(reconciliation()))
+def test_reconciliation_requires_every_binding(field):
+    """Every declared binding is mandatory before the flow can acknowledge an unknown result.
+
+    @param field Required record field omitted by the service.
+    """
+    record = reconciliation()
+    record.pop(field)
+    with pytest.raises(IncompatibleError):
+        reconciliation_data(record, "session-2")
+
 
 pytestmark = pytest.mark.usefixtures("socket_enabled")
 

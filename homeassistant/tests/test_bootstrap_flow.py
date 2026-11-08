@@ -272,6 +272,338 @@ async def to_review(hass, setup):
     return result
 
 
+async def seed_unknown_install(hass, setup):
+    """Persist a consumed plan and unknown Install exactly as a restored HA observer sees them.
+
+    @param hass Actual HA test instance and storage.
+    @param setup Existing hub/client fixture.
+    """
+    physical = setup.physical
+    physical.meta.update(mode="bootstrap", setup_session="session-2")
+    physical.meta["profile"] = "sonoff-zbdongle-e"
+    physical.target["board"] = "sonoff-zbdongle-e"
+    physical.plan["profile"] = "sonoff-zbdongle-e"
+    physical.plan["plan_id"] = "consumed-plan"
+    body = dict(
+        request_id="unknown-install",
+        instance_id="physical-instance",
+        plan_id="consumed-plan",
+        confirmed=True,
+    )
+    receipt = await physical.submit("install", body, "physical-instance")
+    receipt.update(
+        status="unknown",
+        stage="verifying_target",
+        recovery="recovery_required",
+        error="inspection_timeout",
+        application_verified=False,
+    )
+    physical.results[body["request_id"]] = deepcopy(receipt)
+    record = dict(
+        reconciliation_id="reconciliation-1",
+        request_id=body["request_id"],
+        kind="install",
+        plan_id="consumed-plan",
+        target_id="radio-1",
+        resolution="verified_no_flash",
+        permits="prepare_only",
+        setup_session="session-2",
+    )
+    physical.meta["reconciliation"] = record
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    await observer.bind("physical-instance", setup.entry.unique_id)
+    await observer.save(
+        pending={"operation": "install", "body": body},
+        plan=physical.plan,
+        install=receipt,
+        last_operation=receipt,
+        selection=physical.target,
+        completed_requests={"prepare": {"request_id": "old-prepare"}},
+    )
+    hass.data.pop("livolo_ec_bootstrap_observers")
+    return deepcopy(receipt), deepcopy(record)
+
+
+@pytest.mark.parametrize("remote", [False, True])
+async def test_reconciliation_restores_audit_and_requires_separate_fresh_consent(
+    hass, setup_gateway, remote
+):
+    """Reopening only acknowledges authority; fresh Prepare and Install remain separate explicit actions.
+
+    @param hass Actual HA storage and options lifecycle.
+    @param setup_gateway Existing hub with deterministic daemon responses.
+    @param remote Whether the current target offers explicitly confirmed remote entry.
+    """
+    setup = setup_gateway
+    receipt, record = await seed_unknown_install(hass, setup)
+    physical = setup.physical
+    if remote:
+        physical.target["entry_methods"] = ["manual", "sonoff_sniffer_0_12"]
+    result = await open_setup(hass, setup.entry)
+    assert result["step_id"] == ("radio_detect" if remote else "radio_select")
+    assert_radio_placeholders(result)
+    assert (
+        "remains unknown" in result["description_placeholders"]["reconciliation_notice"]
+    )
+    assert "cancel_setup" not in result["data_schema"].schema
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    assert observer.state["pending"] is None
+    assert observer.state["plan"] is None and observer.state["install"] is None
+    audit = deepcopy(observer.state["reconciliations"])
+    assert audit[record["reconciliation_id"]]["operation"] == receipt
+    assert audit[record["reconciliation_id"]]["plan"]["plan_id"] == "consumed-plan"
+    assert observer.state["last_operation"] == receipt
+    flow = hass.config_entries.options._progress[result["flow_id"]]
+    for method in (flow.async_step_radio_initialize, flow.async_step_radio_handoff):
+        denied = await method({"confirmed": True})
+        assert denied["errors"]
+    denied = await flow.async_step_radio_review(
+        {"confirmed": True, "dedicated_radio": True}
+    )
+    assert denied["errors"]
+    assert len(physical.calls) == 1
+    hass.config_entries.options.async_abort(result["flow_id"])
+    hass.data.pop("livolo_ec_bootstrap_observers")
+    result = await open_setup(hass, setup.entry)
+    assert result["step_id"] == ("radio_detect" if remote else "radio_select")
+    assert len(physical.calls) == 1
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "target_id": "radio-1",
+            "board_confirmed": True,
+            "dedicated_radio": True,
+            "entry_confirmed" if remote else "bootloader_ready": True,
+        },
+    )
+    assert result["step_id"] == "radio_review"
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    assert observer.state["reconciliation_ack"]["awaiting_prepare"] is False
+    assert observer.state["plan"]["plan_id"] != "consumed-plan"
+    assert physical.calls[-1][0] == "prepare"
+    assert physical.calls[-1][1]["request_id"] != receipt["request_id"]
+    assert observer.state["reconciliations"] == audit
+    assert physical.results[receipt["request_id"]] == receipt
+    assert [kind for kind, _ in physical.calls] == ["install", "prepare"]
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"confirmed": True, "dedicated_radio": True}
+    )
+    assert result["step_id"] == "radio_handoff"
+    assert [kind for kind, _ in physical.calls] == ["install", "prepare", "install"]
+
+
+@pytest.mark.parametrize(
+    "mismatch",
+    [
+        "absent",
+        "active",
+        "prepare_unsupported",
+        "request",
+        "plan",
+        "target",
+        "result_status",
+        "result_recovery",
+        "result_stage",
+        "result_error",
+        "result_profile",
+        "result_instance",
+        "result_network",
+        "transferred",
+        "verified",
+        "missing_target",
+        "changed_session",
+        "changed_record",
+        "new_active",
+        "instance",
+        "network",
+    ],
+)
+async def test_reconciliation_does_not_release_unmatched_unknown_intent(
+    hass, setup_gateway, mismatch
+):
+    """Incompatible receipts or changing authority preserve the pending Install without any POST.
+
+    @param hass Actual HA storage and flow lifecycle.
+    @param setup_gateway Existing hub and fake physical service.
+    @param mismatch Missing binding or race introduced between authority reads.
+    """
+    setup = setup_gateway
+    receipt, _ = await seed_unknown_install(hass, setup)
+    physical = setup.physical
+    record = physical.meta["reconciliation"]
+    if mismatch == "absent":
+        physical.meta.pop("reconciliation")
+    elif mismatch == "active":
+        physical.meta["active_request_id"] = "other-active"
+    elif mismatch == "prepare_unsupported":
+        physical.meta["prepare_supported"] = False
+    elif mismatch in ("request", "plan", "target"):
+        record[mismatch + "_id"] = "unmatched"
+    elif mismatch == "missing_target":
+        physical.target["target_id"] = "different-radio"
+    elif mismatch in ("instance", "network"):
+        physical.meta[
+            "instance_id" if mismatch == "instance" else "expected_network_id"
+        ] = "replacement"
+    elif mismatch.startswith("result_") or mismatch in ("transferred", "verified"):
+        key, value = {
+            "result_status": ("status", "confirmed"),
+            "result_recovery": ("recovery", None),
+            "result_stage": ("stage", "transferring"),
+            "result_error": ("error", "transfer_failed"),
+            "result_profile": ("profile", "zb-gw04-1v2"),
+            "result_instance": ("instance_id", "replacement"),
+            "result_network": ("expected_network_id", None),
+            "transferred": ("transfer_percent", 0),
+            "verified": ("application_verified", True),
+        }[mismatch]
+        physical.results[receipt["request_id"]][key] = value
+    else:
+        second = deepcopy(physical.meta)
+        if mismatch == "changed_session":
+            second["setup_session"] = "session-3"
+        elif mismatch == "changed_record":
+            second["reconciliation"]["reconciliation_id"] = "replacement"
+        else:
+            second["active_request_id"] = "new-active"
+        physical.info = AsyncMock(side_effect=[deepcopy(physical.meta), second])
+    result = await open_setup(hass, setup.entry)
+    assert result["step_id"] in ("radio_progress", "radio_setup")
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    assert observer.state["pending"]["body"]["request_id"] == receipt["request_id"]
+    assert observer.state["plan"]["plan_id"] == "consumed-plan"
+    assert not observer.state.get("reconciliation_ack")
+    assert not observer.state.get("reconciliations")
+    assert len(physical.calls) == 1
+
+
+@pytest.mark.parametrize("outcome", ["pending", "lost_reply", "consumed_plan"])
+@pytest.mark.parametrize("rotated_session", [False, True])
+async def test_reconciliation_never_replays_or_clears_new_preparation(
+    hass, setup_gateway, outcome, rotated_session
+):
+    """A retained acknowledgment cannot clear newer intent or accept the consumed old plan.
+
+    @param hass Actual HA persistence and options lifecycle.
+    @param setup_gateway Bound service fixture.
+    @param outcome Fresh preparation remains pending, loses its reply or returns the consumed plan.
+    @param rotated_session Whether remote entry hides the old record by rotating the daemon session.
+    """
+    setup = setup_gateway
+    await seed_unknown_install(hass, setup)
+    physical = setup.physical
+    result = await open_setup(hass, setup.entry)
+    if outcome == "pending":
+        physical.pending = "prepare"
+    elif outcome == "lost_reply":
+        physical.lose = "prepare"
+    else:
+        submit = physical.submit
+
+        async def consumed(operation, body, instance_id):
+            """Return the consumed plan after recording one explicit preparation.
+
+            @param operation Requested preparation.
+            @param body Persisted new consent request.
+            @param instance_id Bound service instance.
+            """
+            response = await submit(operation, body, instance_id)
+            response["plan"]["plan_id"] = "consumed-plan"
+            physical.results[body["request_id"]] = deepcopy(response)
+            return response
+
+        physical.submit = consumed
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        dict(
+            target_id="radio-1",
+            board_confirmed=True,
+            dedicated_radio=True,
+            bootloader_ready=True,
+        ),
+    )
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    pending = deepcopy(observer.state["pending"])
+    assert pending["operation"] == "prepare"
+    assert observer.state["reconciliation_ack"]["awaiting_prepare"] is True
+    # Remote entry may rotate the daemon session before its reply is observed.
+    if rotated_session:
+        physical.meta.update(setup_session="session-3", reconciliation=None)
+    hass.config_entries.options.async_abort(result["flow_id"])
+    hass.data.pop("livolo_ec_bootstrap_observers")
+    result = await open_setup(hass, setup.entry)
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    if outcome == "lost_reply":
+        assert result["step_id"] == "radio_review"
+        assert observer.state["pending"] is None
+        assert observer.state["reconciliation_ack"]["awaiting_prepare"] is False
+    else:
+        assert observer.state["pending"] == pending
+        assert observer.state["reconciliation_ack"]["awaiting_prepare"] is True
+    assert [kind for kind, _ in physical.calls] == ["install", "prepare"]
+
+
+async def test_reconciliation_new_hub_keeps_unknown_history_without_creating_hub(
+    hass, setup_gateway
+):
+    """A new-hub flow consumes the same authority without claiming readiness or querying a gateway.
+
+    @param hass Actual HA config lifecycle and persistent storage.
+    @param setup_gateway Physical response fixture borrowed without its existing network binding.
+    """
+    setup = setup_gateway
+    receipt, record = await seed_unknown_install(hass, setup)
+    physical = setup.physical
+    physical.meta["expected_network_id"] = None
+    physical.meta["baseline_available"] = False
+    physical.meta["initialize_supported"] = False
+    physical.target["entry_methods"] = ["manual", "sonoff_sniffer_0_12"]
+    receipt["expected_network_id"] = None
+    physical.results[receipt["request_id"]] = deepcopy(receipt)
+    url = "http://new-reconciliation.invalid:8090"
+    observer = observer_for(hass, url)
+    await observer.bind("physical-instance", None)
+    await observer.save(plan=physical.plan, install=receipt, last_operation=receipt)
+    hass.data.pop("livolo_ec_bootstrap_observers")
+    result = await hass.config_entries.flow.async_init(
+        "livolo_ec",
+        context={"source": "user"},
+        data={"url": url, "token": "secret", "setup_radio": True},
+    )
+    assert result["step_id"] == "radio_detect"
+    assert_radio_placeholders(result)
+    restored = observer_for(hass, url)
+    assert (
+        restored.state["reconciliations"][record["reconciliation_id"]]["operation"]
+        == receipt
+    )
+    assert restored.state["reconciliation_ack"]["awaiting_prepare"] is True
+    assert len(hass.config_entries.async_entries("livolo_ec")) == 1
+    setup.native.info.assert_not_awaited()
+    setup.native.snapshot.assert_not_awaited()
+    assert len(physical.calls) == 1
+
+
+async def test_acknowledged_reconciliation_cannot_change_meaning(hass, setup_gateway):
+    """A reused reconciliation identity cannot overwrite audit history or unlock another target.
+
+    @param hass Actual HA options lifecycle and storage.
+    @param setup_gateway Physical service fixture.
+    """
+    setup = setup_gateway
+    await seed_unknown_install(hass, setup)
+    result = await open_setup(hass, setup.entry)
+    observer = observer_for(hass, setup.entry.data["url"], setup.entry.entry_id)
+    audit = deepcopy(observer.state["reconciliations"])
+    setup.physical.meta["reconciliation"]["target_id"] = "replacement-radio"
+    hass.config_entries.options.async_abort(result["flow_id"])
+    result = await open_setup(hass, setup.entry)
+    assert result["errors"] == {"base": "bootstrap_incompatible"}
+    assert observer.state["reconciliations"] == audit
+    assert observer.state["reconciliation_ack"]["awaiting_prepare"] is True
+    assert len(setup.physical.calls) == 1
+
+
 async def test_explicit_guided_handoff_preserves_existing_entry(hass, setup_gateway):
     """Only explicit actions inspect, install and hand off; existing entry data stays intact.
 

@@ -47,7 +47,7 @@
       },
       "radio_select": {
         "title": "Inspect the selected radio",
-        "description": "Select your **{board}** and confirm its exact model. This experimental setup requires the reviewed board and its preserved Gecko bootloader. Use a radio dedicated to Livolo. Factory firmware conversion requires explicit support for this exact board and starting firmware; this engineering setup does not establish that support.\n\n{instructions}\n\nConfirm after completing this procedure. Inspection verifies the bootloader; it does not install firmware. To leave without installing, choose Cancel setup and follow its instructions. Closing this dialog leaves setup active.",
+        "description": "{reconciliation_notice}\n\nSelect your **{board}** and confirm its exact model. This experimental setup requires the reviewed board and its preserved Gecko bootloader. Use a radio dedicated to Livolo. Factory firmware conversion requires explicit support for this exact board and starting firmware; this engineering setup does not establish that support.\n\n{instructions}\n\nConfirm after completing this procedure. Inspection verifies the bootloader; it does not install firmware. To leave without installing, choose Cancel setup and follow its instructions. Closing this dialog leaves setup active.",
         "data": {
           "target_id": "Radio and exact board",
           "board_confirmed": "I checked the exact board model shown above against the radio label",
@@ -101,7 +101,7 @@
       },
       "radio_detect": {
         "title": "Prepare the radio automatically",
-        "description": "Select your **{board}** and confirm its exact model. The daemon supports checking for the reviewed Livolo sniffer firmware; it has not identified the currently attached firmware yet.\n\nSubmit to detect supported firmware, enter the bootloader and inspect. The daemon first verifies the supported sniffer without sending commands. Only a matching sniffer receives the bootloader entry command. This stops capture and changes the radio mode, but installs no firmware. Keep USB power connected. You will review the firmware and confirm installation separately.\n\nOther firmware is not automatically converted. Choose manual setup to see this board’s BOOT/RESET instructions instead. An uncertain transition will not be retried automatically.",
+        "description": "{reconciliation_notice}\n\nSelect your **{board}** and confirm its exact model. The daemon supports checking for the reviewed Livolo sniffer firmware; it has not identified the currently attached firmware yet.\n\nSubmit to detect supported firmware, enter the bootloader and inspect. The daemon first verifies the supported sniffer without sending commands. Only a matching sniffer receives the bootloader entry command. This stops capture and changes the radio mode, but installs no firmware. Keep USB power connected. You will review the firmware and confirm installation separately.\n\nOther firmware is not automatically converted. Choose manual setup to see this board’s BOOT/RESET instructions instead. An uncertain transition will not be retried automatically.",
         "data": {
           "target_id": "Radio and exact board",
           "board_confirmed": "I checked the exact board model shown above against the radio label",
@@ -113,7 +113,7 @@
       },
       "radio_reinspect": {
         "title": "Inspect the current bootloader state",
-        "description": "The previous automatic entry may already have reached the bootloader on **{board}**. Inspect its current state first. This sends no software-entry command and installs no firmware.\n\nNo BOOT/RESET action is required for this first inspection. If inspection cannot verify the bootloader, use the button instructions as a fallback. Only a verified inspection can produce a firmware review; installation still needs separate confirmation.",
+        "description": "{reconciliation_notice}\n\nThe previous automatic entry may already have reached the bootloader on **{board}**. Inspect its current state first. This sends no software-entry command and installs no firmware.\n\nNo BOOT/RESET action is required for this first inspection. If inspection cannot verify the bootloader, use the button instructions as a fallback. Only a verified inspection can produce a firmware review; installation still needs separate confirmation.",
         "data": {
           "target_id": "Radio and exact board",
           "board_confirmed": "I checked the exact board model shown above against the radio label",
@@ -255,7 +255,7 @@
       },
       "radio_select": {
         "title": "Inspect the selected radio",
-        "description": "Select your **{board}** and confirm its exact model. This experimental setup requires the reviewed board and its preserved Gecko bootloader. Use a radio dedicated to Livolo. Factory firmware conversion requires explicit support for this exact board and starting firmware; this engineering setup does not establish that support.\n\n{instructions}\n\nConfirm after completing this procedure. Inspection verifies the bootloader; it does not install firmware. To leave without installing, choose Cancel setup and follow its instructions. Closing this dialog leaves setup active.",
+        "description": "{reconciliation_notice}\n\nSelect your **{board}** and confirm its exact model. This experimental setup requires the reviewed board and its preserved Gecko bootloader. Use a radio dedicated to Livolo. Factory firmware conversion requires explicit support for this exact board and starting firmware; this engineering setup does not establish that support.\n\n{instructions}\n\nConfirm after completing this procedure. Inspection verifies the bootloader; it does not install firmware. To leave without installing, choose Cancel setup and follow its instructions. Closing this dialog leaves setup active.",
         "data": {
           "target_id": "Radio and exact board",
           "board_confirmed": "I checked the exact board model shown above against the radio label",
@@ -309,7 +309,7 @@
       },
       "radio_detect": {
         "title": "Prepare the radio automatically",
-        "description": "Select your **{board}** and confirm its exact model. The daemon supports checking for the reviewed Livolo sniffer firmware; it has not identified the currently attached firmware yet.\n\nSubmit to detect supported firmware, enter the bootloader and inspect. The daemon first verifies the supported sniffer without sending commands. Only a matching sniffer receives the bootloader entry command. This stops capture and changes the radio mode, but installs no firmware. Keep USB power connected. You will review the firmware and confirm installation separately.\n\nOther firmware is not automatically converted. Choose manual setup to see this board’s BOOT/RESET instructions instead. An uncertain transition will not be retried automatically.",
+        "description": "{reconciliation_notice}\n\nSelect your **{board}** and confirm its exact model. The daemon supports checking for the reviewed Livolo sniffer firmware; it has not identified the currently attached firmware yet.\n\nSubmit to detect supported firmware, enter the bootloader and inspect. The daemon first verifies the supported sniffer without sending commands. Only a matching sniffer receives the bootloader entry command. This stops capture and changes the radio mode, but installs no firmware. Keep USB power connected. You will review the firmware and confirm installation separately.\n\nOther firmware is not automatically converted. Choose manual setup to see this board’s BOOT/RESET instructions instead. An uncertain transition will not be retried automatically.",
         "data": {
           "target_id": "Radio and exact board",
           "board_confirmed": "I checked the exact board model shown above against the radio label",
@@ -321,7 +321,7 @@
       },
       "radio_reinspect": {
         "title": "Inspect the current bootloader state",
-        "description": "The previous automatic entry may already have reached the bootloader on **{board}**. Inspect its current state first. This sends no software-entry command and installs no firmware.\n\nNo BOOT/RESET action is required for this first inspection. If inspection cannot verify the bootloader, use the button instructions as a fallback. Only a verified inspection can produce a firmware review; installation still needs separate confirmation.",
+        "description": "{reconciliation_notice}\n\nThe previous automatic entry may already have reached the bootloader on **{board}**. Inspect its current state first. This sends no software-entry command and installs no firmware.\n\nNo BOOT/RESET action is required for this first inspection. If inspection cannot verify the bootloader, use the button instructions as a fallback. Only a verified inspection can produce a firmware review; installation still needs separate confirmation.",
         "data": {
           "target_id": "Radio and exact board",
           "board_confirmed": "I checked the exact board model shown above against the radio label",

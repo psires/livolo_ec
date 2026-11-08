@@ -13,11 +13,12 @@ attestation is recorded. Its exact USB serial, topology, device node and current
 attachment belong in the protected operator policy, not this public document.
 Do not extend this profile to Sonoff batches with other USB bridges.
 
-The Linux specialist reports five CRC-validated passive ESN1 status records after
-the move: sniffer **0.12**, **921600 baud**, Sonoff board marker, with no UART
-writes. This report is identification evidence; the current loader has not yet
-been freshly observed. Historical records identify Gecko **2.4.2** at **115200**,
-with menu spelling `v2.04.02`.
+The initial passive observation identified sniffer **0.12** at **921600 baud**
+with the Sonoff board marker. The subsequent real HA Prepare accepted fresh
+CRC-valid sniffer status and a complete Gecko **2.4.2** menu at **115200**,
+with menu spelling `v2.04.02`. The separate Install timed out during loader
+reinspection before flash authorization; it did not verify a gateway application.
+See the [HA trial record](verification/sonoff-intel-ha-trial-20261108.json).
 
 | Purpose | Version | SHA-256 |
 | --- | --- | --- |
@@ -70,10 +71,10 @@ rates with writes while the application/loader mode is unknown.
 
 ### Implemented HA-authorized known-sniffer entry
 
-The engineering flow is implemented and has passed independent source review
-and 150 focused offline tests. Physical qualification through the real HA flow
-is still pending; these results do not establish successful hardware entry or
-installation. The live trial remains held until the reviewed build is ready.
+The engineering flow passed independent source review and 150 focused offline
+tests, followed by one successful physical HA Prepare. Full HA installation
+qualification remains pending after the separate preflash inspection timeout.
+The original unknown Install receipt and consumed plan remain preserved.
 The current sniffer already implements the required software command; no new
 radio firmware is needed to enter its loader. Manual buttons remain a recovery
 fallback when passive identification cannot establish the known application.
@@ -87,7 +88,23 @@ bound to the selected Sonoff's serial, topology and attachment. Advertising the
 entry method permits an attempt, not a claim that the current sniffer has
 already been observed. GET, startup, refresh and a failed inspection must never
 trigger entry. Retain the physical lease, process guards, quiesced normal
-service, inactive DTR/RTS, exclusive descriptor and repeated target checks.
+service, exclusive descriptor and repeated target checks. For this reviewed
+Sonoff unit, configure DTR=True and RTS=True while the serial object is closed,
+with hardware flow control disabled. After opening and validating the descriptor
+and exclusive ownership, require both asserted bits through read-only TIOCMGET
+before protocol I/O. A mismatch fails without protocol writes or fallback line
+changes. The ZB-GW04 profile retains DTR=False and RTS=False.
+
+One bounded [candidate lifecycle experiment](verification/sonoff-intel-entry-reopen-20261108.json)
+passed with this Sonoff policy: fresh sniffer identification, software loader
+entry, a complete menu, a 60.104-second closed-port interval, a second open and
+complete menu, then one separately authorized run command and fresh sniffer
+verification on that same descriptor. It used two opens and four fixed writes,
+with no upload; the original journal and HA observer hashes were unchanged.
+This supports the selected policy on the reviewed unit. It does not prove the
+earlier failure's electrical cause, exclude kernel open/close reset effects,
+establish the mode after final close, or qualify other Sonoff hardware variants.
+The production change still needs a clean build and a complete HA install trial.
 
 On that guarded descriptor, listen without writes at fixed **921600**. Discard
 pre-existing RX input with a bounded input reset/drain and start a fresh decoder;
@@ -146,7 +163,7 @@ identification and immediately before write; failed durable permission;
 short/failed writes; absent/wrong/partial/security-contradictory loader menus;
 and cancellation/restart/lost-response reconciliation at each transition.
 Assert the exact write transcript, no writes before validated identity and
-permission, no modem-line reset, no gateway numeric probes, and no automatic
+permission, no explicit modem-line reset sequence, no gateway numeric probes, and no automatic
 retry or flash. Linux must subsequently qualify this through the real HA
 action; an operator shell command is not equivalent evidence.
 
