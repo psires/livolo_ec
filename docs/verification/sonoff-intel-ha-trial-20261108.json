@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Dedicated Sonoff on isolated Intel HA Container; existing radios and HA at 10.1.1.40 excluded",
+  "reported_by": "Linux specialist, sole live operator; Release Engineer reviewed source checkpoint ordering",
+  "daemon_source_commit": "40c3f3e73d32b6de2030117cb3cc3895907fe341",
+  "integration_source_commit": "abb78dba9e68e10e29db6ea0127f34b2015d08df",
+  "integration_zip_sha256": "5ac13ccf3a3b49349ed7fe8988956949381a5c1c084d60825704c8ee312f845f",
+  "integration_source_check": "All 22 integration/client files and license matched clean commit",
+  "image_id": "sha256:ed77be885018fb6591d55573f70c2a1459bac2ead2d171efcf2209aeb6baaebd",
+  "candidate_version": "0.14",
+  "candidate_sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+  "cancellation_fix": {
+    "actual_reopen": "passed after HA-only replacement and full restart",
+    "observer_and_journal_preserved": true,
+    "full_ha_tests": 424,
+    "ci_checks_passed": 6
+  },
+  "prepare": {
+    "submissions": 1,
+    "status": "confirmed",
+    "stage": "prepared",
+    "entry_attempted": true,
+    "recovery": null,
+    "application_verified": false,
+    "loader_version": "2.4.2",
+    "loader_baud": 115200,
+    "evidence": "Production validator accepted fresh strict CRC-valid sniffer proof and complete matching loader menu; retained plan projection verified by operator",
+    "raw_uart_transcript_retained": false,
+    "security_flags": "Historical reviewed policy expectation; not fresh security readback"
+  },
+  "install": {
+    "submissions": 1,
+    "status": "unknown",
+    "stage": "verifying_target",
+    "error": "inspection_timeout",
+    "recovery": "recovery_required",
+    "application_verified": false,
+    "transfer_percent": null,
+    "plan_consumed": true
+  },
+  "durable_failure_boundary": {
+    "installation_attempted": "key absent; store default false",
+    "active_request_id": "key absent",
+    "worker_cleanup_unconfirmed": "key absent",
+    "worker_or_helper_running": false,
+    "uart_owner_present": false,
+    "physical_usb_flock_guard": "retained intentionally during recovery",
+    "source_review": "Controller/store atomically persist installation_attempted before worker flash ACK; preserved Gecko installer rechecks loader before that checkpoint and invokes flash helper only after ACK",
+    "conclusion": "No flash authorization or helper upload reached; preserve immutable unknown receipt and recovery fence"
+  },
+  "timing": {
+    "exact_prepare_to_install_interval_available": false,
+    "plan_creation_utc_inferred_from_expiry": "2026-11-08 18:53:45.314872 UTC",
+    "limitation": "Database mtime roughly 58.06 seconds later is not a proven Install admission/completion timestamp"
+  },
+  "operator_checkpoint_record_sha256": "82f5c1766fd35e00a32be89507e0b1a865ad76fddb73bf080f6b70984b82f285",
+  "retention": "Raw journal, observer, protected policy and checkpoint output remain on testbed; no sensitive state exported",
+  "next_step": "Unix and ZigBee review bounded diagnostic procedure; no retry, reset, run command or recovery clearing",
+  "public_qualified": false,
+  "firmware_installation_passed": false
+}

@@ -17,13 +17,13 @@
     "platform": "linux/amd64",
     "storage_root": "/storage/livolo-testbed",
     "existing_ha_installation": "Unchanged; outside this testbed's scope",
-    "radio": "Owner-confirmed transfer; Linux specialist passively verified Sonoff ZBDongle-E sniffer 0.12 using CRC-valid ESN1 records; current bootloader remains unverified",
+    "radio": "Dedicated Sonoff: remote known-sniffer entry and matching loader Prepare passed; separate Install timed out before flash authorization and remains fenced in recovery",
     "supervisor_available": false
   },
   "gates": [
     {
       "id": "source_and_version_binding",
-      "status": "manual_entry_baseline_bound_remote_entry_revision_pending",
+      "status": "combined_daemon_and_ha_fix_bound_clean_builds_and_ci_passed",
       "required_evidence": "Reviewed committed source including the required ancestor, passing checks, clean-source build context hash, exact distribution/daemon/firmware-compatibility/integration versions, and source revision bound to the resulting artifact"
     },
     {
@@ -71,13 +71,13 @@
     },
     {
       "id": "dedicated_radio_identity_and_recovery",
-      "status": "passive_identity_verified_loader_and_recovery_plan_pending",
+      "status": "identity_and_historical_policy_reviewed_recovery_diagnosis_in_progress",
       "required_evidence": "Confirm physical transfer, exact board/revision, USB topology/identity, current firmware, ownership and reviewed recovery path before an explicitly scoped hardware trial",
       "constraints": "No automatic protocol commands or flash; writes only through the reviewed explicit action. Do not reuse ZB-GW04 policy or firmware."
     },
     {
       "id": "sonoff_ha_firmware_installation",
-      "status": "remote_entry_source_review_passed_clean_combined_build_and_actual_ha_trial_pending",
+      "status": "actual_install_preflash_loader_timeout_recovery_required",
       "required_evidence": "Exact-board provider and loader/security policy, reviewed private candidate and recovery artifacts, actual HA inspect/explicit install, independent application VERSION/CAPS/STATUS, explicit new-network initialization/handoff, and scoped failure/recovery checks on the clean AMD64 image",
       "constraints": "No fabricated gateway baseline for the starting sniffer. Cancellation without a baseline cannot claim restored sniffer or gateway service. Recovery needs its own explicit action and passive sniffer verification. Keep firmware qualified:false until the relevant tests pass.",
       "firmware_source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
@@ -86,22 +86,23 @@
       "candidate_bytes": 60572,
       "candidate_offline_board_version_layout_check": "independently passed by Release Engineer",
       "known_sniffer_recovery_sha256": "c9d5bb865ab6734c9c739a36bcc4a71139ab7fcc01090e5a55371f1378e1896d",
-      "original_factory_readback_available": false
+      "original_factory_readback_available": false,
+      "actual_trial_record": "docs/verification/sonoff-intel-ha-trial-20261108.json"
     },
     {
       "id": "sonoff_remote_bootloader_entry",
-      "status": "offline_source_review_passed_clean_build_and_physical_qualification_pending",
+      "status": "actual_remote_prepare_passed_installation_and_recovery_qualification_incomplete",
       "contract": "Explicit optional Prepare entry_method sonoff_sniffer_0_12 and entry_confirmed true; absent fields preserve manual entry. Fresh strict passive sniffer identity under the exact lease precedes durable permission and one fixed entry command. Complete expected loader menu is mandatory before a plan; Install remains separate.",
       "security_basis": "Private exact-unit historical unsigned/unencrypted acceptance is a reviewed expectation, not a fresh security readback. Prepare must reject any observed contradiction.",
       "failure_boundary": "No automatic replay after uncertain entry. Explicit server-gated manual reinspection may reconcile entry uncertainty only after worker cleanup; it cannot bypass possible-flash recovery.",
-      "physical_trial_performed": false,
+      "physical_trial_performed": true,
       "validation": {
         "full_host_tests_reported_by_unix": 535,
         "independent_focused_daemon_tests": 150,
         "independent_full_ha_tests": 415,
         "independent_fixture_cleanup_tests": 13,
         "new_daemon_entry_tests": 25,
-        "physical_trial_performed": false
+        "physical_trial_performed": true
       }
     },
     {
@@ -172,11 +173,11 @@
     "physical_qualification": false
   },
   "sonoff_provider_review": {
-    "status": "offline_source_review_passed_physical_trial_pending",
+    "status": "offline_review_passed_actual_prepare_passed_install_failed_before_flash_authorization",
     "full_host_tests_reported_by_unix": 510,
     "new_sonoff_cases": 23,
     "physical_qualification": false,
-    "limitations": "Offline checks use simulated serial/USB and synthetic test artifacts. Exact firmware artifact was checked separately. No physical installation or fresh loader observation yet.",
+    "limitations": "Offline checks use simulated serial/USB and synthetic artifacts. Actual dedicated-unit Prepare passed; later loader recheck timed out before flash authorization. No application installation or physical qualification pass.",
     "independent_focused_tests_before_final_cleanup": 124,
     "independent_final_cleanup_and_sonoff_tests": 47,
     "final_focused_tests_reported_by_zigbee": 125,
@@ -198,5 +199,15 @@
     "public_qualified": false,
     "offline_container_check": "PASS reported by Linux: first install/recreation, authenticated API and websocket, ingress origin, persistent local catalog, UID10001, SQLite integrity; no radio access",
     "ci_checks_passed": 12
+  },
+  "combined_remote_entry_trial": {
+    "daemon_source_commit": "40c3f3e73d32b6de2030117cb3cc3895907fe341",
+    "integration_source_commit": "abb78dba9e68e10e29db6ea0127f34b2015d08df",
+    "image_id": "sha256:ed77be885018fb6591d55573f70c2a1459bac2ead2d171efcf2209aeb6baaebd",
+    "integration_zip_sha256": "5ac13ccf3a3b49349ed7fe8988956949381a5c1c084d60825704c8ee312f845f",
+    "daemon_ci_checks_passed": 12,
+    "ha_ci_checks_passed": 6,
+    "actual_trial_record": "docs/verification/sonoff-intel-ha-trial-20261108.json",
+    "public_qualified": false
   }
 }
