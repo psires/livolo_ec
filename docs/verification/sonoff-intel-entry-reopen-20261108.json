@@ -1,0 +1,66 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "One exact-unit Sonoff candidate serial lifecycle experiment; no firmware upload",
+  "reported_by": "Linux specialist, sole live operator",
+  "daemon_source_commit": "40c3f3e73d32b6de2030117cb3cc3895907fe341",
+  "candidate_open_policy": "Historical Sonoff stock pyserial3.5 DTR=True/RTS=True configured while closed, both asserted bits required after open",
+  "script_sha256": "5e3dccc7ddf84fc14ebad4a0175625f2e1fb53d9c5eaee09b09c32e1948c2792",
+  "serial_adapter_sha256": "adbbfdb071a9e5ab70e66e974803940e0ae3dc56902afc8188d83d51324e30db",
+  "tests_sha256": "3d9ed30f507885fdb8f232257c34bcbdc4d56e28243e9416e034306d2f48ac0b",
+  "offline_tests": "11 independently passed by Release Engineer and ZigBee specialist",
+  "submissions": 1,
+  "uart_opens": 2,
+  "uart_closes": 2,
+  "fixed_uart_writes": 4,
+  "observed_sequence": [
+    "Fresh strict Sonoff sniffer0.12 proof at921600",
+    "Private entry intent fsynced, including output and parent directories, before one BOOTLOADER command",
+    "Complete expected Gecko2.4.2 menu accepted, first descriptor closed",
+    "60.104-second closed-port interval under continuous physical/database/journal guards",
+    "Second True/True open at115200; complete expected loader menu accepted",
+    "Read-only original journal no-flash condition revalidated; separate intact-run intent durably recorded",
+    "One run command; same descriptor switched to921600; fresh strict sniffer0.12 proof accepted",
+    "Descriptor closed; guards released; runtime remained stopped"
+  ],
+  "no_flash_basis": "Exact original unknown Install, verifying_target/inspection_timeout, global installation_attempted false, no pending/active work or cleanup uncertainty, exact consumed plan target; original journal read only",
+  "firmware_upload": false,
+  "helper_invoked": false,
+  "result": {
+    "passed": true,
+    "exit_code": 0,
+    "cleanup_errors": [],
+    "result_sha256": "c5ee49e137950cf15aa23766c49f1db987355f5d979718266adbcb639ec8ea37",
+    "events_sha256": "03b8f718f1750f3ac32cf3e6cf36c1fe9a02c9728724dab5a3689445adb65f1d"
+  },
+  "independent_operator_state_comparison": {
+    "original_journal_before_and_after_sha256": "93617e7d18b62f0bd8393f4d63823741f85a7cb9aff83b40998654313cdc0a7d",
+    "ha_observer_before_and_after_sha256": "da0a450555c83a885023806dc787bc40d85a798554547166d17eebc7a8c346de",
+    "journal_unchanged": true,
+    "ha_observer_unchanged": true
+  },
+  "state_at_completion": {
+    "setup_runtime": "stopped",
+    "diagnostic_container": "stopped",
+    "uart_owner_present": false,
+    "physical_guard_held": false,
+    "original_unknown_install": "preserved; no retry or recovery clearing"
+  },
+  "limitations": [
+    "Passing candidate lifecycle does not prove the electrical cause of the earlier failure.",
+    "Sniffer identity was proved before final close; close-induced effects are not excluded.",
+    "One exact unit does not establish all Sonoff hardware variants.",
+    "No completed HA firmware installation, recovery reconciliation, image readback or public qualification is claimed."
+  ],
+  "next_step": "Review minimal Sonoff-only serial profile fix and explicit reconciliation that preserves the original receipt, then clean-source rebuild before new HA trial",
+  "public_qualified": false,
+  "independent_release_review": {
+    "result_sha256_matches": true,
+    "sanitized_events_sha256": "32c3df4d6d0f75bd995742ec30b26e95f51bed5b1e22bb46e6baea6199559385",
+    "exact_two_opens_and_four_expected_writes": true,
+    "durable_intent_event_order_matches": true,
+    "closed_interval_seconds": 60.10448733699923,
+    "limitation": "Raw RX remains on testbed; fresh loader/sniffer acceptance is supported by reviewed production validator and operator record. Sanitized events are distinct from raw events."
+  }
+}
