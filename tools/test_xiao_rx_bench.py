@@ -2,6 +2,11 @@
 
 import binascii
 from copy import deepcopy
+import json
+from pathlib import Path
+import sys
+import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -356,6 +361,68 @@ class PassiveTests(unittest.TestCase):
         self.assertFalse(self.ports[0].active)
         self.assertEqual(self.evidence["assessment"], "failed")
         self.assertTrue(self.evidence["raw_lines"]["mg24"])
+
+    def test_cli_uses_shared_port_policy_and_closes_after_capture_failure(self):
+        """Both selected identities reach the shared policy without bypassing C6."""
+        opened, closed, selected = [], [], []
+
+        def configured(name, path, usb_serial, factory):
+            """Record the shared factory arguments without opening a device.
+
+            @param name Exact selected board.
+            @param path Verified persistent path.
+            @param usb_serial Expected serial.
+            @param factory Unchanged ordinary serial constructor.
+            @return Fixture with explicit lifecycle counters.
+            """
+            selected.append((name, path, usb_serial, factory))
+            return SimpleNamespace(
+                open=lambda: opened.append(name), close=lambda: closed.append(name)
+            )
+
+        ordinary = object()
+        modules = {
+            "serial": SimpleNamespace(Serial=ordinary),
+            "serial.tools": SimpleNamespace(
+                list_ports=SimpleNamespace(comports=lambda: [])
+            ),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "receipt.json"
+            argv = [
+                "rx",
+                "--mg24-port",
+                "/dev/serial/by-id/mg",
+                "--mg24-serial",
+                "mg",
+                "--c6-port",
+                "/dev/serial/by-id/esp",
+                "--c6-serial",
+                "esp",
+                "--output",
+                str(output),
+            ]
+            with (
+                patch.dict(sys.modules, modules),
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    rf, "verify_endpoint", side_effect=["/dev/ttyACM1", "/dev/ttyACM2"]
+                ),
+                patch.object(rf, "configured_port", side_effect=configured),
+                patch.object(rx, "capture", side_effect=ValueError("fixture stop")),
+                patch("builtins.print"),
+            ):
+                self.assertEqual(rx.main(), 1)
+            self.assertIn("fixture stop", json.loads(output.read_text())["error"])
+        self.assertEqual(
+            selected,
+            [
+                ("mg24", "/dev/serial/by-id/mg", "mg", ordinary),
+                ("c6", "/dev/serial/by-id/esp", "esp", ordinary),
+            ],
+        )
+        self.assertEqual(opened, ["mg24", "c6"])
+        self.assertEqual(closed, ["c6", "mg24"])
 
 
 if __name__ == "__main__":

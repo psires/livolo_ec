@@ -36,7 +36,9 @@ The MG24 SAMD11 bridge requires DTR for forwarding. The C6 may emit ROM boot
 chatter; only a complete matching numbered response satisfies a command.
 These settings are specific to the observed bench devices and do not alter any
 daemon serial policy. Ports are opened exclusively, with control-line state set
-before opening; the harness issues no explicit reset, bootloader, flush or
+in the host object before opening; C6 uses the qualified combined DTR/RTS clear
+from [the lifecycle helper](XIAO_C6_SERIAL.md), with no stock fallback. The
+harness issues no explicit reset, bootloader, flush or
 buffer-reset call. This does not exclude OS/USB effects or pyserial's internal
 input-buffer clearing during open.
 
@@ -44,6 +46,8 @@ Run only after the sole device operator has established exclusive ownership and
 that both radios are already idle, before opening either of the two new endpoints.
 Post-open preflight is not a substitute for that condition. Use Python 3.9 or
 newer and pyserial 3.5, as in the host environment:
+
+Keep `xiao_c6_serial.py` beside `xiao_rf_bench.py` when staging the tools.
 
 ```sh
 python3 tools/xiao_rf_bench.py \

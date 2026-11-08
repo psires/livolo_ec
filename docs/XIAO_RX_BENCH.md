@@ -48,7 +48,8 @@ and that both radios are already idle. Post-open preflight is not a substitute
 for that condition. Both distinct endpoints are explicitly selected and
 exclusively opened. Settings
 are 115200 baud, MG24 DTR true, C6 DTR false and RTS false. Use Python 3.9+ and
-pyserial 3.5, with `decode_ec.py` and `xiao_rf_bench.py` beside the tool:
+pyserial 3.5, with `decode_ec.py`, `xiao_rf_bench.py` and `xiao_c6_serial.py`
+beside the tool. C6 uses the qualified combined line clear, with no stock fallback:
 
 ```sh
 python3 tools/xiao_rx_bench.py \
@@ -115,7 +116,7 @@ Close is not an explicit reset command, but OS/USB hangup effects require hardwa
 evidence. Lack of explicit buffer-reset calls does not bypass pyserial's internal
 behavior.
 
-Release Engineering verified three close/reopen cycles on the current fixture:
+Before the combined-line fix, Release Engineering verified three close/reopen cycles:
 C6 uptime restarted at 41 ms each time, then advanced to approximately 7044–7045
 ms within the same open session. RFHEALTH reported reset reason 11, the pinned
 SDK's `ESP_RST_USB`, with zero watchdog events and reported I/O errors. The close
@@ -125,6 +126,11 @@ unique cause in open, close or DTR. It does not establish the cause of the earli
 stall. The [public verification receipt](verification/xiao-rx-20261108.json)
 records the evidence and review outcome; these observations do not apply
 automatically to other hosts, USB connections or firmware builds.
+
+The subsequent [stock-versus-combined comparison](XIAO_C6_SERIAL.md) preserved
+uptime through three combined opens and both five-second closed gaps, while
+stock opens each reset to 41 ms. This bench now uses that combined helper for
+C6 only. The original stall remains separate and unresolved.
 
 Both `in_waiting` and `read` can raise EIO during re-enumeration. A stable by-id
 name does not repair an already open descriptor. The harness fails closed and

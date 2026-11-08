@@ -389,16 +389,13 @@ def main():
             with ExitStack() as stack:
                 links = []
                 for name in rf.BOARDS:
-                    port = serial.Serial(
-                        port=None,
-                        baudrate=115200,
-                        timeout=0,
-                        write_timeout=0.25,
-                        exclusive=True,
+                    port = rf.configured_port(
+                        name,
+                        getattr(args, name + "_port"),
+                        getattr(args, name + "_serial"),
+                        serial.Serial,
                     )
                     stack.callback(close, port, name)
-                    port.dtr, port.rts = rf.BOARDS[name][3], False
-                    port.port = getattr(args, name + "_port")
                     record("open_requested", name)
                     port.open()
                     record("open_returned", name)

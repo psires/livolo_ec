@@ -561,6 +561,7 @@ class RunnerTests(unittest.TestCase):
         """Only the two explicitly selected ports open with their observed DTR policy."""
         opened = []
         closed = []
+        selected_c6 = []
 
         def serial_factory(**kwargs):
             """Record serial configuration without importing or opening hardware.
@@ -576,7 +577,21 @@ class RunnerTests(unittest.TestCase):
             port.close = lambda: closed.append(port.port)
             return port
 
+        def c6_factory(path, usb_serial, *, mode):
+            """Require the combined helper while preserving ordinary factory fixtures.
+
+            @param path Exact persistent C6 path passed through by the CLI.
+            @param usb_serial Exact expected USB serial.
+            @param mode Must be combined, with no implicit stock fallback.
+            @return Closed fixture representing the reviewed helper.
+            """
+            selected_c6.append((path, usb_serial, mode))
+            port = serial_factory(port=None, exclusive=True, write_timeout=0.25)
+            port.port, port.dtr, port.rts = path, False, False
+            return port
+
         modules = {
+            "xiao_c6_serial": SimpleNamespace(C6Serial=c6_factory),
             "serial": SimpleNamespace(Serial=serial_factory),
             "serial.tools": SimpleNamespace(
                 list_ports=SimpleNamespace(comports=lambda: [])
@@ -620,6 +635,29 @@ class RunnerTests(unittest.TestCase):
             ],
         )
         self.assertEqual(len(closed), 2)
+        self.assertEqual(selected_c6, [("/dev/serial/by-id/c6", "esp", "combined")])
+
+    def test_c6_helper_failure_never_falls_back_to_ordinary_serial(self):
+        """A rejected combined helper cannot silently restore the resetting path."""
+        ordinary_calls = []
+        with patch.dict(
+            sys.modules,
+            {
+                "xiao_c6_serial": SimpleNamespace(
+                    C6Serial=lambda *a, **kw: (_ for _ in ()).throw(
+                        RuntimeError("rejected")
+                    )
+                )
+            },
+        ):
+            with self.assertRaisesRegex(RuntimeError, "rejected"):
+                bench.configured_port(
+                    "c6",
+                    "/dev/serial/by-id/c6",
+                    "esp",
+                    lambda **kw: ordinary_calls.append(kw),
+                )
+        self.assertEqual(ordinary_calls, [])
 
     def test_endpoint_identity_rejects_auto_selection_and_serial_mismatch(self):
         """Only the explicitly inventoried persistent endpoint may be opened later."""

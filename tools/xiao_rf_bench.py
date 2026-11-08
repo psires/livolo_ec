@@ -410,6 +410,30 @@ def verify_endpoint(path, serial_number, name, ports):
     return str(resolved)
 
 
+def configured_port(name, path, usb_serial, serial_factory):
+    """Build a closed bench port with the qualified C6 open sequence.
+
+    @param name Exact board key; never an automatically selected endpoint.
+    @param path Explicit persistent path already checked by the CLI inventory.
+    @param usb_serial Exact operator-provided USB serial, rechecked for C6 opens.
+    @param serial_factory Ordinary pyserial-compatible constructor for MG24 only.
+    @return Closed configured port; caller owns opening and guaranteed cleanup.
+    """
+    if name == "c6":
+        from xiao_c6_serial import C6Serial
+
+        return C6Serial(path, usb_serial, mode="combined")
+    if name != "mg24":
+        raise ValueError("Unknown bench board")
+    port = serial_factory(
+        port=None, baudrate=115200, timeout=0, write_timeout=0.25, exclusive=True
+    )
+    port.dtr = BOARDS[name][3]
+    port.rts = False
+    port.port = path
+    return port
+
+
 def run(
     links, nonce, evidence, clock=time.monotonic, sleep=time.sleep, *, mode="baseline"
 ):
@@ -675,17 +699,13 @@ def main():
             with ExitStack() as stack:
                 links = []
                 for name in BOARDS:
-                    port = serial.Serial(
-                        port=None,
-                        baudrate=115200,
-                        timeout=0,
-                        write_timeout=0.25,
-                        exclusive=True,
+                    port = configured_port(
+                        name,
+                        getattr(args, name + "_port"),
+                        getattr(args, name + "_serial"),
+                        serial.Serial,
                     )
                     stack.callback(port.close)
-                    port.dtr = BOARDS[name][3]
-                    port.rts = False
-                    port.port = getattr(args, name + "_port")
                     port.open()
                     links.append(Link(port, name))
                 nonce = f"{secrets.randbelow(0xFFFFFFFF) + 1:08x}"
