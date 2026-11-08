@@ -26,7 +26,7 @@ buffered; TX and parsing run in the main loop. Held RAIL RX packets are copied
 and released in bounded main-loop batches, retaining original FCS bytes.
 This transport is not yet qualified under sustained radio load.
 
-The `xiao-rx-2` diagnostic build implements read-only `RFHEALTH` with separate
+The `xiao-queue-1` diagnostic build preserves read-only `RFHEALTH` with separate
 32-bit modulo occurrence counts for failed packet holds, FIFO overflow, frame
 errors, invalid packet status/length, details lookup failure, invalid packet
 layout and calibration failure. Counts clear while inactive before each adapter
@@ -37,6 +37,14 @@ the existing single aggregate drop, and one frame may produce multiple hardware
 events. These are diagnostic occurrences, not an exact lost-packet denominator.
 The first failed packet predicate determines its adapter reason; release order,
 queue sizes, RX acceptance and aggregate drop policy are unchanged.
+
+`CAPS queue_diag=ring_v1` additionally exposes the shared core's `RFQUEUE`
+snapshot after STOP and complete event drain. It separates portable queue-full
+drops from the adapter reasons above and records producer-observed occupancy
+and adapter-timestamp-to-format age. These counters reset at setup and on a
+successful shared-core start. The UART remains at 115200 baud with seven usable
+receive slots; this build does not increase throughput or hide burst losses.
+See the [queue diagnostics contract](../../docs/XIAO_QUEUE_DIAGNOSTICS.md).
 
 Two 30-second passive windows received valid native reports from both the known
 one-gang and two-gang switches. The initial capture had 58 aggregate drops and

@@ -114,6 +114,23 @@ missing yield before the change and the bounded yield afterward; they are not
 proof of the earlier hardware stall's cause. Target validation is separately
 bounded and must retain uptime, watchdog, I/O and recovery evidence.
 
+The `xiao-usb-2` candidate retains that input-work limit and adds bounded output
+draining. Ready RF records suppress the ten-millisecond input wait; command
+replies and RF records receive alternating service under competing load. Output
+yields after four completed records, 1024 accepted bytes or sixteen attempts,
+whichever comes first, and immediately on zero/error writes. Partial output
+remains intact. Native tests exercise the real main loop with the target's
+100 Hz tick duration, including sustained mixed commands/RX, partial writes,
+backpressure and lease expiry while output is blocked.
+
+`CAPS queue_diag=ring_v1` exposes read-only queue overflow, producer-observed
+occupancy and adapter-timestamp age through `RFQUEUE` after STOP and core event
+drain. This is separate from `RFHEALTH` and does not alter the seven-slot queue,
+USB buffers, watchdog or PHY. See the
+[queue diagnostics contract](../../docs/XIAO_QUEUE_DIAGNOSTICS.md) for accounting
+and timing limits. Host-only tests do not establish complete RF capture or
+resolve the historical intermittent USB stall.
+
 The experimental host [C6 serial helper](../../docs/XIAO_C6_SERIAL.md) replaces
 separate DTR/RTS clears with one combined clear. The reviewed unchanged-firmware
 comparison preserved uptime across all three combined-mode opens and both

@@ -8,6 +8,10 @@ currently a supported Livolo gateway. This document
 tracks the remaining work; hardware findings belong to the linked verification
 records, not to the planned acceptance criteria below.
 
+The current experimental images add explicit receive-queue overflow evidence
+and bounded C6 output scheduling. RF capture qualification remains open;
+pairing and control are still gated on that work.
+
 ## Product scope and sequence
 
 Provide the same local Livolo gateway experience on both boards: standalone
@@ -399,3 +403,85 @@ contains audited measurements, artifact hashes and remaining qualification
 limits. Both XIAOs finished RF-off with their ports closed. No firmware was
 flashed, and existing radios, services, HA, releases and update catalogs were
 unchanged.
+
+### Queue diagnostics and output scheduling, November 8
+
+The MG24 `xiao-queue-1` and C6 `xiao-usb-2` images add read-only `RFQUEUE`
+telemetry after a verified stop and complete event drain. It records portable
+ring overflow directly, alongside enqueue/dequeue counts, producer-observed
+high-water and adapter-timestamp-to-format age. The ring still holds seven
+records. C6 now services ready radio output without the usual idle input wait,
+alternates command and event progress, and yields after bounded output work.
+MG24 UART scheduling and baud rate are unchanged. See the
+[queue diagnostics contract](XIAO_QUEUE_DIAGNOSTICS.md) for interpretation and
+offline regression checks.
+
+Both application updates passed complete flash readback. The programming
+payloads retained the original nonblank bytes following each new image inside
+its final erase page. Every byte outside the actual application image matched
+the fresh backup, including loaders, other application-page data and remaining
+flash. Radio configuration, CRC policy, USB buffers, watchdog, stack and console
+settings were unchanged.
+
+The updated C6 completed another ten-minute RF-off paced workload through one
+USB connection. Independent raw-log review accounted for all 3,014,585 accepted
+bytes and all 21 healthy samples, with continuous uptime, zero queue activity,
+zero unknown lines and a longest request of 9.122 ms. Firmware output-byte
+deltas also matched the raw response bytes between health samples. The scoped
+kernel query reported no USB events. This is a bounded-load result; it does not
+identify the historical intermittent stall's cause or qualify continuously
+ready input.
+
+The subsequent twelve 45-second passive windows completed with clean stops and
+transport accounting, but all twelve retained a **failed** capture assessment.
+MG24 accepted 6,223 records into the portable receive path, delivered 6,213 and
+reported ten explicit queue-full drops, all in one window. Its separate frame
+error count was 481. C6 accepted and delivered 5,049 records with zero queue-full
+drops. All 6,213 delivered MG24 frames passed independent original-FCS checks;
+C6's SDK does not retain those original bytes. C6 output counters matched all
+634,600 captured bytes between the audited health boundaries.
+
+The largest producer-observed queue occupancy was seven records on MG24 and
+six on C6. Maximum adapter-timestamp-to-format age was 101.806 ms on MG24 and
+19.481 ms on C6; the timestamp origins differ, and these values are not on-air
+latency. The observed C6 result is consistent with improved output service, but
+the earlier and current ambient traffic differ, so it is not a controlled
+measurement of the scheduling change's effect. MG24's UART burst-pressure
+limit and RF reception discrepancies remain open.
+
+Raw payload review found three distinct native reports seen by C6 but absent
+from MG24 well inside zero-overflow windows: two from `66780945` and one from
+`46715621`. Their application checksums and native-report classification were
+verified. A fourth absence was close to a capture boundary; a fifth occurred
+in the window with measured MG24 queue loss. Anonymous MG24 frame-error
+occurrences cannot identify which of these payloads, if any, they represent.
+
+Payload classification also exposed opposite capture imbalances. Across the
+eleven zero-overflow windows, excess MG24 observations concentrated in ten-byte
+command-format frames, while excess C6 observations concentrated in 39-byte
+reports. The inspected C6 adapter and pinned SDK receive-done path contain no
+explicit short-ACK or MAC-command rejection rule. Hardware rejection and SDK
+receive availability are not fully observed by the current counters. Equal
+payloads do not prove the same physical transmission attempt, and these
+measurements do not establish a filtering or RF cause.
+
+The final twelve-window synthetic experiment preserved the failed passive
+receipt and verified its exact stopped state before starting new channel-26
+windows. Each board completed all 240 scheduled transmissions. C6 captured
+239 MG24 test frames; MG24 captured all 240 C6 test frames. The one missing
+capture occurred with zero portable queue overflow and exact receive-delivery
+accounting. MG24 separately reported eleven frame errors. Five windows passed
+the strict assessment and seven failed. All 961 delivered MG24 frames,
+including unrelated channel-26 traffic, passed independent original-FCS checks;
+C6 output counters matched 116,336 captured bytes between health boundaries.
+The earlier run captured 234 and 236 test frames respectively, but differences
+between uncontrolled runs do not establish a causal improvement or a general
+loss rate.
+
+The [queue and scheduling verification record](verification/xiao-queues-20261108.json)
+retains the audited per-window evidence, artifact hashes and remaining gates.
+Both XIAOs finished RF-off, with serial ports and the MG24 probe closed and
+unowned. Existing radios, services and HA were not modified by this work.
+Pairing, control and release/update-catalog qualification remain on hold while
+MG24 output burst pressure and the remaining RF capture discrepancies are
+investigated.

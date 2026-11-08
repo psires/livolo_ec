@@ -33,6 +33,12 @@ The CLI observation window is 30–45 seconds, default 30, beginning after both
 receivers enter passive mode. Identity/admission/status requests have two-second
 budgets. Cleanup sends RFSTOP once per owned window, drains for 200 ms and checks
 inactive channel-11 passive status. Stop/final-status budgets are one second.
+When CAPS advertises `queue_diag=ring_v1`, cleanup also reads RFQUEUE and
+reconciles accepted, queued, formatted and independently delivered counts.
+Legacy absence is recorded as unavailable, never inferred as zero overflow;
+unknown advertised contracts or inconsistent snapshots fail the run. Measured
+queue loss still fails the strict capture assessment. See the
+[queue contract](XIAO_QUEUE_DIAGNOSTICS.md) for the exact accounting limits.
 The tool checks admission elapsed time before observing, reserving four seconds
 for end-of-window checks and targeting STOP before 55 seconds from the first
 start request. It aborts rather than silently shortening a requested window when

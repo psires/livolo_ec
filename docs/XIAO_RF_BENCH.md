@@ -170,11 +170,18 @@ performance, production timing, lease/watchdog behavior under a physically stall
 host, long-duration load, pairing, outputs or daemon readiness. Both boards retain
 the zero gateway capabilities until separately accepted.
 
+For `queue_diag=ring_v1` endpoints, cleanup additionally records RFQUEUE after
+STOP and event drain, checking its counter contract and reconciliation against
+independent receive events. Legacy firmware records queue evidence as
+unavailable; an advertised but missing or malformed response fails cleanup.
+These observations do not relax the strict pass criteria above. See the
+[queue contract](XIAO_QUEUE_DIAGNOSTICS.md).
+
 ## Offline regression command
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tools \
-  python3 -m unittest test_xiao_rf_bench -v
+  python3 -m unittest test_xiao_rf_bench test_xiao_queue_bench -v
 ```
 
 The tests exercise the actual runner with virtual time, fragmented and stalled
