@@ -2,6 +2,9 @@
 
 from copy import deepcopy
 import asyncio
+import json
+from pathlib import Path
+from string import Formatter
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -13,14 +16,32 @@ from custom_components.livolo_ec._client.bootstrap import BootstrapError
 from custom_components.livolo_ec.bootstrap_flow import BootstrapFlowMixin
 
 
+def assert_radio_placeholders(result):
+    """Match real form values to both new-hub/options templates and their English translation.
+
+    @param result Actual radio form result with its step and description placeholders.
+    """
+    root = Path(__file__).resolve().parents[2] / "custom_components/livolo_ec"
+    expected = set(result["description_placeholders"])
+    for filename in ("strings.json", "translations/en.json"):
+        content = json.loads((root / filename).read_text())
+        for section in ("config", "options"):
+            description = content[section]["step"][result["step_id"]]["description"]
+            actual = {
+                field for _, field, _, _ in Formatter().parse(description) if field
+            }
+            assert actual == expected, (filename, section, result["step_id"])
+
+
 class PhysicalContractFixture:
     """Model HTTP-client responses only; real-controller loopback tests are separate."""
 
-    def __init__(self, network="2a992b12:a7", mode="gateway"):
+    def __init__(self, network="2a992b12:a7", mode="gateway", profile="zb-gw04-1v2"):
         """Create deterministic metadata with no device or serial dependency.
 
         @param network Existing network identity, or None for initial setup.
         @param mode Initial service mode.
+        @param profile Exact board advertised consistently across the setup contract.
         """
         self.meta = dict(
             instance_id="physical-instance",
@@ -29,7 +50,7 @@ class PhysicalContractFixture:
             prepare_supported=True,
             enter_supported=mode == "gateway",
             initialize_supported=network is None,
-            profile="zb-gw04-1v2",
+            profile=profile,
             expected_network_id=network,
             active_request_id=None,
             latest_request_id=None,
@@ -39,7 +60,7 @@ class PhysicalContractFixture:
         )
         self.target = dict(
             target_id="radio-1",
-            board="zb-gw04-1v2",
+            board=profile,
             label="Test radio",
             candidate_id="image-1",
             version="0.14",
@@ -51,7 +72,7 @@ class PhysicalContractFixture:
             instance_id="physical-instance",
             target_id="radio-1",
             candidate_id="image-1",
-            profile="zb-gw04-1v2",
+            profile=profile,
             version="0.14",
             artifact_sha256="a" * 64,
             expires_at=2_000_000_000,
@@ -146,7 +167,7 @@ class PhysicalContractFixture:
             )
             self.meta.update(mode="gateway", enter_supported=True)
         elif operation == "cancel":
-            if self.meta["expected_network_id"]:
+            if self.meta["baseline_available"]:
                 result.update(network_ready=True)
                 self.meta.update(mode="gateway", enter_supported=True)
             else:
@@ -469,15 +490,17 @@ async def test_known_zha_port_conflict_blocks_inspection(hass, setup_gateway):
     assert conflict.disabled_by is None
 
 
+@pytest.mark.parametrize("profile", ["zb-gw04-1v2", "sonoff-zbdongle-e"])
 async def test_new_hub_requires_initialization_handoff_and_real_readiness(
-    hass, envelope
+    hass, envelope, profile
 ):
     """A bootstrap instance cannot become a hub until explicit initialization and normal ready agreement.
 
     @param hass Actual HA instance.
     @param envelope Normal-network snapshot supplied only after handoff.
+    @param profile Exact board whose independent instructions precede inspection.
     """
-    physical = PhysicalContractFixture(network=None, mode="bootstrap")
+    physical = PhysicalContractFixture(network=None, mode="bootstrap", profile=profile)
     native = SimpleNamespace(
         info=AsyncMock(
             return_value={
@@ -507,6 +530,17 @@ async def test_new_hub_requires_initialization_handoff_and_real_readiness(
             },
         )
         assert result["step_id"] == "radio_select"
+        assert not physical.meta["baseline_available"]
+        assert_radio_placeholders(result)
+        native.info.assert_not_awaited()
+        native.snapshot.assert_not_awaited()
+        instructions = result["description_placeholders"]["instructions"]
+        if profile == "sonoff-zbdongle-e":
+            assert "release both buttons together" in instructions
+            assert "three seconds" not in instructions
+            assert result["description_placeholders"]["board"] == "Sonoff ZBDongle-E"
+        else:
+            assert "three seconds" in instructions
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
             {
@@ -516,6 +550,11 @@ async def test_new_hub_requires_initialization_handoff_and_real_readiness(
                 "bootloader_ready": True,
             },
         )
+        assert (
+            "No previous Livolo gateway"
+            in result["description_placeholders"]["network_effect"]
+        )
+        assert_radio_placeholders(result)
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"confirmed": True, "dedicated_radio": True}
         )
@@ -526,6 +565,8 @@ async def test_new_hub_requires_initialization_handoff_and_real_readiness(
         )
         assert result["step_id"] == "radio_handoff"
         assert hass.config_entries.async_entries("livolo_ec") == []
+        native.info.assert_not_awaited()
+        native.snapshot.assert_not_awaited()
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], {"confirmed": True}
         )
@@ -791,3 +832,120 @@ async def test_engineering_image_warning_precedes_explicit_install(
     assert result["step_id"] == "radio_review"
     assert result["description_placeholders"]["qualification"] == warning
     assert [kind for kind, _ in setup_gateway.physical.calls] == ["enter", "prepare"]
+
+
+@pytest.mark.parametrize("network", [None, "2a992b12:a7"])
+async def test_sonoff_cancel_without_baseline_never_claims_restoration(hass, network):
+    """First setup cancellation creates no hub or gateway probe, even with configured network values.
+
+    @param hass Actual HA instance.
+    @param network Optional daemon configuration, which is not a verified gateway baseline.
+    """
+    physical = PhysicalContractFixture(
+        network=network, mode="bootstrap", profile="sonoff-zbdongle-e"
+    )
+    physical.meta["baseline_available"] = False
+    native = SimpleNamespace(
+        info=AsyncMock(side_effect=AssertionError("No gateway before setup")),
+        snapshot=AsyncMock(side_effect=AssertionError("No gateway before setup")),
+    )
+    with (
+        patch(
+            "custom_components.livolo_ec.bootstrap_flow.BootstrapClient",
+            return_value=physical,
+        ),
+        patch("custom_components.livolo_ec.bootstrap_flow.Client", return_value=native),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            "livolo_ec",
+            context={"source": "user"},
+            data={
+                "url": "http://new.invalid:8090",
+                "token": "secret",
+                "setup_radio": True,
+            },
+        )
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"cancel_setup": True}
+        )
+        assert result["step_id"] == "radio_cancel"
+        instructions = result["description_placeholders"]["instructions"]
+        assert_radio_placeholders(result)
+        assert "No previous Livolo gateway was verified" in instructions
+        assert "does not restore" in instructions
+        assert "No BOOT/RESET action" in instructions
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {"confirmed": True}
+        )
+        assert result["type"] == "abort"
+        assert result["reason"] == "bootstrap_cancelled"
+        assert hass.config_entries.async_entries("livolo_ec") == []
+        assert [kind for kind, _ in physical.calls] == ["cancel"]
+        native.info.assert_not_awaited()
+        native.snapshot.assert_not_awaited()
+
+
+@pytest.mark.parametrize("mismatch", ["unknown", "target", "changed", "plan"])
+async def test_exact_board_instructions_cannot_authorize_other_profile(
+    hass, setup_gateway, mismatch
+):
+    """Unknown, mixed or changed board identities never reach an installation review.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Existing hub with server-advertised physical setup evidence.
+    @param mismatch Board substitution before selection, after display or in the prepared plan.
+    """
+    physical = setup_gateway.physical
+    physical.meta.update(mode="bootstrap", enter_supported=False, cancel_supported=True)
+    if mismatch == "unknown":
+        physical.meta["profile"] = physical.target["board"] = "unreviewed-board"
+    elif mismatch == "target":
+        physical.target["board"] = "sonoff-zbdongle-e"
+    result = await open_setup(hass, setup_gateway.entry)
+    if mismatch in ("unknown", "target"):
+        assert result["errors"] == {"base": "bootstrap_unavailable"}
+        assert physical.calls == []
+        return
+    assert result["step_id"] == "radio_select"
+    if mismatch == "changed":
+        physical.meta["profile"] = "sonoff-zbdongle-e"
+    else:
+        physical.plan["profile"] = "sonoff-zbdongle-e"
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            "target_id": "radio-1",
+            "board_confirmed": True,
+            "dedicated_radio": True,
+            "bootloader_ready": True,
+        },
+    )
+    assert result["errors"] == {"base": "bootstrap_incompatible"}
+    assert [kind for kind, _ in physical.calls] == (
+        ["prepare"] if mismatch == "plan" else []
+    )
+
+
+async def test_sonoff_existing_gateway_cancel_uses_its_own_buttons(hass, setup_gateway):
+    """Cancelling a real Sonoff gateway uses Sonoff instructions without ZB-GW04 timing.
+
+    @param hass Actual HA instance.
+    @param setup_gateway Existing gateway fixture with a verified baseline.
+    """
+    physical = setup_gateway.physical
+    physical.meta.update(
+        mode="bootstrap",
+        enter_supported=False,
+        cancel_supported=True,
+        profile="sonoff-zbdongle-e",
+    )
+    physical.target["board"] = physical.plan["profile"] = "sonoff-zbdongle-e"
+    result = await open_setup(hass, setup_gateway.entry)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"cancel_setup": True}
+    )
+    instructions = result["description_placeholders"]["instructions"]
+    assert "release both buttons together" in instructions
+    assert "three seconds" not in instructions
+    assert "previous firmware before resuming" in instructions
+    assert physical.calls == []

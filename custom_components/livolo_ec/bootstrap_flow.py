@@ -17,6 +17,20 @@ from ._client.bootstrap import BootstrapClient, BootstrapError
 from .bootstrap_observer import observer_for
 from .const import CONF_TOKEN, CONF_URL
 
+BOARD_INSTRUCTIONS = {
+    "zb-gw04-1v2": (
+        "ZB-GW04 1v2",
+        "Keep USB power connected. Hold BOOT, press and release RESET, "
+        "keep holding BOOT for three seconds, then release.",
+    ),
+    # SONOFF's ZBDongle-E flashing guide specifies releasing both buttons together.
+    "sonoff-zbdongle-e": (
+        "Sonoff ZBDongle-E",
+        "Keep USB power connected. Hold BOOT, press RESET, then release both "
+        "buttons together. Use the ZBDongle-E model identified on its label.",
+    ),
+}
+
 
 def display(value):
     """Escape bounded public text before rendering it inside HA Markdown.
@@ -137,6 +151,8 @@ class BootstrapFlowMixin:
                 for key in ("target_id", "candidate_id", "artifact_sha256", "version")
             ):
                 raise IncompatibleError("Prepared image or target changed")
+            if selection and plan["profile"] != selection["board"]:
+                raise IncompatibleError("Prepared board changed")
             fields["plan"] = plan
         if kind == "install":
             plan = state.get("plan")
@@ -241,6 +257,11 @@ class BootstrapFlowMixin:
             return self._radio_progress(result)
         if result["kind"] == "prepare":
             plan = result["plan"]
+            if (
+                plan["profile"] not in BOARD_INSTRUCTIONS
+                or plan["profile"] != info["profile"]
+            ):
+                raise BootstrapError("unsupported_board_instructions")
             self._radio_reviewed_plan = plan["plan_id"]
             return self._radio_form(
                 "radio_review",
@@ -251,6 +272,13 @@ class BootstrapFlowMixin:
                 },
                 board=plan["profile"],
                 version=plan["version"],
+                network_effect=(
+                    "Your existing Livolo network and paired devices are retained."
+                    if info.get("baseline_available") is True
+                    else "No previous Livolo gateway was verified. This replaces the "
+                    "current application, including sniffer firmware. HA adds this hub "
+                    "only after separate network setup and verification."
+                ),
                 qualification=(
                     "Engineering test only; not a qualified public firmware release"
                     if any(
@@ -390,8 +418,8 @@ class BootstrapFlowMixin:
             raise BootstrapError(
                 choices["blocked_reason"] or "no_supported_radio_or_image"
             )
-        if info["profile"] != "zb-gw04-1v2" or any(
-            item["board"] != "zb-gw04-1v2" for item in choices["targets"]
+        if info["profile"] not in BOARD_INSTRUCTIONS or any(
+            item["board"] != info["profile"] for item in choices["targets"]
         ):
             raise BootstrapError("unsupported_board_instructions")
         self._radio_choices = {item["target_id"]: item for item in choices["targets"]}
@@ -409,6 +437,8 @@ class BootstrapFlowMixin:
                 vol.Required("dedicated_radio", default=False): bool,
                 vol.Required("bootloader_ready", default=False): bool,
             },
+            board=BOARD_INSTRUCTIONS[info["profile"]][0],
+            instructions=BOARD_INSTRUCTIONS[info["profile"]][1],
         )
 
     async def async_step_radio_select(self, user_input=None):
@@ -435,7 +465,14 @@ class BootstrapFlowMixin:
                     raise IncompatibleError("Select a currently displayed radio")
                 info = await self._radio_info(client, observer)
                 choices = await client.targets(info["instance_id"])
-                if selected not in choices["targets"]:
+                if (
+                    selected not in choices["targets"]
+                    or info["profile"] != selected["board"]
+                    or selected["board"] not in BOARD_INSTRUCTIONS
+                    or any(
+                        item["board"] != info["profile"] for item in choices["targets"]
+                    )
+                ):
                     raise IncompatibleError("Radio or image selection changed")
                 for configured in self.hass.config_entries.async_entries("zha"):
                     device = configured.data.get("device")
@@ -612,20 +649,27 @@ class BootstrapFlowMixin:
                 info = await self._radio_info(client, observer)
                 if info.get("cancel_supported") is not True:
                     raise BootstrapError("safe_cancel_unavailable")
+                if info.get("baseline_available") is True:
+                    board = BOARD_INSTRUCTIONS.get(info["profile"])
+                    if board is None:
+                        raise BootstrapError("unsupported_board_instructions")
+                    instructions = (
+                        board[1] + " Confirm only after this sequence. The daemon "
+                        "checks the bootloader and previous firmware before resuming "
+                        "your existing hub. No firmware catalog or installation is needed."
+                    )
+                else:
+                    instructions = (
+                        "No previous Livolo gateway was verified. Cancellation leaves "
+                        "setup unfinished and creates no HA hub. It does not restore "
+                        "or verify the previous sniffer or other application. No "
+                        "BOOT/RESET action is needed to cancel this setup."
+                    )
                 self._radio_cancel_review_id = uuid.uuid4().hex
                 return self._radio_form(
                     "radio_cancel",
                     {vol.Required("confirmed", default=False): bool},
-                    instructions=(
-                        "Keep USB power connected. Hold BOOT, press and release RESET, "
-                        "keep holding BOOT for three seconds, then release. Confirm "
-                        "only after this sequence. The daemon checks the bootloader "
-                        "and previous firmware before resuming your existing hub. "
-                        "No firmware catalog or installation is needed."
-                        if info["expected_network_id"] is not None
-                        else "No network is configured. Cancellation leaves this radio "
-                        "unconfigured and creates no HA hub. No BOOT/RESET action is needed."
-                    ),
+                    instructions=instructions,
                 )
         except (LivoloError, OSError) as error:
             return self._radio_failure(error)
