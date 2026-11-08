@@ -14,7 +14,7 @@ import zipfile
 
 from firmware_release import UPDATE_CHECKS, archive, verify_installed
 from project_version import synchronize
-from release_versions import source_versions
+from release_versions import app_config_version, source_versions
 from test_firmware_release import PublicReleaseTests
 import container_prepare
 import package_standalone
@@ -50,6 +50,12 @@ def exercise(output):
             snapshot.extractall(source, filter="data")
         (source / "VERSION").write_text("0.12\n")
         synchronize(source, "radio")
+        versions = source_versions(source)
+        release = versions["distribution_version"]
+        # Exercise independent app/integration identities only in this fixture.
+        app_version = "0.0.1" if release != "0.0.1" else "0.0.2"
+        app_config = source / "homeassistant/app/config.yaml"
+        app_config.write_text(app_config_version(app_config.read_text(), app_version))
         archive_sha = archive(
             bundle,
             output / "NEVER-DEPLOY-fixture.tar.gz",
@@ -85,8 +91,6 @@ def exercise(output):
         commit = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=source, text=True
         ).strip()
-        versions = source_versions(source)
-        release = versions["distribution_version"]
         package_standalone.ROOT = source
         metadata = package_standalone.package(commit, output / "standalone", bundle)
         assert metadata["firmware_release"]["board_count"] == 4
@@ -128,10 +132,21 @@ def exercise(output):
                 member.name.endswith("/FIRMWARE-LICENSES.txt")
                 for member in package.getmembers()
             )
-        package_release.package(source, release, commit, output / "ha", bundle)
+        package_release.package(
+            source, release, commit, output / "ha", bundle, scope="integration-and-app"
+        )
+        ha_metadata = json.loads((output / "ha/release.json").read_text())
+        assert ha_metadata["integration_version"] == release
+        assert ha_metadata["app_version"] == app_version
+        app_archive = output / "ha" / f"livolo-ec-ha-app-{app_version}-source.tar.gz"
+        with tarfile.open(app_archive) as package:
+            assert (
+                package.extractfile("livolo_ec/config.yaml").read()
+                == app_config.read_bytes()
+            )
         for path in (
             output / "standalone" / f"livolo-ec-{release}-standalone.tar.gz",
-            output / "ha" / f"livolo-ec-ha-app-{release}-source.tar.gz",
+            app_archive,
         ):
             with tarfile.open(path) as package:
                 assert not any(
