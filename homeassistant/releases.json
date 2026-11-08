@@ -33,6 +33,13 @@
     "version": "0.5.1",
     "tag": "ha-0.5.1",
     "commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
-    "latest": true
+    "latest": false
+  },
+  {
+    "version": "0.5.2",
+    "tag": "ha-0.5.2",
+    "commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
+    "latest": true,
+    "scope": "integration-only"
   }
 ]
