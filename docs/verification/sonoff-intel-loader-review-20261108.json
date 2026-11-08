@@ -1,0 +1,183 @@
+{
+  "schema": 1,
+  "evidence_id": "sonoff-intel-loader-review-20261108",
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Proposed exact-unit engineering security expectation; not a fresh loader observation or public qualification",
+  "review_status": "accepted_scoped_historical_security_expectation",
+  "board": "sonoff-zbdongle-e",
+  "unit_binding": {
+    "scope": "Only the previously exercised genuine Sonoff unit selected for the Intel trial",
+    "raw_identity_location": "Protected operator target policy; deliberately omitted from this public record",
+    "required_fields": [
+      "serial",
+      "usb_path",
+      "attachment",
+      "interface",
+      "device_number",
+      "port",
+      "board",
+      "vid",
+      "pid"
+    ],
+    "operator_must_match_historical_unit": true,
+    "identity_is_not_cryptographic_authentication": true
+  },
+  "expected_loader": {
+    "kind": "gecko",
+    "version": "2.4.2",
+    "baud": 115200,
+    "accepted_wire_versions": [
+      "2.04.02",
+      "2.4.2"
+    ],
+    "requires_signed": false,
+    "requires_encrypted": false,
+    "basis": "Engineering inference from this unit previously accepting and running unsigned, unencrypted application-only images",
+    "security_configuration_read_back": false,
+    "unchanged_loader_bytes_proven": false,
+    "fresh_menu_alone_proves_security_flags": false
+  },
+  "historical_evidence": [
+    {
+      "date": "2026-10-24",
+      "application": "gateway",
+      "version": "0.4",
+      "application_baud": 460800,
+      "gbl_sha256": "b999bf4e3e9c128c20ec13cc058e1e889a3a5dc480d8487dc91c8cf02f73930e",
+      "recorded_application_only": true,
+      "recorded_unsigned": true,
+      "reported_loader_version": "2.4.2",
+      "reported_loader_baud": 115200,
+      "recorded_successful_application_operation": true,
+      "recorded_software_bootloader_entry": true
+    },
+    {
+      "date": "2026-11-01",
+      "application": "passive_sniffer",
+      "version": "0.12",
+      "application_baud": 921600,
+      "gbl_sha256": "c9d5bb865ab6734c9c739a36bcc4a71139ab7fcc01090e5a55371f1378e1896d",
+      "gbl_size": 37952,
+      "retained_image_repackages_identically": true,
+      "gbl_tag_ids": [
+        "0x03a617eb",
+        "0xf40a0af4",
+        "0xfe0101fe",
+        "0xfc0404fc"
+      ],
+      "signed": false,
+      "encrypted": false,
+      "bootloader_included": false,
+      "recorded_flash_completion_and_following_operation": true,
+      "flash_log_reports_loader_version": "2.4.2",
+      "subsequent_crc_valid_status_records": 180,
+      "subsequent_captured_frames": 1636,
+      "subsequent_stream_crc_errors": 0,
+      "subsequent_sequence_gaps": 0
+    }
+  ],
+  "source_records": [
+    {
+      "path": "analysis/development/sonoff-migration-20261024.md",
+      "sha256": "62c9a20f2cbdc3c51cb34c2414a854c658b9bb7fde9aef6dfd0dbcce40a74c9c"
+    },
+    {
+      "path": "host/verification/deployment-sonoff-20261024.json",
+      "sha256": "f493ef244899a924c23bd092bbe10a28d4231b9b8599140cdf334ee0a970b49a"
+    },
+    {
+      "path": "analysis/development/sonoff-sniffer-20261101.md",
+      "sha256": "43a6f7e0bd03246c4f9d786efd6cec0b1248aa93bb92df319d0e1e24e0d4cfbb"
+    },
+    {
+      "path": "analysis/development/sonoff-sniffer-20261101/image.json",
+      "sha256": "edc9bb933fb7c9f9f58cbced6109c4ed38c8bac2f602418bd25fd088b7abd16e"
+    },
+    {
+      "path": "analysis/development/sonoff-sniffer-20261101/flash.log",
+      "sha256": "a822f6b4bd13250996e443ec163296d2c0dbdea9a33bf350aca435219f6d0741"
+    },
+    {
+      "path": "analysis/development/sonoff-sniffer-20261101/transport.json",
+      "sha256": "10669e28444373643f3354173ed5d70af356c1a89896ce21a68fba3137a80ea9"
+    }
+  ],
+  "candidate": {
+    "board": "sonoff-zbdongle-e",
+    "version": "0.14",
+    "protocol": 3,
+    "application_baud": 460800,
+    "source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
+    "sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+    "size": 60572,
+    "qualified": false,
+    "offline_evidence": "docs/verification/sonoff-guided-offline-20261108.json"
+  },
+  "reviewed_implementation_commit": "40c3f3e73d32b6de2030117cb3cc3895907fe341",
+  "required_fresh_prepare_evidence": [
+    "Current protected target exactly matches the reviewed historical unit and attachment",
+    "Explicit HA Prepare consent for sonoff_sniffer_0_12",
+    "At least two fresh CRC-valid strict ESN1 statuses: exact Sonoff marker, version0.12, baud921600, progressing sequence and timestamps",
+    "Input reset and bounded observation exclude cached status bursts",
+    "Durable bootloader_entry permission precedes one fixed software-entry command on the held descriptor",
+    "Complete expected Gecko menu at115200, with no version, target or security contradiction",
+    "A prepared plan is issued only after all required checks; Install remains separately authorized"
+  ],
+  "fresh_evidence_status": {
+    "ha_prepare_sniffer_proof_observed": false,
+    "ha_prepare_loader_menu_observed": false,
+    "new_application_installed": false,
+    "new_application_postflight_verified": false,
+    "security_configuration_read_back": false
+  },
+  "limits": [
+    "Historical transfer acceptance supports a scoped expectation, not a current security-register measurement",
+    "A matching loader menu cannot prove unchanged loader bytes or current signing/encryption enforcement",
+    "Stop on identity, menu, version or security contradictions; do not upload speculatively to discover policy",
+    "No general eligibility for other Sonoff units, batches or firmware versions",
+    "No exact factory application/configuration backup and no automatic rollback claim",
+    "No HA-guided install, interrupted-flash recovery or RF qualification is established by this record",
+    "This public evidence file alone neither activates a private policy nor authorizes a firmware write"
+  ],
+  "live_actions_by_this_review": 0,
+  "operator_report_20261108": {
+    "source": "Linux specialist confirmation from previously collected metadata and original tool output; no new live collection",
+    "protected_metadata_path": "/storage/livolo-testbed/ha-private/sonoff-metadata.json",
+    "selected_serial_matches_historical_migration_record": true,
+    "previous_passive_observation_seconds": 5,
+    "previous_crc_valid_status_records": 5,
+    "reported_version": "0.12",
+    "reported_baud": 921600,
+    "reported_marker": "EC-MG21-BOARD=sonoff-zbdongle-e",
+    "status_output_saved_as_evidence_file": false,
+    "status_file_hash_available": false,
+    "replaces_fresh_ha_prepare_proof": false
+  },
+  "reviews": {
+    "release_engineering": {
+      "date_local": "2026-11-08",
+      "decision": "accepted_scoped_historical_security_expectation",
+      "condition": "Linux operator verifies exact protected target matches the historical unit and current attachment",
+      "independent_checks": [
+        "All six historical source-record hashes match",
+        "Retained sniffer GBL SHA-256 matches",
+        "Plain GBL header flags and exact four application-only tags verified",
+        "Fresh HA proof/menu/install/security-readback claims remain false",
+        "Earlier five-status observation has no saved status file/hash"
+      ]
+    },
+    "technical_lead": {
+      "date_local": "2026-11-08",
+      "decision": "accepted_scoped_historical_security_expectation",
+      "conditions": [
+        "Only the historical Sonoff unit; bind current serial, topology, interface, full attachment generation and device identity",
+        "Stop on identity, loader menu, version or security contradictions",
+        "Private policy may be admitted before Prepare only after final40c3f3e image, native and CI gates are confirmed",
+        "Prepare must obtain fresh strict sniffer identity and complete matching loader menu before any plan",
+        "Separate explicit Install remains mandatory; qualified remains false"
+      ],
+      "security_readback_or_unchanged_loader_claim": false
+    }
+  }
+}
