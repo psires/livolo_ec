@@ -20,8 +20,16 @@ void esp_task_wdt_isr_user_handler(void);
 static jmp_buf finished;
 static uint32_t clock_us;
 static unsigned reads, writes, starts, stops, sends, injected;
-enum scenario_kind { NORMAL, STALLED, PASSIVE, HEALTH };
+enum scenario_kind {
+	NORMAL,
+	STALLED,
+	PASSIVE,
+	HEALTH,
+	FLOOD_EMPTY,
+	FLOOD_OVERLONG
+};
 static enum scenario_kind kind;
+static unsigned flood_bytes, bytes_at_delay, flood_delays;
 static size_t input_used, output_used;
 static char output[1024];
 static const char *input, *expected;
@@ -136,6 +144,12 @@ void esp_log_level_set(const char *tag, int level)
 
 void vTaskDelay(uint32_t ticks)
 {
+	if (kind == FLOOD_EMPTY || kind == FLOOD_OVERLONG) {
+		assert(ticks == 1);
+		assert(flood_bytes - bytes_at_delay <= 256);
+		bytes_at_delay = flood_bytes;
+		flood_delays++;
+	}
 	clock_us += ticks * 1000;
 	assert(clock_us < 1000000);
 	if (kind == STALLED && stops) {
@@ -151,6 +165,15 @@ int usb_serial_jtag_read_bytes(void *buffer, size_t length, uint32_t ticks)
 	size_t remaining = strlen(input) - input_used;
 
 	assert(++reads < 100);
+	if ((kind == FLOOD_EMPTY || kind == FLOOD_OVERLONG) &&
+	    flood_bytes < 4096) {
+		/* Immediately ready input must not indefinitely starve idle work. */
+		assert(flood_bytes - bytes_at_delay < 256);
+		assert(length == 64);
+		memset(buffer, kind == FLOOD_EMPTY ? '\n' : 'x', length);
+		flood_bytes += length;
+		return (int)length;
+	}
 	if (remaining) {
 		if (kind == HEALTH) {
 			esp_task_wdt_isr_user_handler();
@@ -160,6 +183,12 @@ int usb_serial_jtag_read_bytes(void *buffer, size_t length, uint32_t ticks)
 		memcpy(buffer, input + input_used, remaining);
 		input_used += remaining;
 		return (int)remaining;
+	}
+	if (kind == FLOOD_EMPTY || kind == FLOOD_OVERLONG) {
+		assert(flood_delays >= 16);
+		assert(!starts && !stops && !sends);
+		assert(!strcmp(output, "RSP 1 OK EC-GATEWAY 3\n"));
+		longjmp(finished, 1);
 	}
 	if (kind == HEALTH) {
 		assert(!starts && !stops && !sends);
@@ -213,16 +242,19 @@ int usb_serial_jtag_write_bytes(const void *buffer, size_t length,
 }
 
 /** @brief Run each real-loop scenario with independent synthetic boot state.
- * @param selected Select normal TX, stalled output, passive RX or RF-off health.
+ * @param selected Select an RF, health or continuous-input scheduling scenario.
  */
 static void scenario(enum scenario_kind selected)
 {
 	clock_us = reads = writes = starts = stops = sends = injected = 0;
 	input_used = output_used = 0;
+	flood_bytes = bytes_at_delay = flood_delays = 0;
 	kind = selected;
 	input = kind == HEALTH	  ? "1 RFHEALTH\n"
 		: kind == PASSIVE ? passive_input
-				  : synthetic_input;
+		: (kind == FLOOD_EMPTY || kind == FLOOD_OVERLONG)
+			? "\n1 PING\n"
+			: synthetic_input;
 	expected = kind == PASSIVE ? passive_expected : synthetic_expected;
 	output[0] = '\0';
 	if (!setjmp(finished)) {
@@ -267,8 +299,8 @@ static void test_health_evidence(void)
 	assert(strstr(report, "task_wdt_events=1 "));
 }
 
-/** @brief Verify RF bounds and diagnostic evidence through the actual USB loop.
- * @return Zero after synthetic, passive, stalled-output and health checks pass.
+/** @brief Verify RF bounds, diagnostic evidence and fair input scheduling.
+ * @return Zero after radio, stalled-output, health and input-flood checks pass.
  */
 int main(void)
 {
@@ -276,7 +308,9 @@ int main(void)
 	scenario(STALLED);
 	scenario(PASSIVE);
 	scenario(HEALTH);
+	scenario(FLOOD_EMPTY);
+	scenario(FLOOD_OVERLONG);
 	test_health_evidence();
-	puts("ESP32-C6 RF events, passive RX, health and blocked USB: PASS");
+	puts("ESP32-C6 RF, health, blocked USB and input fairness: PASS");
 	return 0;
 }

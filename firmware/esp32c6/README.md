@@ -104,3 +104,19 @@ line, kernel operation or electrical edge, or explain the original stall.
 Serial open is therefore not guaranteed to preserve prior MCU state, even with
 DTR/RTS configured false. See the
 [passive reception receipt](../../docs/verification/xiao-rx-20261108.json).
+
+The `xiao-usb-1` candidate adds a voluntary one-tick scheduling yield after at
+most 256 consumed input bytes. This bounds main-task monopolization when input
+is continuously available, including newline-only and overlength streams that
+produce no response. It does not change the watchdog, console, stack size or SDK
+configuration. Native tests exercise the actual USB loop and demonstrate the
+missing yield before the change and the bounded yield afterward; they are not
+proof of the earlier hardware stall's cause. Target validation is separately
+bounded and must retain uptime, watchdog, I/O and recovery evidence.
+
+The experimental host [C6 serial helper](../../docs/XIAO_C6_SERIAL.md) replaces
+separate DTR/RTS clears with one combined clear. The reviewed unchanged-firmware
+comparison preserved uptime across all three combined-mode opens and both
+five-second closed gaps, while stock opens each reset uptime. This addresses the
+tested reopen-reset mechanism independently of the scheduling change. It does
+not establish universal host/USB behavior or resolve the original stall by itself.

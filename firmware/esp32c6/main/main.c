@@ -21,6 +21,7 @@ void app_main(void)
 	char response[640];
 	uint8_t input[64];
 	size_t pending = 0, sent = 0;
+	unsigned input_budget = 0;
 	int count = 0, consumed = 0;
 
 	esp_log_level_set("*", ESP_LOG_NONE);
@@ -34,7 +35,7 @@ void app_main(void)
 #ifdef EC_RF_DIAGNOSTICS
 	ec_rf_setup(&ec_c6_rf_ops);
 	parser.radio_command = ec_rf_command;
-	parser.build = "xiao-rx-1";
+	parser.build = "xiao-usb-1";
 #endif
 	for (;;) {
 #ifdef EC_RF_DIAGNOSTICS
@@ -52,6 +53,7 @@ void app_main(void)
 			if (written > 0)
 				sent += written;
 			vTaskDelay(1);
+			input_budget = 0;
 			continue;
 		}
 		pending = sent = 0;
@@ -65,6 +67,7 @@ void app_main(void)
 			if (count < 0) {
 				count = 0;
 				vTaskDelay(1);
+				input_budget = 0;
 			}
 		}
 		if (count > consumed) {
@@ -72,6 +75,11 @@ void app_main(void)
 				&parser, input[consumed++], response,
 				sizeof(response));
 			sent = 0;
+			/* Ready, reply-free input must still allow the idle task to run. */
+			if (++input_budget == 256) {
+				vTaskDelay(1);
+				input_budget = 0;
+			}
 		}
 #ifdef EC_RF_DIAGNOSTICS
 		if (!pending) {
