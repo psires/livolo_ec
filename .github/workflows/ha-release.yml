@@ -31,7 +31,10 @@ jobs:
           assert releases and len({r['tag'] for r in releases}) == len(releases)
           assert sum(r['latest'] for r in releases) == 1
           for release in releases:
-              assert set(release) == {'version', 'tag', 'commit', 'latest'}
+              required = {'version', 'tag', 'commit', 'latest'}
+              assert required <= set(release) <= required | {'scope'}
+              release.setdefault('scope', 'integration-and-app')
+              assert release['scope'] in ('integration-only', 'integration-and-app')
               assert re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', release['version'])
               assert release['tag'] == 'ha-' + release['version']
               assert re.fullmatch(r'[0-9a-f]{40}', release['commit'])
@@ -54,6 +57,7 @@ jobs:
       RELEASE_VERSION: ${{ matrix.release.version }}
       RELEASE_COMMIT: ${{ matrix.release.commit }}
       RELEASE_LATEST: ${{ matrix.release.latest }}
+      RELEASE_SCOPE: ${{ matrix.release.scope }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +77,8 @@ jobs:
       - name: Build and inspect clean source assets
         run: |
           python homeassistant/package_release.py --source release-source \
-            --version "$RELEASE_VERSION" --commit "$RELEASE_COMMIT" --output release-assets
+            --version "$RELEASE_VERSION" --commit "$RELEASE_COMMIT" \
+            --scope "$RELEASE_SCOPE" --output release-assets
           cd release-assets
           sha256sum --check SHA256SUMS
       - name: Publish complete assets without replacing a published release
