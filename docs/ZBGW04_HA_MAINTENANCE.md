@@ -1,6 +1,34 @@
 # ZB-GW04 Home Assistant maintenance plan
 
-**Superseded on 2026-11-07:** the owner will provide a dedicated ZB-GW04 for
+## Current direction: 2026-11-08
+
+The owner has resumed HA radio-flashing development and explicitly authorized
+destructive testing of the **currently connected ZB-GW04** on the HA machine.
+The earlier requirement to wait for a dedicated spare no longer applies to
+that unit. Sonoff MG21, Nordic and TI modules can be moved later at the Tech
+Lead's request; they are not part of this first hardware window. MG24/C6 work
+remains paused and both XIAOs remain experimental.
+
+This authorization concerns the selected radio, not deletion of HA's
+configuration, paired-device registry, database or other radios. Release
+engineering owns fresh backups and deployment restoration; the ZigBee
+specialist owns exact-board identification and firmware/recovery checks.
+Coordinate a single hardware owner before opening the radio. Prefer an
+application-only operation that preserves Gecko and recovery regions when it
+answers the test; permission to erase the unit is not a reason to erase it
+unnecessarily.
+
+The historical observations and staged artifacts below are references only.
+Recheck the current deployment, physical identity, ownership, artifact hashes,
+host compatibility and recovery route, and prepare the bounded execution and
+restoration plan before stopping services or programming. Routine updates from
+Livolo firmware and first installation from stock firmware are distinct tests;
+one does not qualify the other. The current permission does not itself qualify
+an artifact for publication.
+
+## Previous decision: 2026-11-07
+
+**Superseded by the authorization above:** the owner will provide a dedicated ZB-GW04 for
 testing later. The active HA gateway is no longer a qualification target. The
 90-minute outage proposal and its pending approval question are withdrawn; no
 HA outage or Nordic bench-service stop is scheduled. Follow the current
