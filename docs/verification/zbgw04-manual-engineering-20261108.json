@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Exact-unit manual application installation, boot identity and preserved-Gecko recovery engineering trial",
+  "status": "manual_trial_passed_original_service_restored",
+  "board": "zb-gw04-1v2",
+  "units_tested": 1,
+  "authorization": "Owner explicitly authorized testing the connected ZB-GW04; HA configuration and paired-device state were to be preserved",
+  "operator": "Tech Lead/root, with the owner operating BOOT and RESET",
+  "services_stopped_at_utc": "2026-11-08T15:06:18Z",
+  "services_restored_at_utc": "2026-11-08T15:16:11Z",
+  "services_restored_at_local": "2026-11-08T16:16:11+01:00",
+  "artifacts": {
+    "candidate": {
+      "version": "0.14",
+      "format": "application-only GBL",
+      "source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
+      "sha256": "b1358ed6f1ec77043544ca44e84f90d8214817b36d8185eea341ed70b67ba4c7"
+    },
+    "return": {
+      "version": "0.13",
+      "format": "application-only GBL",
+      "provenance_reference": "docs/FIRMWARE_013_TRIAL.md",
+      "sha256": "5dc5624d45c48bd3003012a0391922d288a03d2ff22f00a2e92757b70028241c"
+    }
+  },
+  "manual_runtime": {
+    "app_version": "0.5.1",
+    "daemon_version": "0.14.1",
+    "daemon_firmware_compatibility": "0.13",
+    "image_config_sha256": "8ded3663a6769734090dfe9a63d5c8c2a31ef49c55b528e7c5388ad7a6e008e0",
+    "python_version_reported_by_operator": "3.13.18",
+    "cryptography_version_reported_by_operator": "46.0.7",
+    "pyserial_version_reported_by_operator": "3.5",
+    "helper": "universal-silabs-flasher",
+    "helper_version": "0.0.31",
+    "helper_source_archive_sha256": "7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14",
+    "helper_source_hash_independently_checked_after_restoration": true,
+    "method": "Reviewed manual runner in isolated action containers using the original image and exact selected device",
+    "compatibility_limit": "The 0.13-compatible daemon was stopped during the manual 0.14 trial. No normal-update compatibility or newer-version check was bypassed."
+  },
+  "manual_runner_provenance": {
+    "kind": "Reviewed private staging snapshot, not the later unregistered source adapter",
+    "manual_action_py_sha256": "dab622193039e7b4bd9dba1b8f6006eca87c8d736e03ac8433713cbd4ff4ba79",
+    "test_manual_action_py_sha256": "b592ba6fea322d2d7f6267e9db9ceb1cb0f3d1eb75e7870c1a088dcaea91c948",
+    "inspect_stage_py_sha256": "60614d0aef22e0a7b2bca164fe4986d68025e28089617d12b40d066ffc0366f1",
+    "runner_archive_sha256": "537a62c5cb213f2d3d1f5b526903ad5e4c51f8521f7bd428ce177eb6f4bccd34",
+    "final_orchestration_sha256": "b669504eaef6171ea8b841d305a715db7c0648944734343437afb291728efb94",
+    "orchestration_revision_note": "The operator reports an earlier revision performed the initial service stop; the final revision changed the Supervisor state check. The final hash is not asserted for every action in the window."
+  },
+  "operator_reported_results": {
+    "original_app_and_competing_idle_flasher_stopped": "passed",
+    "host_wide_device_ownership_check_before_uart_open": "passed; no remaining target owners or denied process inspections reported",
+    "physical_boot_reset_entry_to_gecko_1_9_2": "passed",
+    "baseline_0_13_version_caps_status_disarmed": "passed",
+    "single_application_bootloader_command_from_0_13": "passed",
+    "selected_0_14_application_transfer": "passed",
+    "independent_0_14_version_caps_status_disarmed": "passed",
+    "second_physical_boot_reset_to_gecko_1_9_2": "passed",
+    "selected_0_13_return_application_transfer": "passed",
+    "independent_return_0_13_version_caps_status_disarmed": "passed",
+    "original_app_and_idle_flasher_restarted": "passed",
+    "manual_rf_control_pairing_or_network_configuration_commands": false
+  },
+  "independently_verified_restoration": {
+    "reviewer": "Release Engineer",
+    "method": "Comparisons and detailed receipts retained on HA; read-only authenticated native API GETs, no direct UART access",
+    "original_app_image_running": true,
+    "all_backed_up_app_runtime_configuration_and_catalog_files_match": true,
+    "all_livolo_integration_files_match": true,
+    "paired_device_records_and_removed_device_records_match": true,
+    "network_identity_mqtt_settings_and_durable_firmware_job_match": true,
+    "ha_entries_options_devices_and_areas_match": true,
+    "ha_entity_ids_and_all_fields_except_modified_at_match": true,
+    "strict_entity_byte_equality": false,
+    "entity_difference": "Only modified_at timestamps changed; the original strict failure and before/after evidence are retained privately",
+    "native_expected_network_matches_preserved_configuration": true,
+    "native_daemon_0_14_1_and_firmware_0_13_reported": true,
+    "native_radio_ready_and_not_simulated": true,
+    "no_active_firmware_job_or_recovery_requirement": true,
+    "no_active_pairing_session": true,
+    "idle_flasher_running_state_restored": true
+  },
+  "backup_boundary": {
+    "protected_same_host_app_and_ha_snapshots_verified": true,
+    "consistent_daemon_sqlite_backup_integrity_checked": true,
+    "original_image_archive_verified": true,
+    "runtime_overlay_coverage_checked": true,
+    "sensitive_backups_and_derived_receipts_exported": false,
+    "limitation": "Selective same-host app/radio rollback protection while HA storage remains intact; not a full HA or off-host disaster-recovery backup"
+  },
+  "software_source_checks": {
+    "commit": "58598448447e327ee4b7907fffcc882eb3f283b4",
+    "ci_checks_passed": 10,
+    "relationship_to_trial": "Separate source-quality evidence. The unregistered adapter and its later helper cleanup change were not used by this manual trial."
+  },
+  "qualification": {
+    "public_firmware_download_qualified": false,
+    "automatic_update_eligible": false,
+    "ha_updater_qualified": false,
+    "factory_stock_conversion_qualified": false,
+    "basic_rf_control_tested": false,
+    "interrupted_transfer_or_power_loss_recovery_tested": false,
+    "full_flash_readback_verified": false,
+    "factory_state_preservation_by_readback_verified": false,
+    "public_catalog_changed": false,
+    "release_published": false,
+    "other_radio_hardware_changed": false,
+    "limitations": [
+      "Evidence applies to one exact ZB-GW04 1v2 and the selected application artifacts.",
+      "Application-only validation and observed Gecko operation do not establish full-flash or factory-state byte equality.",
+      "The starting application was project firmware, so entry from factory-stock firmware was not tested.",
+      "Normal service restoration is distinct from the disarmed manual trial and does not qualify RF control or an HA-driven firmware job.",
+      "Manual recovery after a completed transfer does not qualify interruption recovery.",
+      "The separate private 0.14-compatible candidate runtime and fake provisioning prototype were not deployed or exercised on this radio."
+    ]
+  }
+}
