@@ -15,6 +15,28 @@ BOARDS = {
 }
 MAX_LINES = 4096
 MAX_LINE = 1024
+ADAPTER_COUNTERS = {
+    "mg24": (
+        "rx_event",
+        "hold_ok",
+        "copy_calls",
+        "release_ok",
+        "release_fail",
+        "core_calls",
+        "poll_budget",
+    ),
+    "c6": (
+        "sfd_event",
+        "rx_done",
+        "rx_invalid",
+        "rx_null",
+        "rx_release_ok",
+        "rx_release_fail",
+        "ack_release_ok",
+        "ack_release_fail",
+        "core_calls",
+    ),
+}
 
 
 def samples(mode):
@@ -374,6 +396,67 @@ def reconcile_queue(queue, state, delivered):
         raise ValueError("Queue accounting does not match delivered events")
 
 
+def adapter_capability(caps):
+    """Negotiate handoff observations without inventing missing adapter evidence.
+
+    @param caps Parsed endpoint capabilities.
+    @return Availability record, rejecting unknown advertised semantics.
+    """
+    value = caps.get("adapter_diag")
+    if value is None:
+        return dict(available=False, reason="not_advertised")
+    if value != "handoff_v1":
+        raise ValueError("Unknown adapter diagnostic capability")
+    return dict(available=True, counters=None)
+
+
+def adapter_status(reply, board):
+    """Validate a board-specific, stopped adapter handoff snapshot.
+
+    @param reply Successful RFADAPTER response after STOP and event drain.
+    @param board Exact supported endpoint key, mg24 or c6.
+    @return Validated string fields; events are observations, not packet identities.
+    """
+    if board not in ADAPTER_COUNTERS or not reply.startswith("OK "):
+        raise ValueError("Adapter snapshot unavailable")
+    data = fields(reply[3:])
+    contract = dict(
+        counter_bits="32", counter_mode="wrapping", scope="last_start_attempt"
+    )
+    if set(data) != set(ADAPTER_COUNTERS[board]) | set(contract) or any(
+        data.get(k) != v for k, v in contract.items()
+    ):
+        raise ValueError("Unexpected adapter diagnostic contract")
+    for key in ADAPTER_COUNTERS[board]:
+        integer(data[key], 0, 0xFFFFFFFF)
+    return data
+
+
+def reconcile_adapter(snapshot, state, board):
+    """Require an aligned successful window and account for observed callback work.
+
+    @param snapshot Validated board handoff counters after the window's clean stop.
+    @param state Final RFSTATUS fields for the same successful-start epoch.
+    @param board Exact endpoint key.
+    """
+    if any(state.get(k) != "0" for k in ("active", "busy", "queued", "fault")):
+        raise ValueError("Adapter accounting requires clean stopped state")
+    if int(snapshot["core_calls"]) != int(state["rx"]):
+        raise ValueError("Adapter core calls do not match this successful RF window")
+    if any(int(snapshot[k]) for k in ADAPTER_COUNTERS[board] if k.endswith("_fail")):
+        raise ValueError("Adapter buffer release failed")
+    if board == "c6":
+        total, invalid, null = (
+            int(snapshot[k]) for k in ("rx_done", "rx_invalid", "rx_null")
+        )
+        released = int(snapshot["rx_release_ok"]) + int(snapshot["rx_release_fail"])
+        if (
+            total != (int(snapshot["core_calls"]) + invalid) & 0xFFFFFFFF
+            or (released & 0xFFFFFFFF) != (total - null) & 0xFFFFFFFF
+        ):
+            raise ValueError("Adapter callback and release accounting disagree")
+
+
 def analyze(expected, received, transmitted):
     """Match entire independent captures and report loss without assigning its cause.
 
@@ -531,6 +614,7 @@ def run(
         cleanup_errors=[],
         requests=[],
         queue={},
+        adapter={},
     )
     deadline = clock() + 30
 
@@ -571,6 +655,7 @@ def run(
                 if caps.get(key) != value:
                     raise ValueError(f"Unexpected diagnostic capability: {key}")
             evidence["queue"][link.name] = queue_capability(caps)
+            evidence["adapter"][link.name] = adapter_capability(caps)
             current = status(request(link, "RFSTATUS"), 0)
             evidence["baseline"][link.name] = current
         evidence["preflight_event_counts"] = {
@@ -623,6 +708,10 @@ def run(
                 evidence["final"][link.name] = status(
                     command(link, "RFSTATUS", [link], 1, clock, sleep), 0
                 )
+            except Exception as error:
+                evidence["cleanup_errors"].append(f"{link.name}: {error}")
+                continue
+            try:
                 if evidence["queue"].get(link.name, {}).get("available"):
                     snapshot = queue_status(
                         command(link, "RFQUEUE", [link], 1, clock, sleep)
@@ -634,7 +723,16 @@ def run(
                         sum(e["kind"] == "rx" for e in link.events),
                     )
             except Exception as error:
-                evidence["cleanup_errors"].append(f"{link.name}: {error}")
+                evidence["cleanup_errors"].append(f"{link.name} RFQUEUE: {error}")
+            try:
+                if evidence["adapter"].get(link.name, {}).get("available"):
+                    snapshot = adapter_status(
+                        command(link, "RFADAPTER", [link], 1, clock, sleep), link.name
+                    )
+                    evidence["adapter"][link.name]["counters"] = snapshot
+                    reconcile_adapter(snapshot, evidence["final"][link.name], link.name)
+            except Exception as error:
+                evidence["cleanup_errors"].append(f"{link.name} RFADAPTER: {error}")
         evidence["directions"] = {
             link.name: analyze(
                 expected[link.name], links[1 - index].events, link.events

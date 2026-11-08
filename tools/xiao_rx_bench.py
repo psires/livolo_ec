@@ -59,7 +59,15 @@ def receive_command(
     @param sleep Injectable scheduler yield.
     @return Matching successful numbered response.
     """
-    if text not in ("PING", "VERSION", "CAPS", "RFSTATUS", "RFSTOP", "RFQUEUE"):
+    if text not in (
+        "PING",
+        "VERSION",
+        "CAPS",
+        "RFSTATUS",
+        "RFSTOP",
+        "RFQUEUE",
+        "RFADAPTER",
+    ):
         match = re.fullmatch(r"RFLISTEN ([0-9a-f]{8})", text)
         if match is None or int(match[1], 16) == 0:
             raise ValueError("Passive harness rejects this command")
@@ -213,6 +221,7 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
         cleanup_errors=[],
         window_completed=False,
         queue={},
+        adapter={},
     )
     started = []
 
@@ -249,6 +258,7 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
                 if caps.get(key) != value:
                     raise ValueError("Missing passive-only diagnostic contract")
             evidence["queue"][link.name] = rf.queue_capability(caps)
+            evidence["adapter"][link.name] = rf.adapter_capability(caps)
             evidence["baseline"][link.name] = rf.status(send(link, "RFSTATUS"), 0)
             if evidence["baseline"][link.name]["busy"] != "0":
                 raise ValueError("Inactive endpoint reports pending radio work")
@@ -296,6 +306,10 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
                     channel=11,
                     mode="passive",
                 )
+            except Exception as error:
+                evidence["cleanup_errors"].append(f"{link.name}: {error}")
+                continue
+            try:
                 if evidence["queue"].get(link.name, {}).get("available"):
                     snapshot = rf.queue_status(
                         receive_command(link, "RFQUEUE", [link], 1, clock, sleep)
@@ -307,7 +321,19 @@ def capture(links, nonce, duration, evidence, clock=time.monotonic, sleep=time.s
                         sum(e["kind"] == "rx" for e in link.events),
                     )
             except Exception as error:
-                evidence["cleanup_errors"].append(f"{link.name}: {error}")
+                evidence["cleanup_errors"].append(f"{link.name} RFQUEUE: {error}")
+            try:
+                if evidence["adapter"].get(link.name, {}).get("available"):
+                    snapshot = rf.adapter_status(
+                        receive_command(link, "RFADAPTER", [link], 1, clock, sleep),
+                        link.name,
+                    )
+                    evidence["adapter"][link.name]["counters"] = snapshot
+                    rf.reconcile_adapter(
+                        snapshot, evidence["final"][link.name], link.name
+                    )
+            except Exception as error:
+                evidence["cleanup_errors"].append(f"{link.name} RFADAPTER: {error}")
         evidence["receivers"] = {
             link.name: summarize(link.events, link.name) for link in links
         }

@@ -29,6 +29,8 @@ class XiaoTransportTests(unittest.IsolatedAsyncioTestCase):
             ("seeed-xiao-esp32c6", "xiao-usb-1"),
             ("seeed-xiao-mg24", "xiao-queue-1"),
             ("seeed-xiao-esp32c6", "xiao-usb-2"),
+            ("seeed-xiao-mg24", "xiao-uart-1"),
+            ("seeed-xiao-esp32c6", "xiao-rxdiag-1"),
         ]
         for (board, build), mode, registered in product(
             profiles, ("disabled", "experimental_phase"), (False, True)
@@ -62,10 +64,19 @@ class XiaoTransportTests(unittest.IsolatedAsyncioTestCase):
                             "xiao-usb-1",
                             "xiao-queue-1",
                             "xiao-usb-2",
+                            "xiao-uart-1",
+                            "xiao-rxdiag-1",
                         ):
                             capabilities += " rx_diag=passive_v1"
-                        if build in ("xiao-queue-1", "xiao-usb-2"):
+                        if build in (
+                            "xiao-queue-1",
+                            "xiao-usb-2",
+                            "xiao-uart-1",
+                            "xiao-rxdiag-1",
+                        ):
                             capabilities += " queue_diag=ring_v1"
+                        if build in ("xiao-uart-1", "xiao-rxdiag-1"):
+                            capabilities += " adapter_diag=handoff_v1"
                         if build == "xiao-reject-1":
                             capabilities = (
                                 "radio_tx=0 rf_diag=none rx_diag=passive_v1 "
