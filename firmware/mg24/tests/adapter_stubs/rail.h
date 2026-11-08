@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 typedef void *RAIL_Handle_t;
-typedef unsigned RAIL_Events_t;
+typedef uint64_t RAIL_Events_t;
 typedef int RAIL_RxPacketHandle_t;
 typedef int RAIL_Status_t;
 typedef struct {
@@ -27,7 +27,17 @@ typedef struct {
 typedef struct {
 	int rssi;
 	unsigned lqi, crcPassed;
+	struct {
+		uint32_t packetTime;
+		unsigned timePosition, totalPacketBytes;
+	} timeReceived;
 } RAIL_RxPacketDetails_t;
+#define RAIL_PACKET_TIME_INVALID 0
+#define RAIL_PACKET_TIME_AT_PACKET_END 6
+#define RAIL_PACKET_TIME_AT_PACKET_END_USED_TOTAL 7
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+#define RAIL_GetRxTimeFrameEndAlt(h, d) ((void)(h), test_packet_end(d))
+#endif
 #define RAIL_RX_PACKET_HANDLE_INVALID (-1)
 #define RAIL_RX_PACKET_HANDLE_OLDEST_COMPLETE 0
 #define RAIL_RX_PACKET_READY_SUCCESS 1
@@ -41,6 +51,11 @@ typedef struct {
 #define RAIL_EVENT_RX_FRAME_ERROR 4U
 #define RAIL_EVENT_CAL_NEEDED 8U
 #define RAIL_EVENT_TX_PACKET_SENT 16U
+#define RAIL_EVENT_RX_SYNC1_DETECT (UINT64_C(1) << 32)
+#define RAIL_EVENT_RX_SYNC2_DETECT (UINT64_C(1) << 33)
+#define RAIL_EVENT_RX_FILTER_PASSED (UINT64_C(1) << 34)
+#define RAIL_EVENT_RX_PACKET_ABORTED (UINT64_C(1) << 35)
+#define RAIL_EVENT_RX_ADDRESS_FILTERED (UINT64_C(1) << 36)
 #define RAIL_EVENTS_TX_COMPLETION 48U
 #define RAIL_EVENTS_ALL 0xffffU
 #define RAIL_TX_POWER_MODE_2P4GIG_HP 0

@@ -55,7 +55,7 @@ static int snapshot_idle(void)
 	       !ec_rf_events_pending();
 }
 
-#ifdef EC_RF_REJECT_DIAGNOSTICS
+#if defined(EC_RF_REJECT_DIAGNOSTICS) || defined(EC_RF_TRACE_DIAGNOSTICS)
 int ec_rf_diagnostic_idle(void)
 {
 	return !atomic_load(&active) && !atomic_load(&busy) && !fault &&
@@ -78,7 +78,7 @@ void ec_rf_setup(const struct ec_rf_ops *ops)
 	quiescent = 1;
 	nonce = started = sent_at = 0;
 	tx_started = tx_done = tx_failed = event_pending = fault = 0;
-#ifdef EC_RF_REJECT_DIAGNOSTICS
+#if defined(EC_RF_REJECT_DIAGNOSTICS) || defined(EC_RF_TRACE_DIAGNOSTICS)
 	channel = 11;
 #else
 	channel = 26;

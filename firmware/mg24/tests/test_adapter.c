@@ -7,6 +7,20 @@ static int test_hold_result, test_start_result, test_release_result;
 static unsigned available, status, packet_bytes, copied, released;
 static unsigned core_calls, aggregate_drops, details_fail;
 static uint8_t packet_data[128];
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+static unsigned end_fail, missing_time;
+/** @brief Validate derived length while modeling SDK timestamp conversion.
+ * @param details Initialized copy; the original metadata must remain unchanged.
+ * @return Selected conversion status.
+ */
+static int test_packet_end(RAIL_RxPacketDetails_t *details)
+{
+	assert(details->timeReceived.totalPacketBytes == packet_bytes);
+	details->timeReceived.packetTime = 25;
+	details->timeReceived.timePosition = RAIL_PACKET_TIME_AT_PACKET_END;
+	return end_fail;
+}
+#endif
 
 /** @brief Return one queued mock descriptor or the no-packet sentinel.
  * @param info Destination descriptor written only for an available packet.
@@ -28,6 +42,12 @@ static int test_packet_details(RAIL_RxPacketDetails_t *details)
 {
 	details->rssi = -40;
 	details->lqi = 255;
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	/* Populate only documented timestamp outputs; totalPacketBytes stays zero. */
+	details->timeReceived.packetTime = UINT32_MAX - 50;
+	details->timeReceived.timePosition =
+		missing_time ? RAIL_PACKET_TIME_INVALID : 3;
+#endif
 	return details_fail;
 }
 /** @brief Copy the mock packet using the adapter's existing void-copy API.
@@ -50,6 +70,29 @@ static int test_packet_release(void)
 }
 #include "../adapter.c"
 #include "../radio.c"
+
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+/** @brief Permit trace snapshots in the quiescent adapter-only fixture.
+ * @return True; actual core busy/drain gating is tested in test_trace.c.
+ */
+int ec_rf_diagnostic_idle(void)
+{
+	return 1;
+}
+/** @brief Refuse unused portable commands in the isolated radio fixture.
+ * @param command Unused command.
+ * @param out Unused destination.
+ * @param capacity Unused capacity.
+ * @return Zero; this fixture only reads private trace records.
+ */
+size_t ec_rf_command(const char *command, char *out, size_t capacity)
+{
+	(void)command;
+	(void)out;
+	(void)capacity;
+	return 0;
+}
+#endif
 
 /** @brief Observe portable handoff attempts without accepting or rejecting data.
  * @param data Borrowed mock MAC bytes.
@@ -84,6 +127,10 @@ static void reset_fixture(void)
 {
 	ec_mg24_adapter_reset();
 	ec_mg24_health_reset();
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	ec_mg24_trace_reset();
+	end_fail = missing_time = 0;
+#endif
 	test_hold_result = 1;
 	test_start_result = 0;
 	test_release_result = 0;
@@ -204,6 +251,41 @@ int main(void)
 	test_invalid_packets_and_budget();
 	test_snapshots_and_reset();
 	test_distinct_snapshot_fields();
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	char output[640];
+	reset_fixture();
+	event(radio, RAIL_EVENT_RX_SYNC1_DETECT | RAIL_EVENT_RX_FRAME_ERROR);
+	poll();
+	assert(stop() == 0);
+	assert(ec_mg24_trace_command("RFTRACE EVENT 0", output,
+				     sizeof(output)));
+	assert(strstr(output, "mask=0000000100000004"));
+	assert(ec_mg24_trace_command("RFTRACE ANCHOR 0", output,
+				     sizeof(output)));
+	assert(strstr(output,
+		      "packet_ticks=4294967245 time_position=3 time_valid=1"));
+	assert(strstr(output, "air_bytes=6 len=5"));
+	assert(strstr(output, "end_ticks=25 end_valid=1 end_status=0"));
+	reset_fixture();
+	end_fail = 1;
+	poll();
+	assert(core_calls == 1 && !aggregate_drops);
+	assert(stop() == 0);
+	assert(ec_mg24_trace_command("RFTRACE ANCHOR 0", output,
+				     sizeof(output)));
+	assert(strstr(output, "end_ticks=0 end_valid=0 end_status=1"));
+	reset_fixture();
+	missing_time = 1;
+	poll();
+	assert(core_calls == 1 && !aggregate_drops);
+	assert(stop() == 0);
+	assert(ec_mg24_trace_command("RFTRACE ANCHOR 0", output,
+				     sizeof(output)));
+	assert(strstr(output, "time_position=0 time_valid=0"));
+	assert(strstr(output, "end_ticks=0 end_valid=0 end_status=4294967295"));
+	assert(start(26) == -1);
+	assert(send(NULL, 0, 0) == -1);
+#endif
 	puts("mg24 adapter tests passed");
 	return 0;
 }

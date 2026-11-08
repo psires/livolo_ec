@@ -13,6 +13,9 @@ extern const struct ec_rf_ops ec_mg24_rf_ops;
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 #include "reject.h"
 #endif
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+#include "trace.h"
+#endif
 #endif
 
 #define RX_SIZE 2048u
@@ -161,6 +164,10 @@ int main(void)
 	parser.radio_command = ec_mg24_reject_command;
 	parser.build = "xiao-reject-1";
 	parser.adapter_diagnostics = 0;
+#endif
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	parser.radio_command = ec_mg24_trace_command;
+	parser.build = "xiao-trace-1";
 #endif
 #endif
 	for (;;) {

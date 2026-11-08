@@ -9,6 +9,11 @@
 #define RADIO_DIAGNOSTICS                                                      \
 	" rf_diag=none rx_diag=passive_v1 reject_diag=untrusted_v1 "           \
 	"queue_diag=ring_v1"
+#elif defined(EC_RF_TRACE_DIAGNOSTICS)
+#define RADIO_TX_CAPABILITY "0"
+#define RADIO_DIAGNOSTICS                                                      \
+	" rf_diag=none rx_diag=passive_v1 trace_diag=events_v1 "               \
+	"queue_diag=ring_v1"
 #else
 #define RADIO_TX_CAPABILITY "synthetic_only"
 #define RADIO_DIAGNOSTICS                                                      \

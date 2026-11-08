@@ -55,8 +55,8 @@ void ec_rf_setup(const struct ec_rf_ops *ops);
  * @return Response body length, or zero if storage is insufficient.
  */
 size_t ec_rf_command(const char *command, char *out, size_t capacity);
-#ifdef EC_RF_REJECT_DIAGNOSTICS
-/** @brief Gate private rejected-frame access/start on fully drained safe idle.
+#if defined(EC_RF_REJECT_DIAGNOSTICS) || defined(EC_RF_TRACE_DIAGNOSTICS)
+/** @brief Gate rejected-frame and trace diagnostics on fully drained core idle.
  * @return Nonzero only if inactive, no busy/fault/completion/event and RX empty.
  */
 int ec_rf_diagnostic_idle(void);

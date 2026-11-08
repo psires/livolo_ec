@@ -111,6 +111,62 @@ approved baseline and full-flash verification. Restore the union of all touched
 erase pages from that unit's backup, including any diagnostic-only tail pages.
 This private image is not a release bundle or a new acceptance policy.
 
+### Private event timeline
+
+`TRACE_DIAGNOSTICS=1` selects the separate `xiao-trace-1` receive-only build.
+It requires RF diagnostics and cannot be combined with rejected-frame sampling.
+The normal CRC policy, PHY, portable queue and UART scheduling remain in use;
+additional sync/filter/abort callbacks and bounded RAM stores add diagnostic
+load. `RFSTART` and `RFTX` are refused before core side effects, and the adapter
+also refuses TX and channels other than 11. This is experimental instrumentation,
+not a firmware release or supported gateway image.
+
+After verified STOP and complete drain, `RFTRACE` returns storage accounting.
+`RFTRACE EVENT index`, `RFTRACE ANCHOR index`, and `RFTRACE MARK index` read
+individual records without consuming them. Capacities are 4096 callback records,
+512 accepted-packet anchors and 128 lifecycle/calibration markers. Counters
+saturate; no buffer overwrites old evidence. A callback record contains the full
+merged 64-bit SDK mask, not an assumed single event or packet. Nested callback
+entry or a failed single weak-CAS reservation sets `reentry=1` and refuses the
+trace write without delaying the original radio handler; this invalidates
+completeness claims for the epoch.
+
+All timestamps use the RAIL microsecond clock modulo 2^32. Callback timestamps,
+legacy main-loop poll timestamps and SDK packet timestamps are distinct fields.
+Anchors retain the full MAC and original FCS before portable queue admission.
+The raw SDK position is retained, and frame-end conversion uses an initialized
+copy with the derived PHR+MAC+FCS byte count. Conversion failure remains explicit
+and neither discards accepted RX nor substitutes a poll timestamp. `end_status`
+is `UINT32_MAX` when conversion was not attempted because raw time was invalid.
+The epoch increments modulo 2^32 on start attempts and must be paired with a
+host-verified boot/session identity. `callback_max_us` covers the measured body
+from entry through original handling, excluding final accounting; it is neither
+isolated added overhead nor a worst-case execution bound.
+
+Callback and marker recording freezes after synchronous STOP. Anchors may
+still be appended during the normal held-packet drain. A collector must verify
+stable stopped/drained counters and identical summaries before and after the
+entire dump. Omitted records, invalid timestamps, reentry or unstable snapshots
+prevent completeness claims. Shared packet bytes and nearby anonymous error
+events support only candidate temporal associations, not proved identities of
+failed transmissions. A reviewed bounded trial must restore the exact normal
+application pages and verify the complete flash afterward.
+
+A single reviewed 30-second passive trial retained all 855 callback records and
+268 accepted-frame anchors without trace or portable-queue overflow. MG24 had
+14 frame-error events and four early receive aborts; the original strict capture
+assessment remains failed. A fit using 20 unique shared packets passed the
+preregistered gates, with a maximum held-out residual of 2.84 microseconds.
+Six of seven interior C6-only forwarded observations were inside the fitted
+interval. Four overlapped anonymous MG24 frame-error episodes, one overlapped an
+early abort, and one overlapped a different accepted, FCS-valid MG24 frame by
+about 769 microseconds. This last case supports competing transmissions as one
+cause of receiver disagreement; it does not identify every anonymous error or
+establish a general loss rate. Diagnostic callback changes remain an observer
+effect. The exact pre-trial normal MG24 full flash was restored and verified;
+C6 was not reprogrammed or reset. Both radios ended inactive and closed.
+See the [event-correlation receipt](../../docs/verification/xiao-rx-correlation-20261108.json).
+
 Build with a separate Gecko SDK 4.4.6 checkout, commit
 `59d2160fe448b13730a91c0f019a8b4c53c43eb2`, including Device/EFR32MG24,
 CMSIS, emlib, common, bootloader and RAIL/PA inputs:

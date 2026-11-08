@@ -1,0 +1,131 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Single bounded experimental MG24/C6 receive-only event correlation",
+  "status": "Investigation complete; original strict RF assessment remains failed",
+  "firmware_version": "0.14",
+  "temporary_mg24_build": "xiao-trace-1",
+  "restored_mg24_build": "xiao-uart-1",
+  "c6_build": "xiao-rxdiag-1",
+  "production_radios_or_ha_modified": false,
+  "release_or_catalog_modified": false,
+  "attempts": 1,
+  "requested_seconds": 30,
+  "actual_seconds": 30.035630829981528,
+  "channel": 11,
+  "radio_tx_count": 0,
+  "unchanged": [
+    "Normal CRC rejection",
+    "PHY",
+    "115200 MG24 UART",
+    "Portable queue capacity and scheduling",
+    "C6 firmware and power epoch",
+    "Strict startup and assessment rules"
+  ],
+  "observer_effect": "Additional sync/filter/abort callbacks and RAM trace stores alter instrumentation load; not production qualification.",
+  "capture": {
+    "strict_assessment": "failed",
+    "window_completed": true,
+    "cleanup_errors": [],
+    "mg24_accepted_delivered": 268,
+    "c6_accepted_delivered": 260,
+    "mg24_queue_drops": 0,
+    "c6_queue_drops": 0,
+    "mg24_original_fcs_validated": 268,
+    "mg24_frame_errors": 14,
+    "mg24_receive_aborts": 4,
+    "address_filtered_events": 0,
+    "other_mg24_health_reasons": 0,
+    "native_target_observations_each": 5,
+    "interior_native_shared": 4,
+    "interior_forwarded_c6_only": 7,
+    "interior_forwarded_mg24_only": 3
+  },
+  "trace": {
+    "events": 855,
+    "anchors": 268,
+    "markers": 6,
+    "omitted": 0,
+    "invalid_anchors": 0,
+    "reentry_or_reservation_failure": false,
+    "measured_callback_max_us": 7,
+    "callback_measurement_limit": "Entry through original handler, excludes final bookkeeping; not isolated added overhead or WCET",
+    "sync_terminal_episodes": 286,
+    "early_abort_duration_us": [
+      52,
+      53
+    ]
+  },
+  "alignment": {
+    "selection": "Unique exact39-byte shared MACs with valid normalized MG frame end, consistent raw position6, <=100ms hostdelivery separation, one-second inward trim and both queues zero",
+    "anchors": 20,
+    "training": 10,
+    "heldout": 10,
+    "span_seconds": 25.823257,
+    "drift_ppm": 13.14410814678979,
+    "heldout_p95_us": 2.830885022878647,
+    "heldout_max_us": 2.830885022878647,
+    "all_preregistered_gates_pass": true,
+    "accepted_callback_after_hardware_end_us": [
+      31,
+      33
+    ],
+    "coverage": "Six of seven C6-only forwarded observations inside anchor bounds; seventh excluded, no extrapolation"
+  },
+  "findings": {
+    "four_covered_misses": "Predicted PHR-through-FCS interval overlaps anonymous MG24 frame-error episode; one also overlaps an early abort",
+    "one_covered_miss": "52us sync-to-abort episode near predicted start; packet identity unknown",
+    "one_covered_miss_competing_frame": {
+      "description": "MG24 accepts a different original-FCS-valid forwarded frame while C6 accepts the unmatched forwarded frame. Same MAC sequence and application subject, different MAC source/destination and body bytes.",
+      "estimated_air_interval_overlap_us": 768.681390017271,
+      "assumption": "250kbit/s PHY; PHR+MAC+FCS42bytes takes1344us; excludes preamble/SFD. C6 callback clock mapped to MG hardware-end clock.",
+      "interpretation": "Supports competing transmissions/capture effects for this observed case, not a UART or portable-queue disappearance."
+    },
+    "no_packet_identity_for_errors": true
+  },
+  "preservation": {
+    "candidate_bytes": 82408,
+    "candidate_sha256": "e90897ccfaf6259624ad9952a69d2e9d1a549d2c2c046b0a568f134a475550f0",
+    "application_pages": 11,
+    "program_start": "0x08006000",
+    "program_end_exclusive": "0x0801c000",
+    "diagnostic_full_sha256": "ea9b50c54c7b7069e37fc1d6864b072dbc6ee86fb522204c981923999c84f2d4",
+    "backup_and_restored_full_sha256": "4b53cfd2f10b7d19295ed582eef99e79e8f05effa74fbdfed1ebbca31aa1adf0",
+    "restored_full_byte_equality": true,
+    "explicit_resume": true,
+    "c6_reprogrammed_or_reset": false,
+    "both_radios_inactive_and_closed": true,
+    "probe_unowned": true,
+    "host_boot_unchanged": true,
+    "scoped_usb_events": 0
+  },
+  "evidence_hashes": {
+    "source-manifest-v3.json": "b96aa6af383135604550c291be8a1f326e945b62c9d8ec1d2b1aea10ec6afdb5",
+    "runtime-manifest.json": "a6ee880ef3db54208b8f561c19f92c576a11bff7016de1e31095a369a0562a7a",
+    "trace-passive.json": "6ec937cda08237c0b3f29d224a34793357dd029ffc9590d1d044b5697c5f504c",
+    "trace-passive.jsonl": "24277704ea9a130427e30c846cc6964b604c7e91611fe69f6ae6ca7665965bd9",
+    "trace-analysis.json": "90e28cd3a6a1a86e7afae7f8737dcd1df307e1dd9f838e91298e50726da0801c",
+    "hardware-evidence-manifest.json": "47ebce3ac0e109f95a8c8c54d971af13e8659981e6ac7fa6b3bbfa265e813ab8",
+    "closure.json": "a49dedb157c3c7728f61a86c00cf400472fb442de317a92373f22b4058957ee0"
+  },
+  "limitations": [
+    "Anonymous events have no packet bytes; temporal coincidence is not packet identity or causal proof.",
+    "Observed residual envelope is not a hard timing bound; accepted-event offsets may differ from error/abort timing.",
+    "The clock model is validated on shared frames; unusual C6 callback latency for an unmatched frame cannot be excluded and would change estimated overlap.",
+    "Early aborts and corrupted lengths can end before/after the expected frame end.",
+    "No sent denominator, no loss probability, no production qualification. Added diagnostic interrupts may affect reception.",
+    "One frozen30s attempt only; original strict failure remains failed.",
+    "Neither radio supplies the count of actual transmitted frames; packet-loss probability cannot be inferred.",
+    "This does not establish that all ambient or production-network errors share the same cause."
+  ],
+  "next_step_not_executed": "Separately reviewed controlled overlap experiment using only non-production transmitters: known unique payloads, clean single-transmitter baseline, then prescribed relative timing/received-power changes with independent capture. Requires suitable spare hardware; no production switches/radios changed in this stage.",
+  "post_trial_quality_followup": {
+    "scope": "Comment clarifications and maximum-index/full-store regression only; runtime C token streams unchanged from frozen V3",
+    "native_gcc": "14.2.0, all6 tests pass at O2 with Wformat2/Werror/ASAN/UBSAN",
+    "source_bundle_sha256": "57459d7aca4489b446d59c34bbc92799f879dc56ce829f89fd0c2fb47cdaead5",
+    "source_manifest_sha256": "9bae600a56706066d30beeeecd5f3d08d84fb2ca3f64032298c4a54097d71ad4",
+    "gcc_log_sha256": "b72afa7254bcfa62ced7e2a76f1b2a396cc27f88fae040eb498f6a3a6a19ac77",
+    "additional_hardware_runs": false
+  }
+}

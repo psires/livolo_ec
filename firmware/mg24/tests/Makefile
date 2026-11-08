@@ -3,11 +3,23 @@ BUILD ?= build
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined
 
 .PHONY: test clean
-test: $(BUILD)/test_adapter $(BUILD)/test_health $(BUILD)/test_reject $(BUILD)/test_output
+test: $(BUILD)/test_adapter $(BUILD)/test_health $(BUILD)/test_reject $(BUILD)/test_output $(BUILD)/test_trace $(BUILD)/test_trace_adapter
 	$(BUILD)/test_adapter
 	$(BUILD)/test_health
 	$(BUILD)/test_reject
 	$(BUILD)/test_output
+	$(BUILD)/test_trace
+	$(BUILD)/test_trace_adapter
+
+$(BUILD)/test_trace: ../trace.c ../trace.h test_trace.c ../../experimental/rf.c ../../experimental/rf.h ../../experimental/transport.c ../../experimental/transport.h Makefile
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -DEC_RF_TRACE_DIAGNOSTICS=1 -I.. -I../../experimental \
+	 test_trace.c ../../experimental/rf.c ../../experimental/transport.c -o $@
+
+$(BUILD)/test_trace_adapter: test_adapter.c ../radio.c ../trace.c ../trace.h ../adapter.c ../adapter.h ../health.c ../health.h ../../experimental/rf.h $(wildcard adapter_stubs/*.h) Makefile
+	mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -DEC_RF_TRACE_DIAGNOSTICS=1 -Iadapter_stubs -I.. -I../../experimental \
+	 test_adapter.c ../health.c ../trace.c -o $@
 
 $(BUILD)/test_health: ../health.c ../health.h test_health.c Makefile
 	mkdir -p $(BUILD)

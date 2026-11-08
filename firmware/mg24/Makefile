@@ -5,6 +5,15 @@ CC = $(PREFIX)gcc
 BUILD ?= build
 RF_DIAGNOSTICS ?= 1
 REJECT_DIAGNOSTICS ?= 0
+TRACE_DIAGNOSTICS ?= 0
+ifeq ($(TRACE_DIAGNOSTICS),1)
+ifneq ($(RF_DIAGNOSTICS),1)
+$(error TRACE_DIAGNOSTICS requires RF_DIAGNOSTICS=1)
+endif
+ifneq ($(REJECT_DIAGNOSTICS),0)
+$(error TRACE_DIAGNOSTICS and REJECT_DIAGNOSTICS are mutually exclusive)
+endif
+endif
 ifeq ($(REJECT_DIAGNOSTICS),1)
 ifneq ($(RF_DIAGNOSTICS),1)
 $(error REJECT_DIAGNOSTICS requires RF_DIAGNOSTICS=1)
@@ -36,6 +45,10 @@ ifeq ($(REJECT_DIAGNOSTICS),1)
 CFLAGS += -DEC_RF_REJECT_DIAGNOSTICS=1
 SOURCES += reject.c
 endif
+ifeq ($(TRACE_DIAGNOSTICS),1)
+CFLAGS += -DEC_RF_TRACE_DIAGNOSTICS=1
+SOURCES += trace.c
+endif
 RADIO_LINK = -Wl,--whole-archive $(RADIO_LIB) -Wl,--no-whole-archive
 endif
 vpath %.c $(sort $(dir $(SOURCES)))
@@ -44,10 +57,10 @@ vpath %.c $(sort $(dir $(SOURCES)))
 all: $(BUILD)/ec-xiao-mg24.bin
 $(BUILD):
 	mkdir -p $@
-$(BUILD)/.config-$(RF_DIAGNOSTICS)-$(REJECT_DIAGNOSTICS): | $(BUILD)
+$(BUILD)/.config-$(RF_DIAGNOSTICS)-$(REJECT_DIAGNOSTICS)-$(TRACE_DIAGNOSTICS): | $(BUILD)
 	rm -f $(BUILD)/.config-*
 	touch $@
-$(OBJECTS): $(BUILD)/.config-$(RF_DIAGNOSTICS)-$(REJECT_DIAGNOSTICS)
+$(OBJECTS): $(BUILD)/.config-$(RF_DIAGNOSTICS)-$(REJECT_DIAGNOSTICS)-$(TRACE_DIAGNOSTICS)
 $(BUILD)/%.o: %.c Makefile | $(BUILD)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 $(BUILD)/ec-xiao-mg24.elf: $(OBJECTS) application.ld $(RADIO_LIB)

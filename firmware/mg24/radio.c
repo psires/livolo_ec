@@ -11,11 +11,14 @@
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 #include "reject.h"
 #endif
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+#include "trace.h"
+#endif
 
 static RAIL_Handle_t radio;
 static unsigned selected_channel;
 static atomic_uint calibration;
-#ifndef EC_RF_REJECT_DIAGNOSTICS
+#if !defined(EC_RF_REJECT_DIAGNOSTICS) && !defined(EC_RF_TRACE_DIAGNOSTICS)
 static uint8_t tx_fifo[256] __attribute__((aligned(4)));
 #endif
 static uint8_t rx_fifo[2048] __attribute__((aligned(4)));
@@ -26,6 +29,12 @@ static uint8_t rx_fifo[2048] __attribute__((aligned(4)));
  */
 static void event(RAIL_Handle_t handle, RAIL_Events_t events)
 {
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	uint32_t entered = RAIL_GetTime();
+	unsigned trace_owner = ec_mg24_trace_callback_enter();
+	if (trace_owner)
+		ec_mg24_trace_event(entered, events);
+#endif
 	if (events & RAIL_EVENT_RX_PACKET_RECEIVED) {
 		ec_mg24_adapter_count(EC_MG24_ADAPTER_RX_EVENT);
 		if (RAIL_HoldRxPacket(handle) ==
@@ -46,6 +55,10 @@ static void event(RAIL_Handle_t handle, RAIL_Events_t events)
 		atomic_store(&calibration, 1);
 	if (events & RAIL_EVENTS_TX_COMPLETION)
 		ec_rf_tx_complete((events & RAIL_EVENT_TX_PACKET_SENT) != 0);
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	if (trace_owner)
+		ec_mg24_trace_callback_cost(RAIL_GetTime() - entered);
+#endif
 }
 
 /** @brief Return callback/poll microseconds from the running RAIL timer.
@@ -61,9 +74,18 @@ static uint32_t now_us(void)
  */
 static int stop(void)
 {
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	ec_mg24_trace_mark(EC_TRACE_STOP, now_us(), 0);
+#endif
 	selected_channel = 0;
 	if (radio)
 		RAIL_Idle(radio, RAIL_IDLE_ABORT, true);
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	ec_mg24_trace_mark(EC_TRACE_STOP_RESULT, now_us(),
+			   radio ? RAIL_GetRadioState(radio)
+				 : RAIL_RF_STATE_IDLE);
+	ec_mg24_trace_freeze();
+#endif
 	return radio && RAIL_GetRadioState(radio) != RAIL_RF_STATE_IDLE ? -1
 									: 0;
 }
@@ -95,7 +117,7 @@ static int start(unsigned channel)
 						RAIL_RF_STATE_RX };
 	uint16_t rx_size = sizeof(rx_fifo);
 
-#ifdef EC_RF_REJECT_DIAGNOSTICS
+#if defined(EC_RF_REJECT_DIAGNOSTICS) || defined(EC_RF_TRACE_DIAGNOSTICS)
 	if (channel != 11)
 		return -1;
 #else
@@ -106,11 +128,21 @@ static int start(unsigned channel)
 	/* Core only calls start while inactive; failed attempts also reset counts. */
 	ec_mg24_health_reset();
 	ec_mg24_adapter_reset();
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	ec_mg24_trace_reset();
+	ec_mg24_trace_mark(EC_TRACE_START, now_us(), channel);
+#endif
 #ifdef EC_RF_REJECT_DIAGNOSTICS
 	ec_mg24_reject_reset();
 #endif
 	if (radio) {
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+		RAIL_Status_t result = RAIL_StartRx(radio, channel, NULL);
+		ec_mg24_trace_mark(EC_TRACE_START_RESULT, now_us(), result);
+		if (result != RAIL_STATUS_NO_ERROR)
+#else
 		if (RAIL_StartRx(radio, channel, NULL) != RAIL_STATUS_NO_ERROR)
+#endif
 			return -1;
 		selected_channel = channel;
 		return 0;
@@ -130,7 +162,7 @@ static int start(unsigned channel)
 				 RAIL_RX_OPTION_IGNORE_CRC_ERRORS) ||
 #endif
 	    RAIL_SetRxFifo(radio, rx_fifo, &rx_size) ||
-#ifndef EC_RF_REJECT_DIAGNOSTICS
+#if !defined(EC_RF_REJECT_DIAGNOSTICS) && !defined(EC_RF_TRACE_DIAGNOSTICS)
 	    RAIL_SetTxFifo(radio, tx_fifo, 0, sizeof(tx_fifo)) !=
 		    sizeof(tx_fifo) ||
 #endif
@@ -144,9 +176,23 @@ static int start(unsigned channel)
 				      RAIL_EVENT_RX_FIFO_OVERFLOW |
 				      RAIL_EVENT_RX_FRAME_ERROR |
 				      RAIL_EVENTS_TX_COMPLETION |
-				      RAIL_EVENT_CAL_NEEDED))
+				      RAIL_EVENT_CAL_NEEDED
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+				      | RAIL_EVENT_RX_SYNC1_DETECT |
+				      RAIL_EVENT_RX_SYNC2_DETECT |
+				      RAIL_EVENT_RX_FILTER_PASSED |
+				      RAIL_EVENT_RX_PACKET_ABORTED |
+				      RAIL_EVENT_RX_ADDRESS_FILTERED
+#endif
+			      ))
 		return -1;
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+	RAIL_Status_t result = RAIL_StartRx(radio, channel, NULL);
+	ec_mg24_trace_mark(EC_TRACE_START_RESULT, now_us(), result);
+	if (result != RAIL_STATUS_NO_ERROR)
+#else
 	if (RAIL_StartRx(radio, channel, NULL) != RAIL_STATUS_NO_ERROR)
+#endif
 		return -1;
 	selected_channel = channel;
 	return 0;
@@ -160,7 +206,7 @@ static int start(unsigned channel)
  */
 static int send(const uint8_t *mac, size_t length, unsigned cca)
 {
-#ifdef EC_RF_REJECT_DIAGNOSTICS
+#if defined(EC_RF_REJECT_DIAGNOSTICS) || defined(EC_RF_TRACE_DIAGNOSTICS)
 	(void)mac;
 	(void)length;
 	(void)cca;
@@ -210,7 +256,12 @@ static void poll(void)
 		return;
 	for (unsigned i = 0; i < 4; i++) {
 		RAIL_RxPacketInfo_t info;
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+		/* SDK does not promise every detail field is populated. */
+		RAIL_RxPacketDetails_t details = { 0 };
+#else
 		RAIL_RxPacketDetails_t details;
+#endif
 		RAIL_RxPacketHandle_t packet;
 		enum ec_mg24_rx_reason reason;
 		uint8_t bytes[128];
@@ -262,11 +313,55 @@ static void poll(void)
 		else
 			reason = EC_MG24_REASON_COUNT;
 		if (reason == EC_MG24_REASON_COUNT) {
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+			RAIL_RxPacketDetails_t normalized = details;
+			uint32_t end_status = UINT32_MAX;
+			unsigned end_valid = 0;
+			/* Conversion input includes PHR+MAC+FCS; never trust an unfilled field. */
+			normalized.timeReceived.totalPacketBytes =
+				info.packetBytes;
+			if (details.timeReceived.timePosition !=
+			    RAIL_PACKET_TIME_INVALID) {
+				end_status = RAIL_GetRxTimeFrameEndAlt(
+					radio, &normalized);
+				end_valid =
+					end_status == RAIL_STATUS_NO_ERROR &&
+					(normalized.timeReceived.timePosition ==
+						 RAIL_PACKET_TIME_AT_PACKET_END ||
+					 normalized.timeReceived.timePosition ==
+						 RAIL_PACKET_TIME_AT_PACKET_END_USED_TOTAL);
+			}
+#endif
 			RAIL_CopyRxPacket(bytes, &info);
 			ec_mg24_adapter_count(EC_MG24_ADAPTER_COPY_CALLS);
 			release_packet(packet);
 			if (!(bytes[0] & 0x80) &&
 			    bytes[0] + 1 == info.packetBytes) {
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+				struct ec_mg24_trace_metadata metadata = {
+					.poll_ticks = ticks,
+					.packet_ticks =
+						details.timeReceived.packetTime,
+					.time_position = details.timeReceived
+								 .timePosition,
+					.time_valid = details.timeReceived
+							      .timePosition !=
+						      RAIL_PACKET_TIME_INVALID,
+					.packet_status = info.packetStatus,
+					/* Includes PHR and FCS; not an SDK output field. */
+					.air_bytes = info.packetBytes,
+					.end_ticks =
+						end_valid
+							? normalized
+								  .timeReceived
+								  .packetTime
+							: 0,
+					.end_valid = end_valid,
+					.end_status = end_status,
+				};
+				ec_mg24_trace_anchor(&metadata, bytes + 1,
+						     bytes[0]);
+#endif
 				ec_mg24_adapter_count(
 					EC_MG24_ADAPTER_CORE_CALLS);
 				ec_rf_receive(bytes + 1, bytes[0] - 2, 1,
@@ -282,11 +377,20 @@ static void poll(void)
 			ec_rf_drop();
 		}
 	}
-	if (atomic_exchange(&calibration, 0))
+	if (atomic_exchange(&calibration, 0)) {
+#ifdef EC_RF_TRACE_DIAGNOSTICS
+		ec_mg24_trace_mark(EC_TRACE_CALIBRATE, now_us(), 0);
+		RAIL_Status_t result =
+			RAIL_Calibrate(radio, NULL, RAIL_CAL_ALL_PENDING);
+		ec_mg24_trace_mark(EC_TRACE_CALIBRATE_RESULT, now_us(), result);
+		if (result) {
+#else
 		if (RAIL_Calibrate(radio, NULL, RAIL_CAL_ALL_PENDING)) {
+#endif
 			ec_mg24_health_count(EC_MG24_CALIBRATION_FAILED);
 			ec_rf_drop();
 		}
+	}
 }
 
 /** @brief Return the configured power, conservatively rounding positive values up.
