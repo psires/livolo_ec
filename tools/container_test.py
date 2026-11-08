@@ -149,6 +149,28 @@ class ReleaseChecks(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 prepare.prepare(data, entry, Path(directory) / "release")
 
+    def test_amd64_is_limited_to_candidate_contexts(self):
+        """AMD64 metadata describes a candidate and cannot relabel a release."""
+        data = prepare.manifest(prepare.ROOT / "host/docker/releases.json")
+        entry = next(e for e in reversed(data["releases"]) if e["kind"] == "ha")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "candidate"
+            metadata = prepare.prepare(
+                data, entry, output, candidate=True, platform="linux/amd64"
+            )
+            self.assertEqual(metadata["platform"], "linux/amd64")
+            self.assertEqual(
+                json.loads((output / "container/release.json").read_text())["platform"],
+                "linux/amd64",
+            )
+            with patch.object(prepare, "command") as command:
+                with self.assertRaisesRegex(ValueError, "Unsupported platform"):
+                    prepare.prepare(
+                        data, entry, Path(directory) / "release", platform="linux/amd64"
+                    )
+                command.assert_not_called()
+            self.assertFalse((Path(directory) / "release").exists())
+
     def test_schema_two_manifest_preserves_explicit_legacy_and_split_entries(self):
         """A new request can retain old identities while requiring new compatibility metadata."""
         original = json.loads((prepare.ROOT / "host/docker/releases.json").read_text())

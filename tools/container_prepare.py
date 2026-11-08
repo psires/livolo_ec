@@ -80,7 +80,9 @@ def manifest(path):
     return data
 
 
-def prepare(data, entry, output, candidate=False, firmware_bundle=None):
+def prepare(
+    data, entry, output, candidate=False, firmware_bundle=None, platform="linux/arm64"
+):
     """Assemble a minimal historical source context plus a recorded external recipe.
 
     @param data Validated manifest containing pinned build tools and images.
@@ -88,7 +90,12 @@ def prepare(data, entry, output, candidate=False, firmware_bundle=None):
     @param output New directory receiving the assembled build context.
     @param candidate Build non-publishing source with its own app version instead of the public listing.
     @param firmware_bundle Optional local copy of the source-pinned firmware inventory.
+    @param platform Target Linux platform; AMD64 is restricted to candidates.
     """
+    if platform not in ("linux/arm64", "linux/amd64") or (
+        platform != "linux/arm64" and not candidate
+    ):
+        raise ValueError("Unsupported platform for this publication")
     if not candidate:
         assert (
             command(
@@ -245,7 +252,7 @@ def prepare(data, entry, output, candidate=False, firmware_bundle=None):
                 if firmware
                 else "BSD-2-Clause"
             ),
-            platform="linux/arm64",
+            platform=platform,
             recipe_commit=command("git", "rev-parse", "HEAD"),
             python_image=data["python_image"],
             buildkit_image=data["buildkit_image"],
@@ -276,7 +283,12 @@ def main():
         action="store_true",
         help="Stage HEAD for non-publishing local CI validation",
     )
+    parser.add_argument(
+        "--platform", choices=("linux/arm64", "linux/amd64"), default="linux/arm64"
+    )
     args = parser.parse_args()
+    if args.platform != "linux/arm64" and not args.candidate:
+        parser.error("AMD64 is available only for non-publishing candidates")
     data = manifest(ROOT / args.manifest)
     if args.candidate:
         if not args.output or not args.kind or args.version:
@@ -297,6 +309,7 @@ def main():
             args.output,
             candidate=True,
             firmware_bundle=args.firmware_bundle,
+            platform=args.platform,
         )
         return
     if args.output:

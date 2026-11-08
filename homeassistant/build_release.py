@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import re
 from pathlib import Path
 import shutil
 import sys
@@ -49,7 +50,14 @@ def main():
         action="store_true",
         help="Non-publishing app qualification build; may omit pending public firmware",
     )
+    parser.add_argument(
+        "--experimental-amd64",
+        action="store_true",
+        help="Stage an experimental local-build app for 64-bit Intel/AMD HA OS",
+    )
     args = parser.parse_args()
+    if args.experimental_amd64 and not (args.app and args.candidate):
+        parser.error("--experimental-amd64 requires --app and --candidate")
     version = json.loads(
         (ROOT / "custom_components/livolo_ec/manifest.json").read_text()
     )["version"]
@@ -80,6 +88,17 @@ def main():
                     config.read_text(), source_versions(ROOT)["distribution_version"]
                 )
             )
+            if args.experimental_amd64:
+                text = config.read_text()
+                image_line = "image: ghcr.io/psires/livolo-ec-ha-app\n"
+                arch_line = "arch:\n  - aarch64\n"
+                if text.count(image_line) != 1 or text.count(arch_line) != 1:
+                    raise ValueError("Unexpected public app configuration")
+                config.write_text(
+                    text.replace(image_line, "").replace(
+                        arch_line, arch_line + "  - amd64\n"
+                    )
+                )
         for relative in (
             "LICENSE",
             "VERSION",
@@ -108,9 +127,19 @@ def main():
                 if origin.exists():
                     shutil.copy2(origin, app / "host/release" / name)
         firmware = stage_for_source(app, args.firmware_bundle, candidate=args.candidate)
+        recipe = (ROOT / "host/docker/Dockerfile").read_text()
+        versions = source_versions(ROOT)
+        for name, value in (
+            ("RELEASE_VERSION", versions["daemon_version"]),
+            ("FIRMWARE_COMPAT_VERSION", versions["firmware_compat_version"]),
+        ):
+            recipe, count = re.subn(
+                rf"^ARG {name}=[^\n]+$", f"ARG {name}={value}", recipe, flags=re.M
+            )
+            if count != 2:
+                raise ValueError(f"Unexpected Dockerfile {name} declarations")
         (app / "Dockerfile").write_text(
-            (ROOT / "host/docker/Dockerfile").read_text()
-            + (app / "Dockerfile.wrapper").read_text()
+            recipe + (app / "Dockerfile.wrapper").read_text()
         )
         if args.candidate:
             (app / "CANDIDATE-NOT-FOR-RELEASE.txt").write_text(

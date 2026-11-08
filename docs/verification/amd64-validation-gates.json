@@ -1,0 +1,103 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "Experimental native AMD64 containers, isolated Home Assistant Container, and a separately qualified dedicated Sonoff HA flashing trial",
+  "status": "validation_in_progress_not_a_public_release",
+  "required_ancestor_commit": "84003d7f1be155b646eba1e2b604de497404dc82",
+  "ownership": {
+    "testbed_operations_and_packaging": "Linux specialist",
+    "ha_architecture_and_integration_acceptance": "Home Assistant specialist",
+    "independent_review_source_freeze_commit_and_artifact_evidence": "Release Engineer",
+    "scope_and_release_decisions": "Tech Lead",
+    "sonoff_provider_and_runtime": "Unix specialist",
+    "sonoff_firmware_loader_and_recovery_evidence": "ZigBee specialist"
+  },
+  "environment": {
+    "platform": "linux/amd64",
+    "storage_root": "/storage/livolo-testbed",
+    "existing_ha_installation": "Unchanged; outside this testbed's scope",
+    "radio": "Owner-confirmed transfer; Linux specialist passively verified Sonoff ZBDongle-E sniffer 0.12 using CRC-valid ESN1 records; current bootloader remains unverified",
+    "supervisor_available": false
+  },
+  "gates": [
+    {
+      "id": "source_and_version_binding",
+      "status": "pending",
+      "required_evidence": "Reviewed committed source including the required ancestor, passing checks, clean-source build context hash, exact distribution/daemon/firmware-compatibility/integration versions, and source revision bound to the resulting artifact"
+    },
+    {
+      "id": "native_image_identity",
+      "status": "pending_clean_commit_rebuild",
+      "required_evidence": "Actual Docker image ID, linux/amd64 inspection, runtime version checks, build recipe and base-image identities; record a registry digest only if one exists and hash any delivered archive"
+    },
+    {
+      "id": "offline_container_lifecycle",
+      "status": "exploratory_pass_reported_by_linux_specialist",
+      "required_evidence": "Fresh startup, health, authenticated API, websocket behavior, persistent configuration/catalog/database, restart and container recreation with no radio access; rerun on the committed artifact",
+      "limitation": "A nonexistent serial port tests offline behavior; it does not prove simulated or physical radio control"
+    },
+    {
+      "id": "simulated_service_and_ha_integration",
+      "status": "partial_exploratory_pass_reported_by_linux_specialist",
+      "required_evidence": "Fresh integration installation against a known isolated simulated daemon, authentication, state updates, disconnect/reconnect, HA and daemon restart, and preserved entry/device/entity identity without duplicate registrations",
+      "review_owner": "Home Assistant specialist",
+      "observed": "Default simulated-endpoint rejection and explicit opt-in; authenticated API; three registered entities; two-gang ON/OFF; daemon reconnect and HA restart with stable registry identifiers; SQLite integrity",
+      "limitations": "One-gang control unavailable because simulator startup reports use the wrong suffix; not a passing control test. Repeat acceptance on the clean committed artifact. Same-version restarts are not upgrades."
+    },
+    {
+      "id": "amd64_upgrade_and_rollback",
+      "status": "no_previous_published_amd64_baseline",
+      "required_evidence": "Record absence honestly. First-install/recreation is not a version upgrade. If a separately source-bound historical AMD64 build is used later, identify it as a test-built baseline and test preserved data plus rollback without claiming it was previously published."
+    },
+    {
+      "id": "supervisor_app_channel",
+      "status": "unqualified_separate_environment_required",
+      "required_evidence": "Actual x86-64 Supervisor app discovery, installation, startup, options/ingress, data persistence, update and restoration with the intended image channel",
+      "limitation": "HA Container plus a companion daemon does not qualify the Supervisor app channel"
+    },
+    {
+      "id": "dedicated_radio_identity_and_recovery",
+      "status": "passive_identity_verified_loader_and_recovery_plan_pending",
+      "required_evidence": "Confirm physical transfer, exact board/revision, USB topology/identity, current firmware, ownership and reviewed recovery path before an explicitly scoped hardware trial",
+      "constraints": "No automatic protocol commands or flash; writes only through the reviewed explicit action. Do not reuse ZB-GW04 policy or firmware."
+    },
+    {
+      "id": "sonoff_ha_firmware_installation",
+      "status": "blocked_pending_explicit_sonoff_profile_and_first_install_flow",
+      "required_evidence": "Exact-board provider and loader/security policy, reviewed private candidate and recovery artifacts, actual HA inspect/explicit install, independent application VERSION/CAPS/STATUS, explicit new-network initialization/handoff, and scoped failure/recovery checks on the clean AMD64 image",
+      "constraints": "No fabricated gateway baseline for the starting sniffer. Cancellation without a baseline cannot claim restored sniffer or gateway service. Recovery needs its own explicit action and passive sniffer verification. Keep firmware qualified:false until the relevant tests pass.",
+      "firmware_source_commit": "0fd515ca156823e513d2d86f0507b8da9b8558e8",
+      "candidate_version": "0.14",
+      "candidate_sha256": "87de29744fd7b991e0da8cdfda0fd160e12bd749764d4bca8c1337683804a7e6",
+      "candidate_bytes": 60572,
+      "candidate_offline_board_version_layout_check": "independently passed by Release Engineer",
+      "known_sniffer_recovery_sha256": "c9d5bb865ab6734c9c739a36bcc4a71139ab7fcc01090e5a55371f1378e1896d",
+      "original_factory_readback_available": false
+    },
+    {
+      "id": "public_publication",
+      "status": "not_requested",
+      "required_evidence": "Supported architecture/channel verified, immutable versioned artifacts and complete release inventory, firmware qualification/redistribution gates satisfied, and reviewed release decision",
+      "constraints": "Do not change public ARM64 manifests, app architecture listing or immutable tags while AMD64 remains experimental"
+    }
+  ],
+  "exploratory_artifact_reported_by_linux_specialist": {
+    "image_id": "sha256:115a70ace3c81a94194f37551e2a202aee41348236423a92183b1910f906592e",
+    "source": "Required ancestor plus uncommitted packaging changes",
+    "release_provenance": false,
+    "daemon_version": "0.15.0",
+    "firmware_compatibility_version": "0.14",
+    "radio_access": false
+  },
+  "references": [
+    "https://www.home-assistant.io/installation/",
+    "https://contributors.home-assistant.io/apps/reference/configuration/"
+  ],
+  "packaging_review": {
+    "scope": "Candidate-only AMD64 staging and native CI matrix; no public architecture promotion",
+    "container_release_tests": 12,
+    "ha_packaging_tests": 20,
+    "platform_guard": "Reject unsupported publication platform before Git resolution or output creation; regression test does not depend on the checkout revision"
+  }
+}

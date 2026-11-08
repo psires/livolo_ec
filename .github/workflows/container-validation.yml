@@ -1,4 +1,4 @@
-name: Validate ARM64 containers without publication
+name: Validate ARM64 and AMD64 containers without publication
 
 on:
   push:
@@ -23,16 +23,28 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         include:
           - kind: standalone
+            runner: ubuntu-24.04-arm
+            architecture: arm64
             previous: ghcr.io/psires/livolod@sha256:f04ebcf3e2a43f79e8441d01c39732534ed22a3e1a15ce3ab7e83368bdd5588f
           - kind: ha
+            runner: ubuntu-24.04-arm
+            architecture: arm64
             previous: ghcr.io/psires/livolo-ec-ha-app@sha256:84150c421ccf89f28c528bfea29df5e54c65eb7d92820a4b34e725854a351f6d
+          - kind: standalone
+            runner: ubuntu-24.04
+            architecture: amd64
+            previous: ""
+          - kind: ha
+            runner: ubuntu-24.04
+            architecture: amd64
+            previous: ""
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -49,7 +61,7 @@ jobs:
         run: |
           python3 tools/project_version.py
           python3 tools/container_test.py
-          python3 tools/container_prepare.py --candidate --kind "$KIND" --output build-context
+          python3 tools/container_prepare.py --candidate --kind "$KIND" --platform "linux/${{ matrix.architecture }}" --output build-context
           mkdir evidence
           cp build-context/container/release.json evidence/release.json
           python3 - <<'PY'
@@ -71,7 +83,7 @@ jobs:
         with:
           context: ./build-context
           file: ./build-context/Dockerfile
-          platforms: linux/arm64
+          platforms: linux/${{ matrix.architecture }}
           load: true
           push: false
           tags: livolo-validation:${{ matrix.kind }}
@@ -89,12 +101,13 @@ jobs:
           KIND: ${{ matrix.kind }}
           DAEMON: ${{ steps.source.outputs.daemon_version }}
           COMPAT: ${{ steps.source.outputs.firmware_compat_version }}
+          ARCHITECTURE: ${{ matrix.architecture }}
         run: |
           docker image inspect "livolo-validation:$KIND" > evidence/image.json
           python3 - <<'PY'
           import json, os
           image = json.load(open('evidence/image.json'))[0]
-          assert image['Architecture'] == 'arm64' and image['Os'] == 'linux'
+          assert image['Architecture'] == os.environ['ARCHITECTURE'] and image['Os'] == 'linux'
           labels = image['Config']['Labels']
           assert labels['net.sfires.livolo.daemon-version'] == os.environ['DAEMON']
           assert labels['net.sfires.livolo.firmware-compat-version'] == os.environ['COMPAT']
@@ -110,7 +123,7 @@ jobs:
               verify_installed("/usr/share/livolo-ec/firmware-release", pathlib.Path(livolod.__file__).parent / "firmware", inventory_sha256=firmware["inventory_sha256"], source_commit=firmware["source_commit"], version=firmware["version"])
           '
           docker run --rm --network none --user 10001:10001 --entrypoint python -e LIVOLO_NORDIC_SMOKE=1 -v "$PWD/host/docker/smoke.py:/checks/smoke.py:ro" "livolo-validation:$KIND" /checks/smoke.py
-      - name: Verify upgrade, persistence and restoration from public 0.5.0
+      - name: Verify persistence and, where available, upgrade from public 0.5.0
         env:
           KIND: ${{ matrix.kind }}
           PREVIOUS: ${{ matrix.previous }}
@@ -118,11 +131,13 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          python3 tools/container_check.py --image "livolo-validation:$KIND" --kind "$KIND" --broker-image "$BROKER" --previous-image "$PREVIOUS" 2>&1 | tee evidence/upgrade.txt
+          args=()
+          if [ -n "$PREVIOUS" ]; then args+=(--previous-image "$PREVIOUS"); fi
+          python3 tools/container_check.py --image "livolo-validation:$KIND" --kind "$KIND" --broker-image "$BROKER" "${args[@]}" 2>&1 | tee evidence/upgrade.txt
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: container-validation-${{ matrix.kind }}
+          name: container-validation-${{ matrix.kind }}-${{ matrix.architecture }}
           path: evidence/
           if-no-files-found: error
 

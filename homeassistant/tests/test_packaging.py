@@ -20,6 +20,43 @@ app = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(app)
 
 
+def test_experimental_amd64_is_local_candidate_only(tmp_path):
+    """Intel staging leaves the public listing unchanged and forces a local build.
+
+    @param tmp_path Isolated output directory for the candidate.
+    """
+    public = ROOT / "homeassistant/app/config.yaml"
+    original = public.read_bytes()
+    script = str(ROOT / "homeassistant/build_release.py")
+    for args in (
+        ("--experimental-amd64",),
+        ("--app", "--experimental-amd64"),
+        ("--candidate", "--experimental-amd64"),
+    ):
+        result = subprocess.run(
+            [sys.executable, script, *args], capture_output=True, text=True
+        )
+        assert result.returncode != 0
+        assert "requires --app and --candidate" in result.stderr
+    subprocess.run(
+        [
+            sys.executable,
+            script,
+            "--app",
+            "--candidate",
+            "--experimental-amd64",
+            "--output",
+            str(tmp_path),
+        ],
+        check=True,
+        capture_output=True,
+    )
+    config = (tmp_path / "ha-addons/livolo_ec/config.yaml").read_text()
+    assert "  - amd64\n" in config and "  - aarch64\n" in config
+    assert not any(line.startswith("image:") for line in config.splitlines())
+    assert public.read_bytes() == original
+
+
 def test_release_bundles_client_and_license(tmp_path):
     """Candidate archives retain the client/license and cannot masquerade as a release.
 
@@ -54,6 +91,15 @@ def test_release_bundles_client_and_license(tmp_path):
     assert f'version: "{distribution}"' in (context / "config.yaml").read_text()
     assert (ROOT / "homeassistant/app/config.yaml").read_bytes() == public_config
     assert (context / "CANDIDATE-NOT-FOR-RELEASE.txt").is_file()
+    versions = json.loads((ROOT / "host/release/version.json").read_text())
+    dockerfile = (context / "Dockerfile").read_text()
+    assert dockerfile.count(f'ARG RELEASE_VERSION={versions["daemon_version"]}') == 2
+    assert (
+        dockerfile.count(
+            f'ARG FIRMWARE_COMPAT_VERSION={versions["firmware_compat_version"]}'
+        )
+        == 2
+    )
     with zipfile.ZipFile(archive) as bundle:
         for name in ("button.py", "commissioning.py"):
             assert (
