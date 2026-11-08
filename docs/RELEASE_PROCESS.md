@@ -329,3 +329,10 @@ before/after paired-device, HA identity, options and running-version checks.
 Verify the pairing UI without starting pairing or controlling/removing devices.
 Rollback replaces only the integration files and restarts HA; it must not restore
 an older daemon database. Record publication and deployment outcomes separately.
+
+The integration-only 0.5.2 publication and actual HACS/Marketplace upgrade checks
+are complete. The official integration was installed on the existing HA host
+with its current peers and HA identities preserved; app, daemon and radio
+versions stayed unchanged. See the [release evidence](verification/ha-integration-0.5.2-20261108.json)
+and [deployment evidence](verification/ha-official-0.5.2-deployment-20261108.json)
+for exact hashes, checks and the Marketplace download/tracking limitation.

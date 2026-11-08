@@ -25,7 +25,7 @@ firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
 **Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
 Install **Livolo EC**, then restart HA. The current
-[0.5.1 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.1) contains
+[0.5.2 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.2) contains
 the assembled client and component. Shared default-catalog inclusion is separate;
 this installation uses a custom repository. Marketplace custom repositories
 require the user's GitHub authorization.
@@ -59,6 +59,15 @@ working app until a planned migration preserves its network identity, token and
 database and reconfigures the existing HA entry. Never start a second daemon on
 the same radio. HA Container users instead use the
 [standalone daemon container](../host/docker/README.md).
+
+Public **0.5.1 to 0.5.2** integration upgrades passed through real HACS on HA
+2026.10.4 and Marketplace on HA 2026.11.0, preserving configuration, entity IDs,
+names, areas and simulator state. The official ZIP and all 19 file hashes were
+verified. Integration 0.5.2 adds the per-hub Development setting and verified
+native device removal; it retains the unchanged 0.5.1 bundled client. App 0.5.1,
+daemon 0.14.1 and radio firmware 0.13 remain separate and unchanged. This is an
+integration-only maintenance release, not an all-board firmware release. See the
+[0.5.2 release evidence](../docs/verification/ha-integration-0.5.2-20261108.json).
 
 Public **0.5.0 to 0.5.1** upgrades passed through HACS on HA 2026.10.4 and
 Marketplace on HA 2026.11.0. Separate-process archive checks preserved actual
@@ -95,14 +104,22 @@ pairing, USB hotplug or automatic upgrades. See the
 
 ## Manual integration installation
 
-Build an archive from the repository root:
+Download the official [0.5.2 integration ZIP](https://github.com/psires/livolo_ec/releases/download/ha-0.5.2/livolo-ec-ha-0.5.2.zip)
+and verify it against the [release checksums](https://github.com/psires/livolo_ec/releases/download/ha-0.5.2/SHA256SUMS).
+Back up the existing integration files, then extract the ZIP into the HA
+configuration directory so `custom_components/livolo_ec/manifest.json` is beneath
+it. Keep the existing integration entry and restart HA Core.
+
+Maintainers rebuilding this release must use a clean checkout of
+`ha-0.5.2` (`25e61e5054e4a066edefa04c9810f6b060e9bdaa`), then run:
 
 ```sh
 python3 homeassistant/build_release.py
 ```
 
-Extract `dist/livolo-ec-ha-0.5.1.zip` into the HA configuration directory so
-`custom_components/livolo_ec/manifest.json` is beneath it, then restart HA.
+That checkout produces `dist/livolo-ec-ha-0.5.2.zip`. The development branch may
+carry a different, unreleased integration version.
+
 Use this assembled archive: the source component alone does not include its
 independent client. The builder bundles `client/livolo_ec_client` as `_client`
 without relying on an unpublished package or installing the daemon in HA Core.
@@ -125,8 +142,8 @@ Maintainers export a reviewed, committed source revision with:
 
 ```sh
 python3 homeassistant/export_channel.py --commit <full-source-commit> \
-  --version 0.5.1 --output dist/ha-channel-0.5.1
-python3 dist/ha-channel-0.5.1/scripts/build_release.py --tag 0.5.1
+  --version 0.5.2 --output dist/ha-channel-0.5.2
+python3 dist/ha-channel-0.5.2/scripts/build_release.py --tag 0.5.2
 ```
 
 The generated repository contains the complete integration, client, original

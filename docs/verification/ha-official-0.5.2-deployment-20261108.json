@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "status": "deployed_verified_with_stale_marketplace_tracking",
+  "host": "existing production HA gateway",
+  "platform": "Home Assistant OS, Core 2026.11.0, aarch64 RPi5",
+  "scope": "Integration/client only; existing HA entry retained",
+  "release": {
+    "version": "0.5.2",
+    "source_commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
+    "integration_files": {
+      "LICENSE": "f2459cc9f4564c7e974465f14a897afa68097a9a0c432b1ea4e9c95280d2940b",
+      "__init__.py": "2aaed3013b85e6a313443df29d74c5a137d390532536bf0a6d4bf0cd626bc0d1",
+      "_client/__init__.py": "88a1da8ac74562fa479d8c501a91533632cc4b6cc562be39965008fdfe224aa0",
+      "brand/README.md": "c43e332a485e14399f96241448dd8f9cc5e6ae4954ab7db5bb30cd8bb696fc80",
+      "brand/icon.png": "0e84fc09001957a9fe50cc1a9cf44e64d4bf2737378fb7449812ced9eb218eda",
+      "brand/icon@2x.png": "db4163f1e9d616313457ec14e6c259cf92a7e78abdedd35770cb583188cb2bf4",
+      "button.py": "f7c269cda62c64fb5e77100c66f8a93a76a8a2800220fd969b35fbd83c5bd5d3",
+      "commissioning.py": "82fb6c6106a350e3d368df558952fcf6d9d5630a77db0f6d2d7e7f738321b2cf",
+      "config_flow.py": "7374ef748d76dc53c5014a0311e9fa09135e03609b997bcc4c3b5c86a01b0eaf",
+      "const.py": "ca08bdfbc9b969c5a2e24261b1d15fe0e18cdbc8a0bdb322af3e674c7b0b8a51",
+      "coordinator.py": "71ec9c5c15c7fe5afc62c6c2bb3870cb80ec95291e0f509ab25032428d5eaffa",
+      "diagnostics.py": "5de66eeb2c3a56975b9cf8c1676fb2ac38ec3d786a5779e540c39570b52fabcc",
+      "firmware_notice.py": "2373ff26b57fb2cfe958d55d3bf43e877ab5bb97e7a27b6b21af8a4ff1eafc13",
+      "manifest.json": "ae8c6bbd06a9f36304c170ef4bd235ee04d397fdf6deb93622a006e282bdb2e1",
+      "sensor.py": "c34143b2af9dc932d702e8580b988931e67bb3ca8c604df50386597aef837e13",
+      "strings.json": "c950e4d5e0c13304576a0c2d9fca26fbc0e553d219fe8bf14d3aea0d86c0c6e8",
+      "switch.py": "7b4f85299eac50bfcfd4542f7f683f8ab5bf27dde05784f70de5ef1ac36f9541",
+      "translations/en.json": "c950e4d5e0c13304576a0c2d9fca26fbc0e553d219fe8bf14d3aea0d86c0c6e8",
+      "update.py": "f9aa0cac63e54452e9d27adae4b691fe23ac23a85932d2efbe35f0541a6af18a"
+    },
+    "zip_sha256": "03c1b4f8226a99a85698ea26a0692a4a7e9fd8fdf80d91de433940c066a05a42",
+    "provenance_sha256": "e2940f82e0a9766eae1f4797e2f9ffe85de4eb190c8c3e693ff7599d2b073ff5",
+    "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.5.2",
+    "channel_commit": "817c0693970e8aaefca740365b021cb2d2682f9a"
+  },
+  "installation": {
+    "method": "Verified official release ZIP, staged and atomically renamed after native Marketplace download failure",
+    "marketplace_attempt": {
+      "result": "failed",
+      "time_local": "2026-11-08T12:38:29+01:00",
+      "error": "HTTP 502 downloading official release livolo_ec.zip",
+      "files_after_failed_download": "All 19 original 0.5.1 files still matched baseline"
+    },
+    "installed_files_verified_before_restart": 19,
+    "loaded_version": "0.5.2",
+    "core_restart_succeeded": true,
+    "core_started_at": "2026-11-08T11:40:04.100231028Z",
+    "app_restarted": false,
+    "radio_flashed": false,
+    "marketplace_refresh_attempted": true,
+    "marketplace_refresh_result": "Still reports 0.5.1 installed and 0.5.2 available; metadata was not edited"
+  },
+  "native_ui": {
+    "version": "0.5.2",
+    "add_hub_visible": true,
+    "normal_menu": [
+      "Pair new device",
+      "Refresh reported state",
+      "Forget a device",
+      "Check firmware update (read-only)",
+      "Settings"
+    ],
+    "pairing_instructions_verified": "One two-minute session, one intended new switch, supported profile detected and registered, fresh pairing confirmation required; no wire ID or output count required.",
+    "pairing_submit_pressed": false,
+    "development_default_off": true,
+    "development_enabled_and_inspected": true,
+    "development_menu": [
+      "Register a device manually",
+      "Detect a switch (experimental)",
+      "Targeted pairing"
+    ],
+    "development_restored_off": true,
+    "development_hidden_after_restore": true,
+    "gateway_pair_button_available": true,
+    "gateway_cancel_button_disabled_without_active_session": true,
+    "gateway_buttons_pressed": false,
+    "integration_restart_repair_present": false
+  },
+  "preservation": {
+    "verified_at_utc": "2026-11-08T11:43:30.954421+00:00",
+    "checks": {
+      "official_integration_files": true,
+      "loaded_integration052": true,
+      "coordinator_connected": true,
+      "radio_ready": true,
+      "app_container_unchanged": true,
+      "app051_daemon0141": true,
+      "app_image_unchanged": true,
+      "daemon_package_files_unchanged": true,
+      "radio_report_unchanged": true,
+      "native_api_identity_unchanged": true,
+      "config_catalog_bytes_unchanged": true,
+      "ha_entities_unchanged": true,
+      "ha_devices_unchanged": true,
+      "ha_areas_unchanged": true,
+      "ha_entry_identity_data_unchanged": true,
+      "unrelated_options_unchanged": true,
+      "development_restored": true,
+      "durable_tables_unchanged": true,
+      "peer_rows_unchanged": true,
+      "removed_rows_unchanged": true,
+      "command_rows_unchanged": true,
+      "token_rows_unchanged": true,
+      "firmware_job_unchanged": true,
+      "commissioning_unchanged": true,
+      "paired_ids_unchanged": true,
+      "paired_online": true,
+      "marketplace_installed052": false,
+      "known_radio_owner_unchanged": true,
+      "core.device_registry_full_rows_unchanged": true,
+      "core.entity_registry_full_rows_unchanged": true
+    },
+    "failed_checks": [
+      "marketplace_installed052"
+    ],
+    "paired_devices": [
+      {
+        "outputs": 2,
+        "availability": "online"
+      },
+      {
+        "outputs": 2,
+        "availability": "online"
+      }
+    ],
+    "ha_devices": 5,
+    "ha_entities": 14,
+    "full_registry_comparison": {
+      "core.device_registry": {
+        "equal": true,
+        "changed_ids": []
+      },
+      "core.entity_registry": {
+        "equal": true,
+        "changed_ids": []
+      }
+    },
+    "development_stored": false,
+    "development_semantically_restored": true,
+    "app_started_at": "2026-11-07T21:21:28.379790036Z",
+    "core_started_at": "2026-11-08T11:40:04.100231028Z",
+    "marketplace": {
+      "installed_version": "0.5.1",
+      "latest_version": "0.5.2",
+      "release_url": "https://github.com/psires/ha-livolo-ec/releases/tag/0.5.2"
+    },
+    "volatile_state_rows_changed": false,
+    "state_evidence_note": "Detailed entity state snapshots retained in the private deployment audit; public receipt omits household entity labels and current switch states."
+  },
+  "expected_metadata_delta": {
+    "development_option": "Absent/default false before; explicit false after ON/OFF UI verification",
+    "entry_modified_at": "Changed by saving options; all other entry identity/data and unrelated options unchanged"
+  },
+  "unchanged_runtime": {
+    "app_version": "0.5.1",
+    "daemon_version": "0.14.1",
+    "radio_firmware": "0.13",
+    "same_daemon_container_process_usb_fd": true,
+    "firmware_cached_report_equal": true,
+    "paired_rows_names_profiles_network_configuration_equal": true,
+    "full_ha_device_and_entity_rows_equal": true
+  },
+  "backup_and_rollback": {
+    "backups": "Existing integration code, HA registries/options, consistent daemon SQLite snapshot retained privately.",
+    "rollback_exercised": false,
+    "rollback_scope": "Integration files and HA Core restart only; do not restore daemon DB to avoid resurrecting forgotten peers.",
+    "private_rollback_code_retained": true
+  },
+  "limitations": [
+    "Physical pairing, switch control, device deletion and firmware update were not exercised during this deployment.",
+    "Marketplace tracking remains stale after an upstream release-download HTTP 502 and supported metadata refresh; actual loaded 0.5.2 and all 19 official file hashes independently verified.",
+    "Existing forgotten-device HA entries retained; current daemon has two online paired switches, while HA retains five device and fourteen entity records."
+  ],
+  "hardware_operations": {
+    "pairing_started": false,
+    "device_control_sent": false,
+    "device_removed": false,
+    "firmware_job_started": false,
+    "serial_port_opened_by_verifier": false
+  },
+  "installer_qualification_reference": "https://github.com/psires/livolo_ec/actions/runs/42476039110"
+}

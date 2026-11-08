@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "status": "released_and_deployed_with_marketplace_tracking_lag",
+  "scope": "integration-only maintenance; not a complete all-board project release",
+  "integration_version": "0.5.2",
+  "previous_integration_version": "0.5.1",
+  "source_commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
+  "integration_channel_commit": "817c0693970e8aaefca740365b021cb2d2682f9a",
+  "unchanged_components": {
+    "bundled_client_package": "0.5.1",
+    "bundled_client_implementation": "identical to ha-0.5.1",
+    "app": "0.5.1",
+    "daemon": "0.14.1",
+    "radio_firmware": "0.13",
+    "native_api": 1,
+    "uart_protocol": 3
+  },
+  "payloads": {
+    "integration": true,
+    "bundled_client": true,
+    "app": false,
+    "daemon": false,
+    "containers": false,
+    "radio_firmware": false
+  },
+  "source_checks": {
+    "local_ha_tests_passed": 266,
+    "local_packaging_tests_passed": 6,
+    "ha_core": "2026.10.4",
+    "python": "3.14",
+    "black": "pass",
+    "function_documentation_files": 185,
+    "whitespace": "pass",
+    "remote": {
+      "commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
+      "native_ha_run": 42475157834,
+      "source_checks_run": 42475157770,
+      "successful_jobs": [
+        "integration",
+        "hassfest",
+        "offline",
+        "wireshark"
+      ]
+    }
+  },
+  "channel": {
+    "commit": "817c0693970e8aaefca740365b021cb2d2682f9a",
+    "validation_run": 42475287331,
+    "validation": "success",
+    "release": "https://github.com/psires/ha-livolo-ec/releases/tag/0.5.2",
+    "published_latest": true,
+    "zip_sha256": "03c1b4f8226a99a85698ea26a0692a4a7e9fd8fdf80d91de433940c066a05a42",
+    "source_json_sha256": "e2940f82e0a9766eae1f4797e2f9ffe85de4eb190c8c3e693ff7599d2b073ff5",
+    "checksums_sha256": "bf0bd3bdcb4de2f4501a99aabd7165e354d87dbe54d1295d8a534773588e49e9",
+    "browser_download_auto_extracted": true,
+    "downloaded_files_match_published_provenance": 19
+  },
+  "canonical": {
+    "release": "https://github.com/psires/livolo_ec/releases/tag/ha-0.5.2",
+    "published_latest": true,
+    "source_commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
+    "zip_sha256": "c91413b006872b44de119886380c1f54728a76f7f80399419a263dacf0567747",
+    "release_json_sha256": "d073a0de8d9ab88ab986ca98b4ef62aaeae7f49aeb3db4ca38aa2dd0b5fe73bd",
+    "checksums_sha256": "30c56ed60e1dd78e21e4fcc7a0f929615ecc6630847a41f5d308b8a2557e2e4e",
+    "app_archive_present": false
+  },
+  "official_artifact_verification": {
+    "github_ui_digests_observed_by": "Tech Lead",
+    "browser_downloaded_component_files": 19,
+    "source_json_digest_verified": true,
+    "all_file_hashes_verified_independently_by_release_engineer": true,
+    "hacs_zip_local_digest_matches_official_asset_digest": true
+  },
+  "public_installer_upgrade": {
+    "run": "https://github.com/psires/livolo_ec/actions/runs/42476039110",
+    "workflow_commit": "1f9a5d25de564e7c228c2fc0a48eaa2d2863f304",
+    "source_commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
+    "hacs": {
+      "ha_core": "2026.10.4",
+      "job_id": 128717519922,
+      "status": "passed"
+    },
+    "marketplace": {
+      "ha_core": "2026.11.0",
+      "job_id": 128717520203,
+      "status": "passed"
+    },
+    "checks": [
+      "Official public ZIP checksum and all 19 file hashes",
+      "Actual public baseline install and upgrade through upstream installer",
+      "Existing configuration/token, entity IDs, names and areas preserved",
+      "Simulator daemon state and readiness preserved",
+      "Pending restart and configuration reload"
+    ],
+    "limits": [
+      "Isolated simulator; no live radios",
+      "Does not test GitHub user authorization or a full HA process restart"
+    ]
+  },
+  "live_deployment": {
+    "status": "official_0.5.2_loaded_and_verified",
+    "evidence": "ha-official-0.5.2-deployment-20261108.json",
+    "method": "Verified official ZIP fallback after native Marketplace asset download HTTP502; HA Core restart",
+    "current_paired_peers": 2,
+    "ha_device_records": 5,
+    "ha_entity_records": 14,
+    "pairing_ui_verified_without_pairing": true,
+    "development_enabled_then_restored_false": true,
+    "app_daemon_radio_unchanged": true,
+    "marketplace_tracking": "Still reports 0.5.1 after supported metadata refresh; actual loaded 0.5.2 and all 19 official files verified. Native asset download failed HTTP502.",
+    "preservation_checks_passed": 29,
+    "tracking_checks_failed": 1,
+    "rollback_exercised": false
+  },
+  "limits": [
+    "No new physical pairing or control qualification",
+    "No all-board firmware qualification or redistribution acceptance claimed",
+    "The 0.6.0 candidate and app firmware gate remain unchanged"
+  ],
+  "publication_access": "GitHub API returned 503/504 and HTML errors from laptop and HA host; native Safari verified official CI/releases/downloads. The unchanged public installer harness passed on GitHub runners.",
+  "excluded_main_ci_issue": {
+    "description": "Experimental MG24 test fixture failed GNU warning checks; maintenance release source excludes it",
+    "test_only_fix_commit": "a0bdb3918e551a4234762a8b64b244a167c08195",
+    "production_firmware_changes": false,
+    "gnu_validation": {
+      "run": "https://github.com/psires/livolo_ec/actions/runs/42476130096",
+      "job_id": 128717794541,
+      "stub_errors_resolved": true,
+      "remaining_failure": "Experimental firmware/mg24/reject.c:99 formats uint32 CRC count into char crc[8]; GCC -Werror=format-truncation",
+      "release_impact": "None: frozen HA maintenance source excludes experimental MG24; no main-CI-green claim",
+      "follow_up": "Tech Lead and ZigBee specialist own separate correction and qualification; no flashing"
+    }
+  }
+}

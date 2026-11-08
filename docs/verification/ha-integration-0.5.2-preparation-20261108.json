@@ -1,5 +1,5 @@
 {
-  "status": "prepared_waiting_for_github_ci_access",
+  "status": "superseded_by_release_and_deployment_evidence",
   "source_commit": "25e61e5054e4a066edefa04c9810f6b060e9bdaa",
   "packaging_commit": "5568a03df2ce9e8734ba45eb8d472b062e498f29",
   "integration_channel_commit": "817c0693970e8aaefca740365b021cb2d2682f9a",
@@ -8,9 +8,9 @@
   "canonical_hacs_component_byte_parity": true,
   "component_file_count": 19,
   "hacs_zip_sha256": "03c1b4f8226a99a85698ea26a0692a4a7e9fd8fdf80d91de433940c066a05a42",
-  "tags_created": false,
-  "published": false,
-  "live_changed": false,
+  "tags_created": true,
+  "published": true,
+  "live_changed": true,
   "scope": "integration-only maintenance",
   "integration_version": "0.5.2",
   "local_tests": {
@@ -36,17 +36,21 @@
     "protected_backup_prepared": true
   },
   "blocker": {
-    "laptop_github_https": "repeated 504 and timeouts",
-    "ha_host_public_github_requests": "source check-runs HTTP503; channel check-runs HTTP504",
-    "remote_ci_verified": false,
-    "public_installer_upgrade_verified": false
+    "historical": "GitHub API errors initially blocked CI observation and local installer checks",
+    "resolution": "Native browser verified exact CI and public assets; both unchanged actual installer tests passed on GitHub runners"
   },
-  "remaining": [
-    "Verify exact-source and channel CI",
-    "Publish immutable canonical ha-0.5.2 and HACS 0.5.2 releases",
-    "Verify public artifacts against reviewed source and hashes",
-    "Run actual HACS and Marketplace 0.5.1 to 0.5.2 upgrade harness",
-    "HA specialist installs official integration only and verifies UI and device preservation"
-  ],
-  "radio_operations": false
+  "remaining": [],
+  "radio_operations": false,
+  "ci": {
+    "maintenance_source": "https://github.com/psires/livolo_ec/actions/runs/42475157770",
+    "maintenance_ha": "https://github.com/psires/livolo_ec/actions/runs/42475157834",
+    "channel": "https://github.com/psires/ha-livolo-ec/actions/runs/42475287331",
+    "verified_by": "Tech Lead using native Safari"
+  },
+  "official_releases": {
+    "hacs": "https://github.com/psires/ha-livolo-ec/releases/tag/0.5.2",
+    "canonical": "https://github.com/psires/livolo_ec/releases/tag/ha-0.5.2"
+  },
+  "official_artifact_verification": "Published HACS ZIP digest equals reviewed local ZIP; browser-downloaded source.json and all 19 component files independently verified",
+  "superseded_by": "ha-integration-0.5.2-20261108.json"
 }
