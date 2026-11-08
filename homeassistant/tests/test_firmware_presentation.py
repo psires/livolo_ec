@@ -90,6 +90,23 @@ def test_blockers_give_a_bounded_next_action(reason, expected):
     assert expected in guidance(reason)
 
 
+@pytest.mark.parametrize(
+    "fields,expected",
+    [
+        ({"recovery": "recovery_required"}, "reviewed recovery procedure"),
+        ({"status": "unknown"}, "unknown outcome"),
+        ({"status": "pending"}, "already running"),
+    ],
+)
+def test_unresolved_job_guidance_precedes_catalog_failure(fields, expected):
+    """Catalog validation can fail first, but next steps must still honor unresolved jobs.
+
+    @param fields Snapshot evidence for the existing job.
+    @param expected Recovery or waiting guidance that takes precedence.
+    """
+    assert expected in guidance("artifact_missing", fields)
+
+
 async def test_report_links_existing_gateway_and_preserves_job_and_options(
     hass, envelope, preflight_report
 ):
@@ -137,7 +154,7 @@ async def test_report_links_existing_gateway_and_preserves_job_and_options(
         envelope["data"]["firmware_update"].update(
             status="unknown", recovery="recovery_required", stage="interrupted"
         )
-        report.update(blocked_reason="recovery_required", installed_version=None)
+        report.update(blocked_reason="artifact_missing", installed_version=None)
         result = await hass.config_entries.options.async_configure(
             flow["flow_id"], {"refresh": True}
         )

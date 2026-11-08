@@ -64,11 +64,19 @@ def public_code(value, fallback="Not reported"):
     )
 
 
-def guidance(reason):
+def guidance(reason, firmware=None):
     """Translate known blockers while leaving unknown outcomes explicitly unsupported.
 
     @param reason Optional stable daemon preflight blocking code.
+    @param firmware Current snapshot; unresolved jobs take precedence over catalog advice.
     """
+    if isinstance(firmware, dict):
+        if firmware.get("recovery"):
+            return REASONS["recovery_required"]
+        if firmware.get("status") == "unknown":
+            return "The existing job has an unknown outcome. Inspect its status and recovery guidance before requesting another installation."
+        if firmware.get("in_progress") is True or firmware.get("status") == "pending":
+            return REASONS["update_in_progress"]
     if not reason:
         return "Review the versions and compatibility checks before using the gateway's standard firmware update control. Installation checks compatibility again."
     return REASONS.get(

@@ -439,7 +439,7 @@ class LivoloOptionsFlow(OptionsFlow):
                             f"- {item['id'].replace('_', ' ')}: {item['status']} ({item['code'].replace('_', ' ')})"
                             for item in report["checks"]
                         ),
-                        "guidance": guidance(report["blocked_reason"]),
+                        "guidance": guidance(report["blocked_reason"], firmware),
                     }
                 )
         except AuthenticationError:
