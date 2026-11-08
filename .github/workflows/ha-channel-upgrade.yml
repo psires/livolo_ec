@@ -1,0 +1,80 @@
+name: Public HA installer upgrade
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ha-channel-upgrade.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-upgrade:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        installer: [hacs, marketplace]
+    env:
+      LIVOLO_INSTALLER: ${{ matrix.installer }}
+      LIVOLO_BASELINE_VERSION: '0.5.1'
+      LIVOLO_CURRENT_VERSION: '0.5.2'
+      LIVOLO_HACS_SOURCE: ${{ github.workspace }}/hacs-upstream
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 25e61e5054e4a066edefa04c9810f6b060e9bdaa
+          path: release-source
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+      - uses: actions/checkout@v4
+        if: matrix.installer == 'hacs'
+        with:
+          repository: hacs/integration
+          ref: a15e87ec0d1c82e58f1ddbaf17669d3eaa261eb8
+          path: hacs-upstream
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        if: matrix.installer == 'marketplace'
+        with:
+          repository: home-assistant/core
+          ref: 74cf5a49c63ed8d4d87717844bf14f79c28c9cea
+          path: ha-upstream
+          sparse-checkout: packages/pytest-homeassistant
+          persist-credentials: false
+      - name: Install HACS test environment
+        if: matrix.installer == 'hacs'
+        run: python -m pip install -r release-source/homeassistant/requirements-test.txt aiogithubapi==26.0.0
+      - name: Install Marketplace test environment
+        if: matrix.installer == 'marketplace'
+        run: python -m pip install homeassistant==2026.11.0 aiogithubapi==26.0.0 pyserial==3.5 ./ha-upstream/packages/pytest-homeassistant sqlalchemy
+      - name: Verify immutable public integration assets
+        working-directory: release-source
+        run: |
+          mkdir public-assets
+          cd public-assets
+          for file in livolo_ec.zip source.json SHA256SUMS; do
+            curl --fail --location --retry 3 --max-time 60 "https://github.com/psires/ha-livolo-ec/releases/download/0.5.2/$file" --output "$file"
+          done
+          sha256sum --check SHA256SUMS
+          echo '03c1b4f8226a99a85698ea26a0692a4a7e9fd8fdf80d91de433940c066a05a42  livolo_ec.zip' | sha256sum --check
+          python - <<'PY'
+          import hashlib, json, zipfile
+          from pathlib import Path
+          source = json.loads(Path('source.json').read_text())
+          assert source['source_commit'] == '25e61e5054e4a066edefa04c9810f6b060e9bdaa'
+          assert source['integration_version'] == '0.5.2' and source['preview'] is False
+          with zipfile.ZipFile('livolo_ec.zip') as bundle:
+              files = {'custom_components/livolo_ec/' + name: hashlib.sha256(bundle.read(name)).hexdigest() for name in bundle.namelist()}
+          assert files == source['files'] and len(files) == 19
+          print('Official 0.5.2 ZIP, pinned source and all 19 component file hashes verified')
+          PY
+      - name: Install public baseline and upgrade with real upstream installer
+        working-directory: release-source
+        run: python homeassistant/channel_tests/run.py -c homeassistant/pytest.ini homeassistant/channel_tests -q
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-upgrade-${{ matrix.installer }}
+          path: release-source/public-assets/
