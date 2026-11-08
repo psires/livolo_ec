@@ -1,7 +1,13 @@
 """Native Home Assistant entities backed by a local Livolo EC daemon."""
 
+import re
+
 from homeassistant.const import Platform
-from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    ConfigEntryNotReady,
+    HomeAssistantError,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
@@ -68,21 +74,43 @@ async def async_unload_entry(hass, entry):
 
 
 async def async_remove_config_entry_device(hass, entry, device_entry):
-    """Allow registry removal only after a physical device was forgotten by the daemon.
+    """Forget the selected daemon peer before allowing HA to remove its registry entry.
 
     @param hass Home Assistant instance.
     @param entry Network config entry.
     @param device_entry HA device proposed for deletion.
-    @return True for a forgotten child; False for the gateway or active peers.
+    @return True for a verified absent child; False for unsupported device identities.
     """
-    if not hasattr(entry, "runtime_data"):
+    coordinator = getattr(entry, "runtime_data", None)
+    if coordinator is None or not entry.unique_id:
         return False
-    active = {(DOMAIN, entry.unique_id)}
-    active.update(
-        (DOMAIN, f"{entry.unique_id}:{device['id']}")
-        for device in entry.runtime_data.data["devices"]
-    )
-    return not bool(device_entry.identifiers & active)
+    identifiers = [
+        identifier
+        for domain, identifier in device_entry.identifiers
+        if domain == DOMAIN
+    ]
+    if len(identifiers) != 1:
+        return False
+    match = re.fullmatch(re.escape(entry.unique_id) + r":([0-9a-f]{8})", identifiers[0])
+    if match is None:
+        return False
+    device_id = match[1]
+    try:
+        coordinator.accept(await coordinator.client.snapshot())
+        if any(device["id"] == device_id for device in coordinator.data["devices"]):
+            await coordinator.client.command("remove", {"device": device_id})
+            coordinator.accept(await coordinator.client.snapshot())
+    except LivoloError as error:
+        raise HomeAssistantError(
+            "Could not verify removal from the Livolo daemon. "
+            "The HA device has been kept; check the daemon and retry."
+        ) from error
+    if any(device["id"] == device_id for device in coordinator.data["devices"]):
+        raise HomeAssistantError(
+            "The Livolo daemon still reports this device as registered. "
+            "The HA device has been kept."
+        )
+    return True
 
 
 async def async_remove_entry(hass, entry):

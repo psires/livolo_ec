@@ -20,12 +20,33 @@ official Nordic PCA10059 now also has a qualified gateway build; support remains
 specific to the boards and tests recorded in the matrix. A radio running Livolo
 firmware cannot simultaneously serve ZHA, Zigbee2MQTT or Thread.
 
+## Integration-only maintenance release 0.5.2
+
+This release updates the assembled integration and bundled client only. It keeps
+app 0.5.1, daemon 0.14.1 and firmware compatibility 0.13; the bundled client
+implementation remains unchanged from 0.5.1. No app image, daemon package or
+radio firmware is published by this release. Full-project firmware qualification
+remains a separate release blocker.
+
+Configure now presents **Pair new device**, refresh, forget, read-only firmware
+preflight and **Settings**. Manual registration, detection and pairing are under
+**Development**, disabled by default for each hub. Turning it off also guards
+already-open manual flows. Automatic pairing status and cancellation remain
+available. Native HA device deletion forgets the selected daemon peer and verifies
+its absence before allowing HA to remove the device; failures retain the HA record.
+Updating the integration does not delete devices or start pairing.
+
+Retain the existing configuration entry during upgrade. Restore the previous
+integration files and restart HA for software rollback; do not restore an older
+daemon database or re-add the integration. The release uses the 0.5.1 maintenance
+line and does not change the 0.6.0 all-board candidate or firmware publication gate.
+
 ## Install through HACS or Marketplace
 
 Add [psires/ha-livolo-ec](https://github.com/psires/ha-livolo-ec) as a custom
 **Integration** repository in HACS (HA 2026.10.4) or Marketplace (HA 2026.11).
 Install **Livolo EC**, then restart HA. The current
-[0.5.0 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.0) contains
+[0.5.2 release](https://github.com/psires/ha-livolo-ec/releases/tag/0.5.2) contains
 the assembled client and component. Shared default-catalog inclusion is separate;
 this installation uses a custom repository. Marketplace custom repositories
 require the user's GitHub authorization.

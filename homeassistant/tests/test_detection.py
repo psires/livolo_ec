@@ -41,9 +41,13 @@ async def start_detection(hass):
         domain="livolo_ec",
         unique_id="2a992b12:a7",
         data={"url": "http://example.invalid:8090", "token": "test-secret"},
+        options={"development": True},
     )
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "development"}
+    )
     return await hass.config_entries.options.async_configure(
         result["flow_id"], {"next_step_id": "discover"}
     )

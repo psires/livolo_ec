@@ -13,6 +13,7 @@ from custom_components.livolo_ec._client import CommandFailed
 
 from test_update import gateway  # noqa: F401
 from test_commissioning_client import session
+from test_development_options import set_development
 
 
 @pytest.fixture
@@ -251,7 +252,7 @@ async def test_existing_targeted_pairing_and_disconnect_disable_start(hass, pair
     assert hass.states.get(pairing.cancel).state == "unavailable"
 
 
-async def test_options_attach_without_second_start_and_preserve_advanced_menu(
+async def test_options_attach_without_second_start_with_development_disabled(
     hass, pairing
 ):
     """Opening the secondary flow observes the current session without creating another one.
@@ -264,12 +265,41 @@ async def test_options_attach_without_second_start_and_preserve_advanced_menu(
         result = await hass.config_entries.options.async_init(
             pairing.gateway.entry.entry_id
         )
-        assert {"pair_new", "pair", "add", "discover"} <= set(result["menu_options"])
+        assert "pair_new" in result["menu_options"]
+        assert not {"pair", "add", "discover", "development"} & set(
+            result["menu_options"]
+        )
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {"next_step_id": "pair_new"}
         )
         assert result["step_id"] == "pairing_status"
         assert result["description_placeholders"]["session"] == "session-1"
+        submit.assert_not_called()
+
+
+async def test_legacy_daemon_explains_upgrade_without_manual_options(hass, pairing):
+    """An older daemon cannot silently reveal manual commissioning in the normal UI.
+
+    @param hass Actual HA instance.
+    @param pairing Loaded gateway with its automatic commissioning capability withdrawn.
+    """
+    pairing.data["commissioning_supported"] = False
+    await pairing.publish(None)
+    with patch.object(pairing.gateway.entry.runtime_data.client, "command") as submit:
+        result = await hass.config_entries.options.async_init(
+            pairing.gateway.entry.entry_id
+        )
+        assert not {"development", "add", "pair", "discover"} & set(
+            result["menu_options"]
+        )
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "pair_new"}
+        )
+        assert result["errors"] == {"base": "commissioning_unsupported"}
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {}
+        )
+        assert result["errors"] == {"base": "commissioning_unsupported"}
         submit.assert_not_called()
 
 
@@ -331,11 +361,12 @@ async def test_options_distinguish_observed_unknown_profile_from_session_outcome
 
 
 async def test_options_explicit_start_refresh_and_cancel(hass, pairing):
-    """The secondary entry point submits only explicit start and cancel actions.
+    """Disabling Development during automatic pairing preserves observation and cancellation.
 
     @param hass Actual HA instance.
     @param pairing Loaded controls with controllable daemon replies.
     """
+    await set_development(hass, pairing.gateway.entry, True)
 
     async def command(action, payload):
         """Publish the daemon state corresponding to the submitted action.
@@ -365,6 +396,7 @@ async def test_options_explicit_start_refresh_and_cancel(hass, pairing):
         )
         assert result["description_placeholders"]["status"] == "listening"
         assert submit.await_count == 1
+        await set_development(hass, pairing.gateway.entry, False)
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {}
         )

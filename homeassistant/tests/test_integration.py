@@ -309,10 +309,14 @@ async def test_options_targeted_pairing_and_forget_confirmation(hass):
     """
     config_entry = entry()
     config_entry.add_to_hass(hass)
+    hass.config_entries.async_update_entry(config_entry, options={"development": True})
     with patch(
         "custom_components.livolo_ec.config_flow.Client.command", new_callable=AsyncMock
     ) as command:
         result = await hass.config_entries.options.async_init(config_entry.entry_id)
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"], {"next_step_id": "development"}
+        )
         result = await hass.config_entries.options.async_configure(
             result["flow_id"], {"next_step_id": "pair"}
         )

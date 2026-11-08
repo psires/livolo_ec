@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "scope": "integration-only maintenance; not a complete all-board project release",
+  "integration_version": "0.5.2",
+  "base_commit": "e08b3bc3430ae547fa15ccc594206b8cbf3cc3f2",
+  "reviewed_implementation_commit": "6484d0846b41e1428fc4ef8902f5d7de3e64e24e",
+  "unchanged": {
+    "client_package": "0.5.1",
+    "app": "0.5.1",
+    "daemon": "0.14.1",
+    "firmware_compat": "0.13",
+    "api": 1,
+    "uart": 3
+  },
+  "checks": {
+    "home_assistant": "2026.10.4",
+    "python": "3.14",
+    "ha_suite_passed": 266,
+    "ha_suite_seconds": 20.32,
+    "black": "pass",
+    "function_documentation_files": 185,
+    "version_consistency": "pass",
+    "whitespace": "pass"
+  },
+  "payload_scope": "assembled integration with unchanged bundled client only; no app, daemon or radio firmware publication",
+  "qualification_limits": [
+    "No new physical pairing or control validation",
+    "No radio firmware changes or additional board qualification",
+    "Public installer upgrade and live deployment evidence recorded separately after publication"
+  ],
+  "authorization": "Owner explicitly requested release and HA update preserving paired devices and radio firmware; integration-only maintenance scope agreed with Tech Lead"
+}
