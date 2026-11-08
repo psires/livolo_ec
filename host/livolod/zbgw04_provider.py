@@ -10,6 +10,7 @@ retain inherited leases until all workers and helpers have exited.
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+import ctypes
 import fcntl
 import errno
 import hashlib
@@ -21,6 +22,7 @@ from pathlib import Path
 import re
 import secrets
 import stat
+import sys
 import termios
 import time
 
@@ -43,6 +45,57 @@ def _require(condition, code, message):
         raise BundleError(code, message)
 
 
+class _LinuxStatFS(ctypes.Structure):
+    """Linux arm64/amd64 LP64 statfs layout, used only after native ABI admission."""
+
+    _fields_ = [
+        ("f_type", ctypes.c_long),
+        ("f_bsize", ctypes.c_long),
+        ("f_blocks", ctypes.c_ulong),
+        ("f_bfree", ctypes.c_ulong),
+        ("f_bavail", ctypes.c_ulong),
+        ("f_files", ctypes.c_ulong),
+        ("f_ffree", ctypes.c_ulong),
+        ("f_fsid", ctypes.c_int * 2),
+        ("f_namelen", ctypes.c_long),
+        ("f_frsize", ctypes.c_long),
+        ("f_flags", ctypes.c_long),
+        ("f_spare", ctypes.c_long * 4),
+    ]
+
+
+def _check_attachment_environment(sysfs):
+    """Require a reviewed full-width Linux ABI and genuine kernel sysfs metadata.
+
+    The 64-bit kernfs inode contains both allocation ID and wrap generation.
+    A 32-bit kernel can expose only its low bits; pointer width alone is not
+    enough to establish this contract. No timestamp fallback is permitted.
+    @param sysfs Resolved sysfs directory; opened read-only, never a serial node.
+    """
+    _require(
+        sys.platform == "linux"
+        and os.uname().machine in {"aarch64", "x86_64"}
+        and ctypes.sizeof(ctypes.c_void_p) == 8
+        and ctypes.sizeof(ctypes.c_ulong) == 8
+        and ctypes.sizeof(_LinuxStatFS) == 120,
+        "unsupported_profile",
+        "Physical inventory requires native 64-bit Linux arm64 or amd64",
+    )
+    descriptor = os.open(sysfs, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        buffer = _LinuxStatFS()
+        call = ctypes.CDLL(None, use_errno=True).fstatfs
+        call.argtypes = [ctypes.c_int, ctypes.POINTER(_LinuxStatFS)]
+        call.restype = ctypes.c_int
+        _require(
+            call(descriptor, ctypes.byref(buffer)) == 0 and buffer.f_type == 0x62656572,
+            "inventory_unavailable",
+            "Physical inventory requires a real sysfs filesystem",
+        )
+    finally:
+        os.close(descriptor)
+
+
 class LinuxUSB:
     """Read Linux metadata without opening a serial endpoint or claiming board identity."""
 
@@ -52,6 +105,7 @@ class LinuxUSB:
         dev="/dev",
         boot_id="/proc/sys/kernel/random/boot_id",
         node_stat=os.stat,
+        environment_check=None,
     ):
         """Inject filesystem roots/stat only for offline tests.
 
@@ -59,93 +113,124 @@ class LinuxUSB:
         @param dev Trusted device-node directory.
         @param boot_id Host boot-generation file.
         @param node_stat Device stat function; never supplied by an API client.
+        @param environment_check Optional offline substitute for native sysfs validation.
         """
         self.sysfs = Path(sysfs).resolve()
         self.dev = Path(dev)
         self.boot_id = Path(boot_id)
         self.node_stat = node_stat
+        self.environment_check = environment_check or _check_attachment_environment
 
     def inventory(self):
-        """Return bridge candidates with attachment tokens, not confirmed board identities.
+        """Return a coherent, mount-stable generation from real native 64-bit sysfs.
 
-        Missing or unreadable selected-bridge metadata fails closed. Tokens bind
-        boot ID, bus/dev numbers and sysfs inode/ctime to detect reattachment;
-        they are not hardware authentication for serial-less adapters.
+        Tokens bind host boot, USB bus/device and the complete kernfs node ID.
+        View-local timestamps are not attachment evidence. A second snapshot
+        rejects observed reattachment during inventory; later actions recheck.
         """
+        try:
+            self.environment_check(self.sysfs)
+        except (OSError, AttributeError) as error:
+            raise BundleError(
+                "inventory_unavailable", "Cannot validate the sysfs environment"
+            ) from error
         try:
             boot = self.boot_id.read_text().strip()
             _require(bool(boot), "inventory_unavailable", "Missing host boot identity")
-            result = []
-            for tty in sorted((self.sysfs / "class/tty").iterdir()):
-                device = tty / "device"
-                if not device.exists():
-                    continue
-                resolved = device.resolve(strict=True)
-                _require(
-                    resolved.is_relative_to(self.sysfs),
-                    "inventory_unavailable",
-                    "TTY metadata is outside sysfs",
-                )
-                lineage = (resolved, *resolved.parents)
-                usb = next((p for p in lineage if (p / "idVendor").exists()), None)
-                if usb is None:
-                    continue
-                vid = int((usb / "idVendor").read_text().strip(), 16)
-                pid = int((usb / "idProduct").read_text().strip(), 16)
-                if (vid, pid) != (0x1A86, 0x7523):
-                    continue
-                interface = next(
-                    (p for p in lineage if (p / "bInterfaceNumber").exists()), None
-                )
-                _require(
-                    interface is not None and interface.is_relative_to(usb),
-                    "inventory_unavailable",
-                    "USB interface cannot be identified",
-                )
-                number = (interface / "bInterfaceNumber").read_text().strip().lower()
-                _require(
-                    re.fullmatch(r"[0-9a-f]{2}", number) is not None,
-                    "inventory_unavailable",
-                    "Invalid USB interface",
-                )
-                port = self.dev / tty.name
-                node = self.node_stat(port)
-                _require(
-                    stat.S_ISCHR(node.st_mode),
-                    "target_changed",
-                    "Not a character device",
-                )
-                serial_path = usb / "serial"
-                _require(
-                    not serial_path.exists() or not serial_path.read_text().strip(),
-                    "unsupported_profile",
-                    "This profile requires the reviewed serial-less bridge",
-                )
-                usb_stat = usb.stat()
-                attachment = dict(
-                    boot=boot,
-                    bus=int((usb / "busnum").read_text()),
-                    device=int((usb / "devnum").read_text()),
-                    inode=usb_stat.st_ino,
-                    ctime_ns=usb_stat.st_ctime_ns,
-                )
-                result.append(
-                    GeckoTarget(
-                        port=str(port),
-                        usb_path=str(usb.relative_to(self.sysfs)),
-                        attachment=hashlib.sha256(
-                            json.dumps(attachment, sort_keys=True).encode()
-                        ).hexdigest(),
-                        device_number=(os.major(node.st_rdev), os.minor(node.st_rdev)),
-                        interface=number,
-                        loader_version=LOADER_VERSION,
-                    )
-                )
-            return tuple(result)
-        except (OSError, ValueError) as error:
+            result = self._snapshot(boot)
+            repeated = self._snapshot(boot)
+            unchanged_boot = self.boot_id.read_text().strip() == boot
+        except (OSError, ValueError, AttributeError) as error:
             raise BundleError(
                 "inventory_unavailable", "Linux USB inventory is incomplete"
             ) from error
+        _require(
+            result == repeated and unchanged_boot,
+            "target_changed",
+            "USB metadata changed during inventory",
+        )
+        return result
+
+    def _snapshot(self, boot):
+        """Collect one metadata sample without opening any character device.
+
+        @param boot Host boot ID already read by the enclosing consistency check.
+        """
+        result = []
+        for tty in sorted((self.sysfs / "class/tty").iterdir()):
+            device = tty / "device"
+            if not device.exists():
+                continue
+            resolved = device.resolve(strict=True)
+            _require(
+                resolved.is_relative_to(self.sysfs),
+                "inventory_unavailable",
+                "TTY metadata is outside sysfs",
+            )
+            lineage = (resolved, *resolved.parents)
+            usb = next((p for p in lineage if (p / "idVendor").exists()), None)
+            if usb is None:
+                continue
+            self.environment_check(usb)
+            vid = int((usb / "idVendor").read_text().strip(), 16)
+            pid = int((usb / "idProduct").read_text().strip(), 16)
+            if (vid, pid) != (0x1A86, 0x7523):
+                continue
+            interface = next(
+                (p for p in lineage if (p / "bInterfaceNumber").exists()), None
+            )
+            _require(
+                interface is not None and interface.is_relative_to(usb),
+                "inventory_unavailable",
+                "USB interface cannot be identified",
+            )
+            number = (interface / "bInterfaceNumber").read_text().strip().lower()
+            _require(
+                re.fullmatch(r"[0-9a-f]{2}", number) is not None,
+                "inventory_unavailable",
+                "Invalid USB interface",
+            )
+            port = self.dev / tty.name
+            node = self.node_stat(port)
+            _require(
+                stat.S_ISCHR(node.st_mode),
+                "target_changed",
+                "Not a character device",
+            )
+            serial_path = usb / "serial"
+            _require(
+                not serial_path.exists() or not serial_path.read_text().strip(),
+                "unsupported_profile",
+                "This profile requires the reviewed serial-less bridge",
+            )
+            usb_stat = usb.stat()
+            attachment = dict(
+                boot=boot,
+                bus=int((usb / "busnum").read_text()),
+                device=int((usb / "devnum").read_text()),
+                inode=usb_stat.st_ino,
+                schema="linux-usb-kernfs64-v1",
+            )
+            _require(
+                0 < attachment["inode"] < (1 << 64)
+                and attachment["bus"] > 0
+                and 1 <= attachment["device"] <= 127,
+                "inventory_unavailable",
+                "Invalid USB generation metadata",
+            )
+            result.append(
+                GeckoTarget(
+                    port=str(port),
+                    usb_path=str(usb.relative_to(self.sysfs)),
+                    attachment=hashlib.sha256(
+                        json.dumps(attachment, sort_keys=True).encode()
+                    ).hexdigest(),
+                    device_number=(os.major(node.st_rdev), os.minor(node.st_rdev)),
+                    interface=number,
+                    loader_version=LOADER_VERSION,
+                )
+            )
+        return tuple(result)
 
 
 def select_target(port, board_evidence, inventory):

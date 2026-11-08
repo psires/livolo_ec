@@ -2,7 +2,10 @@
 
 from dataclasses import replace
 import errno
+import ctypes
 import fcntl
+import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -12,12 +15,14 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from livolod.firmware_bundle import BundleError
 from livolod.preserved_gecko import GeckoTarget, check_loader
 from livolod.zbgw04_provider import (
     BOARD_EVIDENCE,
+    _check_attachment_environment,
+    _LinuxStatFS,
     DedicatedAccess,
     LinuxUSB,
     LoaderPolicy,
@@ -559,7 +564,7 @@ class InventoryTests(unittest.TestCase):
         """Build synthetic sysfs with a CH340 tty and injected character-device stat."""
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.usb = self.root / "devices/platform/usb1/1-2"
         self.interface = self.usb / "1-2:1.0"
         self.tty = self.interface / "ttyUSB0"
@@ -579,7 +584,11 @@ class InventoryTests(unittest.TestCase):
         self.boot.write_text("boot-one")
         self.node = SimpleNamespace(st_mode=stat.S_IFCHR, st_rdev=os.makedev(20, 0))
         self.reader = LinuxUSB(
-            self.root, "/dev", self.boot, node_stat=lambda path: self.node
+            self.root,
+            "/dev",
+            self.boot,
+            node_stat=lambda path: self.node,
+            environment_check=Mock(),
         )
 
     def test_inventory_metadata_and_explicit_selection(self):
@@ -616,6 +625,203 @@ class InventoryTests(unittest.TestCase):
         self.node.st_mode = stat.S_IFREG
         with self.assertRaises(BundleError):
             self.reader.inventory()
+
+    def test_mount_local_timestamps_and_device_number_do_not_change_attachment(self):
+        """Independent sysfs views retain one generation despite local ctime/st_dev."""
+        original_stat = Path.stat
+        readings = []
+
+        def view_stat(path, *args, **kwargs):
+            """Emulate a new VFS view without changing the underlying kernfs ID.
+
+            @param path Metadata path requested by the provider.
+            @param args Positional stat arguments forwarded unchanged.
+            @param kwargs Keyword stat arguments forwarded unchanged.
+            """
+            value = original_stat(path, *args, **kwargs)
+            if path == self.usb:
+                readings.append(len(readings) + 1)
+                return SimpleNamespace(
+                    st_ino=value.st_ino,
+                    st_ctime_ns=readings[-1],
+                    st_dev=readings[-1],
+                    st_mode=value.st_mode,
+                )
+            return value
+
+        expected = self.reader.inventory()[0]
+        with patch.object(Path, "stat", view_stat):
+            self.assertEqual(self.reader.inventory()[0], expected)
+            self.assertEqual(self.reader.inventory()[0], expected)
+        self.assertGreaterEqual(len(readings), 4)
+
+    def test_full_inode_generation_survives_address_and_low_id_reuse(self):
+        """A reused devnum or low inode ID cannot hide a new high generation."""
+        original_stat = Path.stat
+        inode = 1234
+
+        def node_stat(path, *args, **kwargs):
+            """Expose a complete kernel node ID independently of the test filesystem.
+
+            @param path Metadata path requested by the provider.
+            @param args Positional stat arguments forwarded unchanged.
+            @param kwargs Keyword stat arguments forwarded unchanged.
+            """
+            value = original_stat(path, *args, **kwargs)
+            if path == self.usb:
+                return SimpleNamespace(st_ino=inode, st_mode=value.st_mode)
+            return value
+
+        with patch.object(Path, "stat", node_stat):
+            original = self.reader.inventory()[0]
+            for changed in (1235, (1 << 32) + 1234):
+                inode = changed
+                self.assertNotEqual(
+                    self.reader.inventory()[0].attachment, original.attachment
+                )
+            for invalid in (0, -1, 1 << 64):
+                inode = invalid
+                with self.assertRaises(BundleError):
+                    self.reader.inventory()
+
+    def test_bus_number_and_boot_changes_remain_bound(self):
+        """Neither another USB bus nor a host reboot can reuse the previous token."""
+        original = self.reader.inventory()[0]
+        (self.usb / "busnum").write_text("2")
+        self.assertNotEqual(self.reader.inventory()[0].attachment, original.attachment)
+        (self.usb / "busnum").write_text("1")
+        self.boot.write_text("new-host-boot")
+        self.assertNotEqual(self.reader.inventory()[0].attachment, original.attachment)
+
+    def test_disappearance_and_torn_metadata_fail_before_selection(self):
+        """A second sample cannot silently validate a mixed or vanished attachment."""
+        snapshot = self.reader._snapshot
+        for mutation in ("device", "boot", "disappear"):
+            calls = 0
+
+            def changing(boot):
+                """Change the selected metadata between the two inventory samples.
+
+                @param boot Boot identity read before the first sample.
+                """
+                nonlocal calls
+                calls += 1
+                if calls == 2:
+                    if mutation == "device":
+                        (self.usb / "devnum").write_text("3")
+                    elif mutation == "boot":
+                        self.boot.write_text("changed")
+                    else:
+                        (self.root / "class/tty/ttyUSB0/device").unlink()
+                return snapshot(boot)
+
+            with patch.object(self.reader, "_snapshot", side_effect=changing):
+                with self.assertRaises(BundleError) as error:
+                    select_target("/dev/ttyUSB0", BOARD_EVIDENCE, self.reader.inventory)
+                self.assertEqual(error.exception.code, "target_changed")
+            (self.usb / "devnum").write_text("2")
+            self.boot.write_text("boot-one")
+
+    def test_legacy_policy_cannot_authorize_the_new_generation_scheme(self):
+        """The old ctime hash has no compatibility fallback in the loader policy."""
+        metadata = self.usb.stat()
+        legacy = hashlib.sha256(
+            json.dumps(
+                dict(
+                    boot="boot-one",
+                    bus=1,
+                    device=2,
+                    inode=metadata.st_ino,
+                    ctime_ns=metadata.st_ctime_ns,
+                ),
+                sort_keys=True,
+            ).encode()
+        ).hexdigest()
+        target = self.reader.inventory()[0]
+        policy = LoaderPolicy(legacy, "reviewed", "1.9.2", False, False)
+        with self.assertRaises(BundleError) as error:
+            policy.validate(target)
+        self.assertEqual(error.exception.code, "loader_unverified")
+
+    def test_environment_rejection_precedes_any_metadata_or_device_read(self):
+        """Unsupported environments never reach inventory or character-device stat."""
+        self.reader.environment_check.side_effect = BundleError(
+            "unsupported_profile", "unsupported"
+        )
+        with patch.object(self.reader, "_snapshot") as snapshot:
+            with self.assertRaises(BundleError) as error:
+                self.reader.inventory()
+            self.assertEqual(error.exception.code, "unsupported_profile")
+            snapshot.assert_not_called()
+        self.reader.environment_check.side_effect = OSError("missing sysfs")
+        with self.assertRaises(BundleError) as error:
+            self.reader.inventory()
+        self.assertEqual(error.exception.code, "inventory_unavailable")
+
+
+class InventoryEnvironmentTests(unittest.TestCase):
+    def test_narrow_unknown_or_nonlinux_platform_rejected_before_open(self):
+        """Native ABI and kernel machine admission are both required before sysfs I/O."""
+        real_sizeof = ctypes.sizeof
+        for system, machine, narrow in (
+            ("darwin", "arm64", False),
+            ("linux", "armv7l", False),
+            ("linux", "unknown", False),
+            ("linux", "aarch64", True),
+        ):
+            with (
+                patch("livolod.zbgw04_provider.sys.platform", system),
+                patch(
+                    "livolod.zbgw04_provider.os.uname",
+                    return_value=SimpleNamespace(machine=machine),
+                ),
+                patch(
+                    "livolod.zbgw04_provider.ctypes.sizeof",
+                    side_effect=lambda kind: (
+                        4 if narrow and kind is ctypes.c_ulong else real_sizeof(kind)
+                    ),
+                ),
+                patch("livolod.zbgw04_provider.os.open") as opened,
+            ):
+                with self.assertRaises(BundleError) as error:
+                    _check_attachment_environment(Path("/sys"))
+                self.assertEqual(error.exception.code, "unsupported_profile")
+                opened.assert_not_called()
+
+    def test_statfs_admits_only_the_supported_real_sysfs_layout(self):
+        """Copied metadata and failed statfs calls cannot masquerade as kernel sysfs."""
+        self.assertEqual(ctypes.sizeof(_LinuxStatFS), 120)
+        for magic, result in ((0x62656572, 0), (0xEF53, 0), (0x62656572, -1)):
+
+            def statfs(descriptor, address):
+                """Model the supported native statfs ABI without a real Linux syscall.
+
+                @param descriptor Read-only directory descriptor supplied by the provider.
+                @param address Pointer to the explicit native statfs result structure.
+                """
+                address._obj.f_type = magic
+                return result
+
+            function = Mock(side_effect=statfs)
+            with (
+                patch("livolod.zbgw04_provider.sys.platform", "linux"),
+                patch(
+                    "livolod.zbgw04_provider.os.uname",
+                    return_value=SimpleNamespace(machine="aarch64"),
+                ),
+                patch("livolod.zbgw04_provider.os.open", return_value=42),
+                patch("livolod.zbgw04_provider.os.close") as closed,
+                patch(
+                    "livolod.zbgw04_provider.ctypes.CDLL",
+                    return_value=SimpleNamespace(fstatfs=function),
+                ),
+            ):
+                if magic == 0x62656572 and result == 0:
+                    _check_attachment_environment(Path("/sys"))
+                else:
+                    with self.assertRaises(BundleError):
+                        _check_attachment_environment(Path("/sys"))
+                closed.assert_called_once_with(42)
 
 
 if __name__ == "__main__":

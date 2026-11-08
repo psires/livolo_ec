@@ -55,10 +55,30 @@ or generic Sonoff reset procedure is introduced.
 
 `LinuxUSB.inventory()` reads sysfs and node metadata without opening serial.
 It records canonical USB topology, interface, current character-device number
-and an attachment token derived from host boot ID, USB bus/device numbers and
-sysfs inode/ctime. This detects ordinary reattachment and host restart; a
-serial-less bridge is not cryptographically authenticated. The reviewed profile
+and a versioned attachment token derived from host boot ID, USB bus/device
+numbers and the **complete 64-bit sysfs kernfs node ID**. The physical provider
+requires native Linux arm64 or amd64, a 64-bit ABI and real sysfs directories;
+unsupported or narrow inode environments fail before serial access. Two metadata
+samples must agree. This is a generation fence, not cryptographic authentication
+of a serial-less bridge. The reviewed profile
 is CH340 `1a86:7523`, with no USB serial. This identifies a transport only.
+
+Sysfs inode timestamps can differ between container mounts of the same device,
+so neither timestamps nor mount-local `st_dev` enter the token. On the supported
+64-bit kernels, `st_ino` exposes the complete kernfs allocation ID, including its
+high-bit wrap generation. USB addresses can wrap and be reused; a new kernfs node
+still changes the token even when its USB address and low inode bits are reused.
+The boot ID separates host restarts. This relies on the kernel allocation contract,
+not an adversarial-root or hardware-authentication guarantee; an entire 64-bit ID
+cycle within the same boot is outside the supported lifetime. See the upstream
+Linux 6.18 [allocation code](https://github.com/torvalds/linux/blob/v6.18/fs/kernfs/dir.c),
+[inode ID mapping](https://github.com/torvalds/linux/blob/v6.18/include/linux/kernfs.h)
+and [timestamp initialization](https://github.com/torvalds/linux/blob/v6.18/fs/kernfs/inode.c).
+
+The `linux-usb-kernfs64-v1` hash scheme deliberately invalidates older policies
+and pinned operations. There is no old-token fallback or automatic policy rewrite.
+After independent metadata validation, begin a new attempt with a newly reviewed
+exact-unit policy; do not migrate an active or uncertain firmware operation.
 
 `select_target(port, board_evidence, inventory)` requires an exact canonical
 inventory endpoint, a unique physical mapping and recorded confirmation of

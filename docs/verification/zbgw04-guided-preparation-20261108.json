@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "date_local": "2026-11-08",
+  "timezone": "Europe/Warsaw",
+  "scope": "First guided engineering attempt preparation and attachment-token defect investigation",
+  "status": "preparation_stopped_original_service_restored",
+  "board": "zb-gw04-1v2",
+  "candidate_source_commit": "f9802a3384797908bd1e385889958211b570c375",
+  "candidate_source_image": "sha256:59f41c8382905cf4b342ce5162d209505f7c12cc3f1edd5c113a88c3f4f8a5c8",
+  "operator": "Tech Lead/root",
+  "preparation": {
+    "original_app_and_idle_flasher_stopped": true,
+    "isolated_candidate_data_clone_created": true,
+    "candidate_uart_opened": false,
+    "firmware_flashed": false,
+    "ha_core_changed": false,
+    "ha_integration_changed": false,
+    "private_intents_and_failed_policy_retained_on_ha": true
+  },
+  "blockers": [
+    {
+      "kind": "private_deployment_helper_permissions_order",
+      "observation": "After changing catalog ownership, chmod failed under the restricted capability set.",
+      "correction": "Set mode before changing owner; retain the existing restricted capabilities.",
+      "release_engineer_verification": "Independently reproduced on development Linux; corrected private helper passed 19 offline tests.",
+      "product_image_change_required": false
+    },
+    {
+      "kind": "mount_local_ctime_in_attachment_token",
+      "observation": "Strict read-only policy verification rejected differing target and loader attachment tokens across container mounts.",
+      "release_engineer_reproduction": "Separate development Linux container mounts exposed the same boot ID, USB bus/address and sysfs inode with differing ctime values.",
+      "correction": "Versioned linux-usb-kernfs64-v1 token uses host boot ID, USB bus/address and the full 64-bit kernfs node ID; requires native supported 64-bit Linux and genuine sysfs; coherent repeated metadata samples must match.",
+      "old_policy_automatically_rewritten": false,
+      "old_token_fallback_added": false,
+      "product_image_change_required": true
+    }
+  ],
+  "restoration_reported_by_operator": {
+    "original_app_and_idle_flasher_running": true,
+    "actual_firmware_version": "0.13",
+    "normal_radio_ready": true,
+    "ha_entry_data_preserved": true,
+    "paired_devices_entities_and_areas_preserved": true,
+    "sensitive_backups_or_derived_receipts_exported": false
+  },
+  "source_fix_validation": {
+    "independent_reviewers": ["ZigBee specialist", "Release Engineer", "Tech Lead"],
+    "unix_full_host_tests_passed": 481,
+    "release_engineer_optimized_focused_tests_passed": 84,
+    "native_linux_arm64_statfs_guard": "passed",
+    "non_sysfs_metadata_rejected": true,
+    "fresh_container_production_token_comparison": "passed with different mount namespaces and ctime values",
+    "development_probe_limit": "The production LinuxUSB inventory used an offline CH340 transport fixture backed by real USB root-hub generation metadata. This does not qualify the HA radio transport.",
+    "real_ha_transport_pre_outage_check": "pending on the replacement image"
+  },
+  "qualification": {
+    "guided_installation_qualified": false,
+    "public_firmware_download_qualified": false,
+    "rf_control_tested_in_this_attempt": false,
+    "public_catalog_changed": false,
+    "release_published": false,
+    "next_gate": "Clean-commit replacement image and isolated new attempt; compare actual radio metadata across fresh containers before stopping original service. Create and verify a fresh exact-unit policy without modifying the failed attempt."
+  }
+}
