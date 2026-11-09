@@ -52,6 +52,30 @@ Heartbeat-only protocol frames need not each cause an HA event. State,
 availability, registry, readiness, pairing and result changes must be delivered.
 Snapshots omit MQTT configuration, credentials, raw packets and browser tokens.
 
+### Receive rejection diagnostics
+
+`data.diagnostics.invalid_rx` retains its legacy meaning: all RX records rejected
+by the envelope or supported EC decoder, including unsupported traffic. It is
+not a count of proven corrupt radio packets. The optional `rx_rejections` object
+breaks this total into fixed nonnegative integer counters:
+
+| Counter | Rejection |
+| --- | --- |
+| `envelope` | Malformed RX record, numeric/hex parsing failure, length mismatch or out-of-range sequence/ticks |
+| `unsupported_frame` | Frame length or header outside the supported EC layouts |
+| `unsupported_family` | Unsupported application family/length combination within that layout |
+| `checksum` | Supported EC application checksum failed |
+| `other` | Unclassified receive validation `ValueError` fallback |
+
+Each rejected record increments exactly one reason and `invalid_rx` once, so
+the reason counters sum to the aggregate. Both start at zero when the service
+is created, reset on daemon restart, and remain cumulative across reconnects.
+Retained query reports use the same rejection accounting without advancing RX
+sequence tracking. Older daemons may omit this object; absence means unknown,
+not zero. These fields contain no raw traffic, identities or exception messages.
+Unsupported traffic alone establishes neither corruption nor protocol validity;
+the decoder still admits only the existing supported EC layouts and checksums.
+
 ### Experimental device-profile detection
 
 Each discovery may include an additive `profile` object:

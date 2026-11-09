@@ -4,6 +4,28 @@ import binascii
 from dataclasses import dataclass
 
 
+RX_REJECTION_REASONS = (
+    "envelope",
+    "unsupported_frame",
+    "unsupported_family",
+    "checksum",
+    "other",
+)
+
+
+class ReceiveError(ValueError):
+    """A rejected receive record with a stable, payload-free diagnostic reason."""
+
+    def __init__(self, reason, message):
+        """Preserve ValueError behavior while identifying the rejecting predicate.
+
+        @param reason Stable receive rejection category.
+        @param message Existing human-readable validation error.
+        """
+        super().__init__(message)
+        self.reason = reason
+
+
 def frame(gateway, tag, device, suffix, sequence, opcode, data):
     """Create a direct EC application command for a configured device.
 
@@ -70,7 +92,7 @@ def decode(raw):
     @return A decoded Packet; invalid frames raise ValueError.
     """
     if len(raw) not in (39, 41) or raw[:2] != b"\x01\x88":
-        raise ValueError("Unsupported EC frame")
+        raise ReceiveError("unsupported_frame", "Unsupported EC frame")
     family = raw[21]
     if family == 0x8C and len(raw) == 41:
         valid = raw[37] == sum(raw[21:37]) & 255
@@ -79,9 +101,9 @@ def decode(raw):
             raw[21:37], 0xFFFF
         )
     else:
-        raise ValueError("Unsupported EC family")
+        raise ReceiveError("unsupported_family", "Unsupported EC family")
     if not valid:
-        raise ValueError("Bad application checksum")
+        raise ReceiveError("checksum", "Bad application checksum")
     return Packet(
         raw[7:11].hex(),
         raw[3:7].hex(),
@@ -102,15 +124,18 @@ def rx_envelope(line):
     """
     parts = line.split()
     if len(parts) != 7 or parts[0] != "RX":
-        raise ValueError("Malformed RX record")
-    sequence, ticks, rssi, lqi, length = map(int, parts[1:6])
-    raw = bytes.fromhex(parts[6])
+        raise ReceiveError("envelope", "Malformed RX record")
+    try:
+        sequence, ticks, rssi, lqi, length = map(int, parts[1:6])
+        raw = bytes.fromhex(parts[6])
+    except ValueError as error:
+        raise ReceiveError("envelope", str(error)) from error
     if (
         length != len(raw)
         or not 0 <= sequence <= 0xFFFFFFFF
         or not 0 <= ticks <= 0xFFFFFFFF
     ):
-        raise ValueError("Invalid RX length/counter")
+        raise ReceiveError("envelope", "Invalid RX length/counter")
     return sequence, rssi, lqi, raw
 
 

@@ -5,6 +5,41 @@ import re
 from ._client import IncompatibleError, commissioning_data, version_data
 from .commissioning import PAIRING_REASONS
 
+RECEIVE_COUNTERS = (
+    "invalid_rx",
+    "rx_gaps",
+    "ack_failures",
+)
+RECEIVE_REJECTIONS = (
+    "envelope",
+    "unsupported_frame",
+    "unsupported_family",
+    "checksum",
+    "other",
+)
+
+
+def receive_diagnostics(value):
+    """Export only reported numeric counters without inferring radio health or missing zeros.
+
+    @param value Optional daemon diagnostic mapping from the accepted native snapshot.
+    @return Nonnegative integer counters and fixed rejection breakdown; absent or malformed fields are omitted.
+    """
+    source = value if isinstance(value, dict) else {}
+    result = {
+        key: source[key]
+        for key in RECEIVE_COUNTERS
+        if type(source.get(key)) is int and source[key] >= 0
+    }
+    rejected = source.get("rx_rejections")
+    if isinstance(rejected, dict):
+        result["rx_rejections"] = {
+            key: rejected[key]
+            for key in RECEIVE_REJECTIONS
+            if type(rejected.get(key)) is int and rejected[key] >= 0
+        }
+    return result
+
 
 def pairing_diagnostics(value):
     """Retain bounded pairing payload evidence without device identities or command history.
@@ -51,7 +86,10 @@ async def async_get_config_entry_diagnostics(hass, entry):
     """
     coordinator = entry.runtime_data
     data = coordinator.data
-    firmware = data.get("diagnostics", {}).get("firmware", {})
+    diagnostics = data.get("diagnostics")
+    diagnostics = diagnostics if isinstance(diagnostics, dict) else {}
+    firmware = diagnostics.get("firmware")
+    firmware = firmware if isinstance(firmware, dict) else {}
     return {
         "connected": coordinator.connected,
         "ready": bool(data.get("ready")),
@@ -59,6 +97,7 @@ async def async_get_config_entry_diagnostics(hass, entry):
         "simulated": bool(data.get("simulated")),
         "device_count": len(data.get("devices", [])),
         "versions": version_data(data.get("diagnostics")),
+        "receive_counters": receive_diagnostics(diagnostics),
         "commissioning": pairing_diagnostics(data.get("commissioning")),
         "firmware": {
             key: firmware.get(key)

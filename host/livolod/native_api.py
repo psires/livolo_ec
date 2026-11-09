@@ -63,6 +63,13 @@ DIAGNOSTIC_FIELDS = {
     "query_mode",
 }
 DIAGNOSTIC_GROUPS = {
+    "rx_rejections": {
+        "envelope",
+        "unsupported_frame",
+        "unsupported_family",
+        "checksum",
+        "other",
+    },
     "firmware": {
         "running_version",
         "target_version",
@@ -100,6 +107,7 @@ def native_snapshot(service):
                 for key, item in value.items()
                 if key in fields
                 and isinstance(item, (str, int, float, bool, type(None)))
+                and (group != "rx_rejections" or (type(item) is int and item >= 0))
             }
     devices = []
     now = time.monotonic()

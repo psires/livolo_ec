@@ -116,7 +116,7 @@ Request IDs accept 1–128 letters, digits, underscores, dots, colons or hyphens
 | `bridge/controls` | retained event | `offline` when output controls are disabled; otherwise `online` |
 | `bridge/info` | retained event | Daemon software, firmware compatibility, API/UART revisions, gateway/tag, readiness and current pairing window |
 | `bridge/devices` | retained event | Device registry with name, ID, slot, outputs and suffix |
-| `bridge/diagnostics` | retained event | MCU counters/status, host RX gaps, invalid frames and ACK failures |
+| `bridge/diagnostics` | retained event | MCU counters/status, host RX gaps, rejected RX records with reason counters, and ACK failures |
 | `bridge/discovery` | event | Observed unpaired registration candidate; does not admit it |
 | `bridge/request/add` | command | `{"request_id":"add-1","device":"12345678","name":"Hall","outputs":2,"suffix":"0002"}`; optional `slot`, otherwise allocated |
 | `bridge/request/rename` | command | `{"request_id":"name-1","device":"46715621","name":"Kitchen"}` |

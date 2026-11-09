@@ -17,7 +17,15 @@ from .config import Device, hex_value, identity, integer, mqtt_config
 from .commissioning import Commissioning
 from .device_profile import pairing_profile
 from .homeassistant import discovery_messages
-from .protocol import decode, frame, heartbeat, key_values, rx_envelope
+from .protocol import (
+    RX_REJECTION_REASONS,
+    ReceiveError,
+    decode,
+    frame,
+    heartbeat,
+    key_values,
+    rx_envelope,
+)
 from .phase import PhaseClient
 from .scheduler import SchedulerClient
 from . import FIRMWARE_COMPAT_VERSION
@@ -120,6 +128,7 @@ class Service:
         self.pairing = None
         self.schedule = []
         self.diagnostics = {"rx_gaps": 0, "invalid_rx": 0, "ack_failures": 0}
+        self.diagnostics["rx_rejections"] = dict.fromkeys(RX_REJECTION_REASONS, 0)
         self.diagnostics.update(version_info(), host_version=FIRMWARE_COMPAT_VERSION)
         self.diagnostics["output_mode"] = config.output_mode
         self.diagnostics["serial_baudrate"] = config.serial_baudrate
@@ -1248,6 +1257,17 @@ class Service:
                 continue
             self.handle_rx(received, line)
 
+    def reject_rx(self, error):
+        """Count each rejected record once without exporting exception details.
+
+        @param error Receive validation failure, optionally carrying a stable reason.
+        """
+        reason = error.reason if isinstance(error, ReceiveError) else "other"
+        if reason not in RX_REJECTION_REASONS:
+            reason = "other"
+        self.diagnostics["invalid_rx"] += 1
+        self.diagnostics["rx_rejections"][reason] += 1
+
     def handle_rx(self, received, line, *, retained=False):
         """Accept valid device reports for discovery, durable state, and exact command
         confirmation.
@@ -1258,8 +1278,8 @@ class Service:
         """
         try:
             sequence, rssi, lqi, raw = rx_envelope(line)
-        except ValueError:
-            self.diagnostics["invalid_rx"] += 1
+        except ValueError as error:
+            self.reject_rx(error)
             return
         if not retained and self.last_rx is not None:
             gap = (sequence - self.last_rx - 1) & 0xFFFFFFFF
@@ -1269,8 +1289,8 @@ class Service:
             self.last_rx = sequence
         try:
             packet = decode(raw)
-        except ValueError:
-            self.diagnostics["invalid_rx"] += 1
+        except ValueError as error:
+            self.reject_rx(error)
             return
         if not retained:
             self.observe_discovery(packet, received, rssi, lqi)
