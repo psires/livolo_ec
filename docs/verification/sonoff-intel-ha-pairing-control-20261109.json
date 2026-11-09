@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-09",
+  "scope": "Exact-unit engineering evidence for two designated bench switches on an Intel Home Assistant testbed",
+  "outcome": "pairing_confirmed_control_not_tested",
+  "provenance": {
+    "basis": "Operator-transcribed native API observations, Home Assistant state and protected testbed evidence; not a retained raw RF capture.",
+    "sanitized_operator_record_sha256": "aeb93ae587b9796e0ba055bb07f7f815dcd2067804ce384dd0b0751cc58fb977",
+    "limitations": "Full native snapshots from earlier pairing attempts were not separately retained before subsequent sessions replaced them; the operator record preserves their observed results."
+  },
+  "runtime": {
+    "architecture": "amd64",
+    "source_revision": "f48cf42c06a934876847013330d6929b472c45ac",
+    "image_id": "sha256:d9ecaf7d3814a90b6e10c4a23e564a2f2d40bb3244ea359201f35bbcbaeae404",
+    "daemon_version": "0.15.0",
+    "firmware_version": "0.14",
+    "uart_protocol": 3,
+    "home_assistant_core": "2026.10.4"
+  },
+  "pairing_attempts": [
+    {
+      "switch": "two-gang",
+      "outcome": "expired",
+      "reason": "discovery_timeout",
+      "registered": false,
+      "note": "Supported candidate observed; precise arrival time is unknown."
+    },
+    {
+      "switch": "both",
+      "outcome": "conflict",
+      "reason": "multiple_devices",
+      "registered": false
+    },
+    {
+      "switch": "two-gang",
+      "outcome": "confirmed",
+      "registered": true,
+      "outputs": 2,
+      "profile_reason": "known_pairing_signature"
+    },
+    {
+      "switch": "one-gang",
+      "outcome": "confirmed",
+      "registered": true,
+      "outputs": 1,
+      "profile_reason": "known_pairing_signature"
+    }
+  ],
+  "confirmation_basis": "The deployed code requires positive admission transmission completion plus a fresh matching report received after admission transmission began; the report can be buffered before completion. No raw transmission capture is claimed.",
+  "inventory": {
+    "registered_switches": 2,
+    "expected_home_assistant_output_entities": 3,
+    "entities_unavailable_when_disabled": 3
+  },
+  "control_preparation": {
+    "user_reported_initial_physical_state": "all three outputs off",
+    "pre_restart_native_report": "all three outputs off",
+    "enablement": "After clean stop and network identity checks, temporarily set the wrapper options to the exact existing saved gateway identity and experimental_phase; retained image, firmware, journal, paired registry and paths.",
+    "daemon_after_enable": "ready, controls enabled, MCU heartbeat and MCU query mode",
+    "home_assistant": "The physical integration remained disconnected with a stale snapshot. One reviewed physical-entry reload led to setup_retry; independent authenticated GETs and the installed client info/snapshot validators in fresh processes succeeded. The original HA in-process session was not exercised by those probes.",
+    "refresh": "One explicit HA refresh returned unknown without a surfaced request ID; no corresponding daemon ledger record was observed. This does not prove the request was never sent.",
+    "output_commands": 0,
+    "physical_control_verification": "not performed"
+  },
+  "restoration": {
+    "options": "Original options restored byte-for-byte, including disabled mode and original blank network seeds.",
+    "daemon": "ready, controls disabled, host heartbeat and raw query mode",
+    "identity_and_registry": "same persisted network and two paired peers; current journal and database retained",
+    "firmware_changed": false,
+    "home_assistant_entities": "Immediately after disabled-mode restoration, three original physical output entity IDs remained present and unavailable while the integration was in setup_retry; subsequent recovery is documented separately.",
+    "diagnosis": "One automatic setup retry recorded aiodns DNS error code 1 (answer with no data), surfaced as ClientConnectorDNSError then LivoloError during in-process info(). Fresh-process validation succeeded; the cause of the resolver difference is unproven. Temporary scoped debug logging was restored."
+  },
+  "public_firmware_qualification": false,
+  "production_environment": "Production Home Assistant and other radios unchanged.",
+  "recovery": {
+    "action": "One graceful restart of the existing Intel test Home Assistant container after the DNS failure was recorded. The physical daemon and radio were not restarted.",
+    "home_assistant": "Same container identity, image, mounts, networks, two existing Livolo entries and endpoint configuration retained. Both physical and simulator entries loaded and reported connected via their event streams.",
+    "physical_daemon": "Same daemon process and image; ready, nonsimulated, controls disabled, two registered peers.",
+    "entities_and_ledger": "All 20 prior Livolo entity registry records, including the three physical output IDs, were unchanged; comparison found the same six physical daemon command records.",
+    "limitations": "Recovery after restart does not establish the mechanism behind the resolver divergence. No pairing, state-refresh replay, or output command was issued as part of recovery."
+  }
+}
