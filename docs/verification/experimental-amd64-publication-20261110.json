@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-10",
+  "status": "experimental_amd64_published",
+  "image": "ghcr.io/psires/livolo-ec-ha-app:0.6.0-experimental-amd64-81cf6fb",
+  "index_digest": "sha256:7b84b3ab6fa55fcbf7b05bce36efa5d010b1cf8aa5da999f2ec997615c3b829b",
+  "amd64_manifest_digest": "sha256:bb63d84643f2ee7c23dafcb19881f3392e450fc2b47d401233cadae14c4253a7",
+  "image_config_digest": "sha256:c92b0eaefc0f56999cb7aacdde1d04d3627d5b18b39738cd4a5b0bb88908deae",
+  "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+  "distribution_version": "0.6.0",
+  "daemon_version": "0.15.0",
+  "firmware_compatibility": "0.14",
+  "build_run": "https://github.com/psires/livolo_ec/actions/runs/42821835218",
+  "promotion_run": "https://github.com/psires/livolo_ec/actions/runs/42824433810",
+  "integration_zip": {
+    "url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/livolo-ec-ha-0.6.0-experimental-amd64.zip",
+    "sha256": "8fbfb3b98179d821af017baeaac7acf141ce07e359981c28148312c0ff2466b8"
+  },
+  "source_archive": {
+    "url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/universal_silabs_flasher-0.0.31.tar.gz",
+    "sha256": "7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14"
+  },
+  "additional_notices": {
+    "url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/experimental-amd64-third-party-notices.txt",
+    "sha256": "86ad9a5c4ffb4812c0019d2bf22cd394a929d641298a25ad8c8aa5a15d5a71c3"
+  },
+  "verification": "experimental-amd64-independent-review-20261110.json",
+  "limitations": [
+    "Rebuilt image is not byte-identical to the image used in physical radio tests; no physical equivalence claimed.",
+    "Experimental plain HA Container companion tested without a radio at this digest; HA-origin control on this candidate remains unqualified.",
+    "Changed-address DNS recovery, HA OS, Supervisor, other radio boards and full firmware release are not qualified.",
+    "Registry tags are mutable; use the index digest for installation."
+  ]
+}
