@@ -129,8 +129,11 @@ In an earlier Intel trial, replacement with the locally built image reconnected
 automatically at the same address while HA stayed running. When the published
 image was installed on that testbed, HA did not reconnect within the 120-second
 check; recovery was observed approximately 600 seconds after container start,
-without an HA restart or reload.
-The cause of that delay is unproven. Recovery after an address change and the
+without an HA restart or reload. A later single same-address repeat with an
+instrumented engineering integration reconnected within 120 seconds; its
+startup-deadline changes are not in the public integration ZIP linked above.
+That repeat did not reproduce or explain the earlier delay. The cause of that
+delay is unproven. Recovery after an address change and the
 cause of an earlier HA DNS resolver failure remain unverified. A controlled HA
 restart recovered that earlier incident; it does not establish a general DNS
 fix. If control is unconfirmed, inspect the recorded outcome before retrying.
