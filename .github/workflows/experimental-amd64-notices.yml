@@ -1,0 +1,58 @@
+name: Publish experimental AMD64 accompanying notices
+
+on:
+  push:
+    branches: [main]
+    paths: [host/docker/experimental-notices.json]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: experimental-amd64-notices
+  cancel-in-progress: false
+
+jobs:
+  notices:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: container-preview-0.6.0-amd64-81cf6fb
+      ASSET: experimental-amd64-third-party-notices.txt
+      EXPECTED_SHA: 86ad9a5c4ffb4812c0019d2bf22cd394a929d641298a25ad8c8aa5a15d5a71c3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - id: request
+        name: Validate explicit publication request
+        run: |
+          python3 - <<'PY'
+          import json, os
+          request = json.load(open('host/docker/experimental-notices.json'))
+          assert set(request) == {'enabled'} and type(request['enabled']) is bool
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write('enabled=' + str(request['enabled']).lower() + '\n')
+          PY
+      - if: steps.request.outputs.enabled == 'true'
+        name: Verify and add notice without replacing any existing asset
+        run: |
+          set -euo pipefail
+          echo "$EXPECTED_SHA  docs/verification/$ASSET" | sha256sum --check
+          gh release view "$TAG" --json tagName,isDraft,isPrerelease,assets > release.json
+          python3 - <<'PY'
+          import json, os
+          release = json.load(open('release.json'))
+          assert release['tagName'] == os.environ['TAG']
+          assert release['isDraft'] is False and release['isPrerelease'] is True
+          assert not any(a['name'] == os.environ['ASSET'] for a in release['assets']), 'Notice asset exists; refusing replacement'
+          PY
+          gh release upload "$TAG" "docs/verification/$ASSET"
+          mkdir anonymous
+          curl --fail --location --proto '=https' --proto-redir '=https' \
+            "https://github.com/$GH_REPO/releases/download/$TAG/$ASSET" -o "anonymous/$ASSET"
+          echo "$EXPECTED_SHA  anonymous/$ASSET" | sha256sum --check
+          cmp "docs/verification/$ASSET" "anonymous/$ASSET"
