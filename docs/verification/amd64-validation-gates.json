@@ -125,9 +125,13 @@
     },
     {
       "id": "candidate_physical_feedback",
-      "status": "trial_paused_no_physical_change_reported_pending_investigation",
+      "status": "not_executed_user_clarified_no_press_redo_pending",
       "required_evidence": "Separately scoped enable/restart, fresh user readiness, one physical ON/OFF cycle with fresh native and HA feedback, unchanged ledger and final original disabled restoration. Planned restarts must not be counted as automatic reconnect results.",
-      "observation": "During the separately scoped final-candidate physical check, the user reported no change after the requested brief one-gang press. Passive observation and protocol review remain pending; no candidate physical-feedback pass is claimed."
+      "observation": "The user initially reported no change, then clarified that they had not pressed the physical button. The earlier attempt was not executed and is not evidence of a candidate failure. A fresh monitored redo is pending; no candidate physical-feedback pass is claimed.",
+      "history": [
+        "Initial no-change report was recorded as unresolved while passive evidence was reviewed.",
+        "Direct user correction: the requested physical press had not occurred; user requested a redo."
+      ]
     },
     {
       "id": "public_publication",
