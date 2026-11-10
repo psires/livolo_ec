@@ -1,0 +1,271 @@
+name: Publish experimental AMD64 image
+
+on:
+  push:
+    branches: [main]
+    paths: [docs/verification/experimental-amd64-publication-request.json]
+  workflow_dispatch:
+    inputs:
+      phase:
+        description: Build a candidate or verify and promote an existing candidate digest
+        required: true
+        type: choice
+        options: [build, promote]
+      candidate_digest:
+        description: Candidate registry digest, required only for promotion
+        required: false
+        type: string
+      source_url:
+        description: Public HTTPS URL for the matching flasher source archive
+        required: false
+        type: string
+      zip_url:
+        description: Public HTTPS URL for the reviewed HA integration ZIP
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-release-publication
+  cancel-in-progress: false
+
+jobs:
+  request:
+    runs-on: ubuntu-24.04
+    outputs:
+      phase: ${{ steps.resolve.outputs.phase }}
+      candidate_digest: ${{ steps.resolve.outputs.candidate_digest }}
+      source_url: ${{ steps.resolve.outputs.source_url }}
+      zip_url: ${{ steps.resolve.outputs.zip_url }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - id: resolve
+        env:
+          EVENT: ${{ github.event_name }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          INPUT_PHASE: ${{ inputs.phase }}
+          INPUT_DIGEST: ${{ inputs.candidate_digest }}
+          INPUT_SOURCE: ${{ inputs.source_url }}
+          INPUT_ZIP: ${{ inputs.zip_url }}
+        run: |
+          python3 - <<'PYCODE'
+          import json, os, re, subprocess
+          if os.environ['EVENT'] == 'push':
+              assert os.environ['RUN_ATTEMPT'] == '1', 'Push requests cannot be rerun; commit a new reviewed request'
+              changed = subprocess.check_output(['git', 'diff', '--name-only', 'HEAD^', 'HEAD'], text=True).splitlines()
+              path = 'docs/verification/experimental-amd64-publication-request.json'
+              assert changed == [path], 'Request commit must contain only the reviewed request'
+              with open(path) as f:
+                  value = json.load(f)
+              assert set(value) == {'phase', 'candidate_digest', 'source_url', 'zip_url', 'nonce'}
+              assert re.fullmatch(r'[a-zA-Z0-9-]{8,80}', value['nonce'])
+          else:
+              value = dict(phase=os.environ['INPUT_PHASE'], candidate_digest=os.environ['INPUT_DIGEST'], source_url=os.environ['INPUT_SOURCE'], zip_url=os.environ['INPUT_ZIP'])
+          assert value['phase'] in ('build', 'promote')
+          for key in ('phase', 'candidate_digest', 'source_url', 'zip_url'):
+              assert isinstance(value[key], str) and '\n' not in value[key] and '\r' not in value[key]
+          if value['phase'] == 'build':
+              assert not value['candidate_digest'] and not value['source_url'] and not value['zip_url']
+          else:
+              assert re.fullmatch(r'sha256:[0-9a-f]{64}', value['candidate_digest'])
+              assert value['source_url'].startswith('https://') and value['zip_url'].startswith('https://')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for key in ('phase', 'candidate_digest', 'source_url', 'zip_url'):
+                  output.write(key + '=' + value[key] + '\n')
+          PYCODE
+  experimental:
+    needs: request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE: ghcr.io/psires/livolo-ec-ha-app
+      FINAL: ghcr.io/psires/livolo-ec-ha-app:0.6.0-experimental-amd64-81cf6fb
+      SOURCE_URL: ${{ needs.request.outputs.source_url }}
+      ZIP_URL: ${{ needs.request.outputs.zip_url }}
+      PHASE: ${{ needs.request.outputs.phase }}
+      CANDIDATE_DIGEST: ${{ needs.request.outputs.candidate_digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 81cf6fb4628987cdd9ca2ec7637e1535d9feecbe
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Checkout publication review receipt
+        if: needs.request.outputs.phase == 'promote'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: publication-review
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.13'
+      - name: Verify source availability and prepare frozen context
+        run: |
+          set -eu
+          mkdir evidence
+          test "$(git rev-parse HEAD)" = 81cf6fb4628987cdd9ca2ec7637e1535d9feecbe
+          python -m pip install -r tools/requirements-firmware-release.txt
+          python tools/container_prepare.py --candidate --kind ha --platform linux/amd64 --output build-context
+          cp build-context/container/release.json evidence/release.json
+          python - <<'PY'
+          import json
+          m = json.load(open('evidence/release.json'))
+          assert m['source_commit'] == m['recipe_commit'] == '81cf6fb4628987cdd9ca2ec7637e1535d9feecbe'
+          assert (m['version'], m['daemon_version'], m['firmware_compat_version'], m['platform'], m['firmware_release']) == ('0.6.0', '0.15.0', '0.14', 'linux/amd64', None)
+          PY
+      - name: Verify reviewed digest and public assets
+        if: needs.request.outputs.phase == 'promote'
+        run: |
+          set -eu
+          test "${{ github.ref }}" = refs/heads/main
+          python - <<'PY'
+          import json, os, re
+          p = 'publication-review/docs/verification/experimental-amd64-reviewed-candidate.json'
+          with open(p) as f:
+              r = json.load(f)
+          assert re.fullmatch(r'sha256:[0-9a-f]{64}', os.environ['CANDIDATE_DIGEST'])
+          assert r['candidate_digest'] == os.environ['CANDIDATE_DIGEST']
+          assert r['source_commit'] == r['recipe_commit'] == '81cf6fb4628987cdd9ca2ec7637e1535d9feecbe'
+          assert r['independent_linux_review'] == 'passed' and r['source_notice_inventory_review'] == 'passed'
+          assert r['build_run_url'].startswith('https://github.com/psires/livolo_ec/actions/runs/')
+          assert r['linux_evidence_sha256'] and re.fullmatch(r'[0-9a-f]{64}', r['linux_evidence_sha256'])
+          assert r['attestation_review'] == 'passed'
+          assert all(re.fullmatch(r'[0-9a-f]{64}', r[k]) for k in ('sbom_sha256', 'provenance_sha256'))
+          assert r['source_url'] == os.environ['SOURCE_URL'] and r['zip_url'] == os.environ['ZIP_URL']
+          assert r['source_sha256'] == '7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14'
+          assert r['zip_sha256'] == '8fbfb3b98179d821af017baeaac7acf141ce07e359981c28148312c0ff2466b8'
+          with open('evidence/reviewed-candidate.json', 'w') as f:
+              json.dump(r, f, indent=2)
+          PY
+          case "$SOURCE_URL" in https://*) ;; *) exit 1;; esac
+          case "$ZIP_URL" in https://*) ;; *) exit 1;; esac
+          curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error "$SOURCE_URL" -o evidence/universal_silabs_flasher-0.0.31.tar.gz
+          curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error "$ZIP_URL" -o evidence/livolo-ec-ha-0.6.0.zip
+          echo '7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14  evidence/universal_silabs_flasher-0.0.31.tar.gz' | sha256sum --check
+          echo '8fbfb3b98179d821af017baeaac7acf141ce07e359981c28148312c0ff2466b8  evidence/livolo-ec-ha-0.6.0.zip' | sha256sum --check
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f
+        with:
+          version: v0.38.2
+          driver-opts: image=moby/buildkit@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe
+      - name: Refuse an existing experimental tag
+        if: needs.request.outputs.phase == 'promote'
+        run: |
+          python - <<'PY'
+          import os, sys
+          sys.path.insert(0, 'tools')
+          from container_registry import digest
+          if digest(os.environ['FINAL'], missing=True) is not None:
+              raise SystemExit('Experimental tag already exists; refusing replacement')
+          PY
+      - id: build
+        if: needs.request.outputs.phase == 'build'
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8
+        with:
+          context: ./build-context
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE }}:candidate-amd64-81cf6fb-${{ github.run_id }}-${{ github.run_attempt }}
+          build-args: |
+            PYTHON_IMAGE=python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+            RELEASE_VERSION=0.15.0
+            FIRMWARE_COMPAT_VERSION=0.14
+          labels: |
+            org.opencontainers.image.version=0.6.0
+            org.opencontainers.image.revision=81cf6fb4628987cdd9ca2ec7637e1535d9feecbe
+            net.sfires.livolo.daemon-version=0.15.0
+            net.sfires.livolo.firmware-compat-version=0.14
+          sbom: true
+          provenance: mode=max
+      - name: Inspect and test the exact candidate
+        env:
+          DIGEST: ${{ needs.request.outputs.phase == 'build' && steps.build.outputs.digest || needs.request.outputs.candidate_digest }}
+        run: |
+          set -eu
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          docker pull "$IMAGE@$DIGEST"
+          docker buildx imagetools inspect --raw "$IMAGE@$DIGEST" > evidence/index.json
+          docker image inspect "$IMAGE@$DIGEST" > evidence/image.json
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" --format '{{json .SBOM}}' > evidence/sbom.json
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" --format '{{json .Provenance}}' > evidence/provenance.json
+          python - <<'PY'
+          import json
+          i = json.load(open('evidence/image.json'))[0]
+          assert (i['Os'], i['Architecture']) == ('linux', 'amd64')
+          assert i['Config']['Entrypoint'] == ['python', '/usr/local/lib/livolo-app.py']
+          l = i['Config']['Labels']
+          assert l['org.opencontainers.image.version'] == '0.6.0'
+          assert l['org.opencontainers.image.revision'] == '81cf6fb4628987cdd9ca2ec7637e1535d9feecbe'
+          assert l['net.sfires.livolo.daemon-version'] == '0.15.0'
+          assert l['net.sfires.livolo.firmware-compat-version'] == '0.14'
+          index = json.load(open('evidence/index.json'))
+          platform = [m for m in index['manifests'] if m.get('platform', {}).get('os') == 'linux' and m.get('platform', {}).get('architecture') == 'amd64']
+          assert len(platform) == 1
+          assert any(m.get('annotations', {}).get('vnd.docker.reference.type') == 'attestation-manifest' and m.get('annotations', {}).get('vnd.docker.reference.digest') == platform[0]['digest'] for m in index['manifests'])
+          import hashlib
+          for name in ('sbom', 'provenance'):
+              data = open('evidence/' + name + '.json', 'rb').read()
+              assert json.loads(data) not in (None, {}, [])
+              if __import__('os').environ['PHASE'] == 'promote':
+                  receipt = json.load(open('evidence/reviewed-candidate.json'))
+                  assert hashlib.sha256(data).hexdigest() == receipt[name + '_sha256']
+          PY
+          docker run --rm --network none --entrypoint python "$IMAGE@$DIGEST" -m pip check
+          docker run --rm --network none --entrypoint python -v "$PWD/build-context/host/livolod:/expected:ro" "$IMAGE@$DIGEST" -c '
+          import pathlib, livolod
+          expected = pathlib.Path("/expected")
+          installed = pathlib.Path(livolod.__file__).parent
+          files = [p for p in expected.rglob("*") if p.is_file()]
+          assert files
+          for p in files:
+              assert p.read_bytes() == (installed / p.relative_to(expected)).read_bytes(), str(p.relative_to(expected))
+          '
+          docker run --rm --network none --entrypoint python -v "$PWD/build-context/run.py:/expected-run.py:ro" -v "$PWD/build-context/container/release.json:/expected-release.json:ro" "$IMAGE@$DIGEST" -c '
+          import json, pathlib
+          assert pathlib.Path("/usr/local/lib/livolo-app.py").read_bytes() == pathlib.Path("/expected-run.py").read_bytes()
+          assert json.loads(pathlib.Path("/usr/share/livolo-ec/release.json").read_text()) == json.loads(pathlib.Path("/expected-release.json").read_text())
+          '
+          docker run --rm --network none --entrypoint sh "$IMAGE@$DIGEST" -c 'cd /usr/share/livolo-ec/sources && sha256sum -c SHA256SUMS && cd nordic && sha256sum -c SHA256SUMS'
+          docker run --rm --network none --user 10001:10001 --entrypoint python -e LIVOLO_NORDIC_SMOKE=1 -v "$PWD/host/docker/smoke.py:/checks/smoke.py:ro" "$IMAGE@$DIGEST" /checks/smoke.py
+          set -o pipefail
+          python tools/container_check.py --image "$IMAGE@$DIGEST" --kind ha --broker-image eclipse-mosquitto@sha256:860aeb5d63ce509508f6dcfb2bc8a1c1dd2bc60555b562b45ce90e52d8dabb0f | tee evidence/runtime.txt
+      - name: Promote verified digest without replacing an existing tag
+        if: needs.request.outputs.phase == 'promote'
+        env:
+          DIGEST: ${{ needs.request.outputs.phase == 'build' && steps.build.outputs.digest || needs.request.outputs.candidate_digest }}
+        run: |
+          python - <<'PY'
+          import json, os, subprocess, sys
+          sys.path.insert(0, 'tools')
+          from container_registry import anonymous, digest
+          image, final, candidate = os.environ['IMAGE'], os.environ['FINAL'], os.environ['DIGEST']
+          ref = image + '@' + candidate
+          assert digest(ref) == candidate
+          anonymous(ref)
+          if digest(final, missing=True) is not None:
+              raise SystemExit('Experimental tag already exists; refusing replacement')
+          subprocess.run(['docker', 'buildx', 'imagetools', 'create', '--tag', final, ref], check=True)
+          assert digest(final) == candidate
+          anonymous(final)
+          with open('evidence/publication.json', 'w') as f:
+              json.dump(dict(image=final, digest=candidate, source_url=os.environ['SOURCE_URL'], zip_url=os.environ['ZIP_URL'], rebuilt=True, previously_tested_image='sha256:8ba5557107e031ed0806573eca95919863b3fa3597ea401d03253c2e1cc2aeb6', physical_equivalence_claimed=False), f, indent=2)
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: experimental-amd64-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: error
