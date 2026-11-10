@@ -1,0 +1,44 @@
+{
+  "scope": "Independent anonymous pull and disposable no-radio verification of a GHCR build candidate, not physical equivalence or final-tag publication.",
+  "workflow_run": "https://github.com/psires/livolo_ec/actions/runs/42821835218",
+  "candidate_tag": "ghcr.io/psires/livolo-ec-ha-app:candidate-amd64-81cf6fb-42821835218-1",
+  "index_digest": "sha256:7b84b3ab6fa55fcbf7b05bce36efa5d010b1cf8aa5da999f2ec997615c3b829b",
+  "amd64_manifest_digest": "sha256:bb63d84643f2ee7c23dafcb19881f3392e450fc2b47d401233cadae14c4253a7",
+  "pulled_config_image_id": "sha256:c92b0eaefc0f56999cb7aacdde1d04d3627d5b18b39738cd4a5b0bb88908deae",
+  "physically_tested_image_id": "sha256:8ba5557107e031ed0806573eca95919863b3fa3597ea401d03253c2e1cc2aeb6",
+  "platform": "linux/amd64",
+  "source_revision": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+  "distribution_version": "0.6.0",
+  "daemon_version": "0.15.0",
+  "firmware_compatibility": "0.14",
+  "verification": [
+    "Anonymous pull of exact index digest succeeded; labels and architecture verified.",
+    "All 54 frozen livolod context files, wrapper bytes and embedded release metadata matched the reviewed frozen context; helper CLIs, disabled unconfigured wrapper, empty public firmware catalog and pip check passed.",
+    "Disposable no-radio startup used private data/network, resolved service alias, served authenticated API, correctly reported offline radio and disabled controls, and ran daemon as UID 10001.",
+    "Disposable install/recreation harness passed native authenticated API, WebSocket, persistence, SQLite integrity, UID, trusted ingress/Origin and persistent local catalog checks; no radio was mounted.",
+    "Both source archive SHA256SUMS manifests verified; flasher source archive matches required public source hash. Debian package inventory records 97 packages, all with standard copyright files."
+  ],
+  "inventory": {
+    "python_main_count": 35,
+    "python_nordic_count": 14,
+    "main_license_field_absent": ["aiosqlite"],
+    "main_recorded_license_files_absent": ["pyserial"],
+    "nordic_license_field_absent": ["piccata"],
+    "nordic_recorded_license_files_absent": ["protobuf", "pyserial", "pyspinel"],
+    "all_entries_have_source": true,
+    "notice": "Metadata omissions do not by themselves establish missing legal notices or source; separate notice review applies."
+  },
+  "build_comparison": "Published config/image ID differs from the physically tested local image. Dependency names, versions, source hashes and license metadata matched; built wheel SHA256 differs for the local daemon and Nordic crcmod, nrfutil and pyspinel. Same source is not a byte-identical runtime or physical-equivalence claim.",
+  "attestations": {
+    "imagetools_sbom_json_sha256": "058b3898519b5020749433bbd353fe43e3857d41bcb10655f945e2a5e86521a5",
+    "imagetools_provenance_json_sha256": "f5107701504fb86bc1008fe25d77cff269e87832b94848840c0bf84353ce0a56",
+    "sbom": "Nonempty SPDX-2.3 document; 207 packages and 3397 files.",
+    "provenance": "Nonempty SLSA output includes frozen revision and pinned Python image; pinned BuildKit digest was not found in its text. Presence and inspection are not independent signature verification."
+  },
+  "private_evidence_sha256": {
+    "isolated_harness_log": "9b7e939cc45b96670c51319084c453c89965e1860cef149d6fc5ae6967fbe501",
+    "published_main_inventory": "44ef46e4f9462023cc61a71435d235155d7d1b478f7a16ff11714e7f668d62a2",
+    "published_nordic_inventory": "53f229e37121f5ac12b07663f591f258d8f33daeedd85f0c4c68f0ca91406c76"
+  },
+  "limits": ["No physical radio, existing HA data or live daemon was touched.","Final experimental tag promotion and publicly downloadable supporting assets require separate verification.","Changed-address DNS recovery, HA OS/Supervisor and other radio boards are not qualified."]
+}

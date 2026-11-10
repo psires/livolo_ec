@@ -1,0 +1,21 @@
+{
+  "candidate_digest": "sha256:7b84b3ab6fa55fcbf7b05bce36efa5d010b1cf8aa5da999f2ec997615c3b829b",
+  "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+  "recipe_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+  "independent_linux_review": "passed",
+  "linux_evidence_sha256": "61bffee2bd5a9ece0d0b0ce11ccd2718bd46480ccb7d071cd3a172cb9b0a190e",
+  "linux_evidence_path": "docs/verification/experimental-amd64-independent-review-20261110.json",
+  "source_notice_inventory_review": "passed",
+  "notice_review_scope": "Targeted source and notice review; not a legal guarantee or a package-by-package legal audit.",
+  "build_run_url": "https://github.com/psires/livolo_ec/actions/runs/42821835218",
+  "attestation_review": "passed",
+  "sbom_sha256": "058b3898519b5020749433bbd353fe43e3857d41bcb10655f945e2a5e86521a5",
+  "provenance_sha256": "f5107701504fb86bc1008fe25d77cff269e87832b94848840c0bf84353ce0a56",
+  "source_url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/universal_silabs_flasher-0.0.31.tar.gz",
+  "source_sha256": "7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14",
+  "zip_url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/livolo-ec-ha-0.6.0-experimental-amd64.zip",
+  "zip_sha256": "8fbfb3b98179d821af017baeaac7acf141ce07e359981c28148312c0ff2466b8",
+  "notice_url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/experimental-amd64-third-party-notices.txt",
+  "notice_sha256": "86ad9a5c4ffb4812c0019d2bf22cd394a929d641298a25ad8c8aa5a15d5a71c3",
+  "physical_equivalence_claimed": false
+}
