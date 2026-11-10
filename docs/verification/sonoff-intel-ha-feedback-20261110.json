@@ -1,0 +1,79 @@
+{
+  "date": "2026-11-10",
+  "scope": "Exact-unit AMD64 engineering test: physical switch feedback through the existing daemon and Home Assistant Container; not general product or public firmware qualification.",
+  "source_revision": "f48cf42c06a934876847013330d6929b472c45ac",
+  "image_id": "sha256:d9ecaf7d3814a90b6e10c4a23e564a2f2d40bb3244ea359201f35bbcbaeae404",
+  "firmware_version": "0.14",
+  "method": "User operated one designated bench output at a time while the existing daemon API and Home Assistant states were observed. User physical confirmations were relayed by the coordinating chat. No application refresh, set or pairing command was issued during the physical-button phase.",
+  "baseline": "The user confirmed all three outputs physically OFF before the checks. Previously reported OFF values were stale and not treated as current physical evidence.",
+  "edges": [
+    {
+      "output": "two-gang 1",
+      "physical": "ON",
+      "native_utc": "2026-11-10T12:01:32.083Z",
+      "ha_utc": "2026-11-10T12:01:32.100Z",
+      "user_confirmed": true,
+      "other_outputs_unchanged": true,
+      "native_and_ha_matched_physical": true
+    },
+    {
+      "output": "two-gang 1",
+      "physical": "OFF",
+      "native_utc": "2026-11-10T12:02:14.684Z",
+      "ha_utc": "2026-11-10T12:02:14.701Z",
+      "user_confirmed": true,
+      "other_outputs_unchanged": true,
+      "native_and_ha_matched_physical": true
+    },
+    {
+      "output": "two-gang 2",
+      "physical": "ON",
+      "native_utc": "2026-11-10T12:03:21.284Z",
+      "ha_utc": "2026-11-10T12:03:21.301Z",
+      "user_confirmed": true,
+      "other_outputs_unchanged": true,
+      "native_and_ha_matched_physical": true
+    },
+    {
+      "output": "two-gang 2",
+      "physical": "OFF",
+      "native_utc": "2026-11-10T12:03:57.684Z",
+      "ha_utc": "2026-11-10T12:03:57.700Z",
+      "user_confirmed": true,
+      "other_outputs_unchanged": true,
+      "native_and_ha_matched_physical": true
+    },
+    {
+      "output": "one-gang 1",
+      "physical": "ON",
+      "native_utc": "2026-11-10T12:05:12.282Z",
+      "ha_utc": "2026-11-10T12:05:12.300Z",
+      "user_confirmed": true,
+      "other_outputs_unchanged": true,
+      "native_and_ha_matched_physical": true
+    },
+    {
+      "output": "one-gang 1",
+      "physical": "OFF",
+      "native_utc": "2026-11-10T12:05:52.666Z",
+      "ha_utc": "2026-11-10T12:05:52.694Z",
+      "user_confirmed": true,
+      "other_outputs_unchanged": true,
+      "native_and_ha_matched_physical": true
+    }
+  ],
+  "evidence": {
+    "private_two_gang_1_trace_sha256": "f6e80a4a6fc87fc1cb0689bb6c0b858a84c21c9423838e78155a53513168cdfa",
+    "private_two_gang_2_trace_sha256": "df6bacc11869cf5f775416c2094a049130fd2bd6ee4a9dbc89eba430f524c29c",
+    "private_one_gang_trace_sha256": "40d0e717ed413384f22da29d1c0450b3b2b6069563a8d3530f140428935623b4",
+    "ledger": "All 15 logical command records exactly matched the retained November 9 post-control snapshot after the button phase and restore.",
+    "trace_limit": "The one-gang monitor ended on connection refusal when the daemon was deliberately stopped for disabled-mode restoration, after both user-confirmed edges had been captured. No raw UART or RF capture was made.",
+    "timing_limit": "Timestamps are reported observation values, not a latency qualification.",
+    "timestamp_sources": "native_utc is the device state.last_seen timestamp; ha_utc is the HA entity last_changed timestamp. Values are truncated to milliseconds for presentation.",
+    "provenance": "Private native and HA API observation traces were retained by the sole testbed operator. The release and HA reviewers assessed sanitized operator evidence; they did not independently capture the live events.",
+    "registry": "Comparison with retained prior registry inventory found all 20 Livolo entity IDs and unique IDs, including the same three physical output mappings, unchanged. An independent prior device-registry ID comparison was not retained."
+  },
+  "restoration": "User confirmed all three physical outputs OFF. Original wrapper options were restored byte-for-byte; current databases and journal retained. Daemon ready with controls disabled, same image and two peers; HA reported connected.",
+  "prior_ha_control": "Separate November 9 HA-origin ON/OFF actions were confirmed by daemon receipts and user observations; those are not physical-button evidence from this run.",
+  "remaining": "Container replacement, reconnect and candidate revision checks are separate gates."
+}
