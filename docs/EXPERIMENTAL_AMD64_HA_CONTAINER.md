@@ -125,8 +125,12 @@ journal; do not overwrite newer command or identity history with an old backup.
 Backups are for deliberate recovery, not routine image rollback. Never run both
 versions against the same radio.
 
-On the tested Intel setup, daemon replacement reconnected automatically at the
-same address while HA stayed running. Recovery after an address change and the
+In an earlier Intel trial, replacement with the locally built image reconnected
+automatically at the same address while HA stayed running. When the published
+image was installed on that testbed, HA did not reconnect within the 120-second
+check; recovery was observed approximately 600 seconds after container start,
+without an HA restart or reload.
+The cause of that delay is unproven. Recovery after an address change and the
 cause of an earlier HA DNS resolver failure remain unverified. A controlled HA
-restart recovered that particular incident; it does not establish a general DNS
+restart recovered that earlier incident; it does not establish a general DNS
 fix. If control is unconfirmed, inspect the recorded outcome before retrying.

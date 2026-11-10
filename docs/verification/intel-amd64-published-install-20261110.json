@@ -1,0 +1,34 @@
+{
+  "date": "2026-11-10",
+  "scope": "Published experimental AMD64 companion installation on the isolated Intel Home Assistant Container testbed; not Supervisor/HA OS or general radio qualification.",
+  "outcome": "installed_eventually_connected_bounded_reconnect_failed",
+  "published_image": {
+    "reference": "ghcr.io/psires/livolo-ec-ha-app:0.6.0-experimental-amd64-81cf6fb",
+    "index_digest": "sha256:7b84b3ab6fa55fcbf7b05bce36efa5d010b1cf8aa5da999f2ec997615c3b829b",
+    "amd64_manifest_digest": "sha256:bb63d84643f2ee7c23dafcb19881f3392e450fc2b47d401233cadae14c4253a7",
+    "config_image_id": "sha256:c92b0eaefc0f56999cb7aacdde1d04d3627d5b18b39738cd4a5b0bb88908deae",
+    "source_revision": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe"
+  },
+  "previous_image_id": "sha256:8ba5557107e031ed0806573eca95919863b3fa3597ea401d03253c2e1cc2aeb6",
+  "preflight": "Existing daemon and HA were ready and connected, output controls disabled, two paired bench devices retained, no active output/pairing/firmware operation and 15 existing command records. A previously reconciled unknown installation receipt was retained. Private online snapshots and subsequent stopped-owner SQLite backups were captured; original running image/container remains retained for reviewed rollback. Backups were not restored over current state.",
+  "replacement": "The operator stopped the sole companion owner, verified serial and lock release, and started one container from the published immutable digest using the same persistent data, options, network identity, serial mapping and security settings. HA Container remained running. The daemon acquired a new epoch, became ready with both peer profiles, and retained firmware 0.14 and disabled output controls; no firmware, pairing, refresh or output action was submitted.",
+  "reconnection": {
+    "outage_observed_utc": "2026-11-10T14:31:26.923748Z",
+    "new_container_started_utc": "2026-11-10T14:31:27.373496Z",
+    "deadline_result": "FAIL: the HA physical coordinator did not reconnect within the agreed 120 seconds after native readiness.",
+    "later_sensor_available_utc": "2026-11-10T14:41:27.581563Z",
+    "later_sensor_seconds_after_container_start": 600.208067,
+    "later_result": "HA later reported the physical coordinator connected, ready and nonsimulated with two peers and controls disabled. A physical version sensor became available after the new container start. No HA restart or reload was used.",
+    "method_and_limits": "The transition script polled daemon readiness at nominal 0.5-second intervals and HA diagnostics/sensor state at nominal 1-second intervals, subject to request duration. It stopped the bounded check at 120 seconds after readiness and saved failure evidence; the later recovery was observed separately. The sensor availability timestamp is not the exact socket reconnection time or a latency qualification. The old and new Docker address were the same. Bounded logs showed no concrete exception for this occurrence; its cause is unknown."
+  },
+  "final_state": "Original options match byte-for-byte. HA entry data/options and all 20 Livolo entity and six device registry records matched the pre-activation snapshot; both HA entries are loaded and connected. All 15 daemon command records are unchanged. Published daemon remains ready, nonsimulated and output-disabled with host heartbeat/raw query mode, two peers, firmware 0.14 and intact current databases/journal. The three physical switch entities are unavailable while output control is disabled.",
+  "interactive_tests": "New pairing admission and HA control of the published build remain pending user availability. Existing paired devices were not removed; their continued presence does not prove a new pairing admission.",
+  "provenance": "The sole Linux operator retained private Docker, daemon API, HA diagnostic, registry and backup evidence. Physical actions were not performed in this installation phase; no raw UART or RF capture was made.",
+  "private_evidence_sha256": {
+    "before": "aa9ca2deca3eb998758e90834d68346a750ac75a8af316d1811f3cee17fd1048",
+    "outage": "063b274c003c8b90911c06debc505b98796c76ecfd413a4e61503c1120662dbb",
+    "bounded_failure": "fcd132ed5b1b70f50e08c6c0eadceafcc5d9c900f3f9882ae77ec424fe33c0b9",
+    "later_recovery": "e379438e34d88a8fd40f7aa76ef3a52f37c16fed1eb54c82db27700172b7be7c"
+  },
+  "limitations": ["Eventual recovery is not a pass of the 120-second criterion.","The cause of this delayed reconnect is unproven; the time interval alone does not prove DNS caching.","The published image was rebuilt from the tested source; its image ID and some wheel hashes differ from the physically tested local image.","The separate production Home Assistant instance and radio firmware were not changed."]
+}
