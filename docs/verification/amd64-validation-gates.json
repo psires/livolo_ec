@@ -3,7 +3,7 @@
   "date_local": "2026-11-10",
   "timezone": "Europe/Warsaw",
   "scope": "Experimental native AMD64 containers and isolated Home Assistant Container: exact-source lifecycle validation plus separately recorded dedicated Sonoff firmware and switch trials",
-  "status": "validation_in_progress_not_a_public_release",
+  "status": "scoped_intel_candidate_tests_passed_public_release_gates_open",
   "required_ancestor_commit": "84003d7f1be155b646eba1e2b604de497404dc82",
   "ownership": {
     "testbed_operations_and_packaging": "Linux specialist",
@@ -116,6 +116,14 @@
       }
     },
     {
+      "id": "ha_origin_output_control",
+      "status": "passed_six_ha_edges_on_f48_exact_unit",
+      "source_commit": "f48cf42c06a934876847013330d6929b472c45ac",
+      "record": "docs/verification/sonoff-intel-ha-control-20261109.json",
+      "observed": "Six separate actual HA ON/OFF calls across all three outputs were confirmed by daemon receipts and user physical observations, with matching HA states. Each output began and ended OFF; MCU attempts remained within each bounded daemon transaction.",
+      "limitation": "This is f48 exact-unit evidence, not HA-origin output-control qualification on the later rebuilt candidate."
+    },
+    {
       "id": "physical_button_feedback",
       "status": "passed_six_edges_on_f48_exact_unit",
       "source_commit": "f48cf42c06a934876847013330d6929b472c45ac",
@@ -125,13 +133,17 @@
     },
     {
       "id": "candidate_physical_feedback",
-      "status": "not_executed_user_clarified_no_press_redo_pending",
+      "status": "passed_one_gang_on_off_feedback_exact_candidate",
       "required_evidence": "Separately scoped enable/restart, fresh user readiness, one physical ON/OFF cycle with fresh native and HA feedback, unchanged ledger and final original disabled restoration. Planned restarts must not be counted as automatic reconnect results.",
-      "observation": "The user initially reported no change, then clarified that they had not pressed the physical button. The earlier attempt was not executed and is not evidence of a candidate failure. A fresh monitored redo is pending; no candidate physical-feedback pass is claimed.",
+      "observation": "After a separate mode-enable/restart phase, the actual user-operated one-gang ON/OFF cycle matched fresh native and HA states with other outputs unchanged. Both edges were captured in the renewed monitor after its earlier HTTP 401 observation gap. All outputs were physically OFF and original disabled options restored; 15 command records and the registry were preserved.",
       "history": [
         "Initial no-change report was recorded as unresolved while passive evidence was reviewed.",
-        "Direct user correction: the requested physical press had not occurred; user requested a redo."
-      ]
+        "Direct user correction: the requested physical press had not occurred; user requested a redo.",
+        "The coordinated redo captured both actual edges and passed; the earlier missed prompt remains explicitly unexecuted."
+      ],
+      "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+      "record": "docs/verification/sonoff-intel-candidate-feedback-20261110.json",
+      "limitation": "One-output passive physical feedback on this exact candidate; not candidate HA-origin output-control qualification, all-board qualification, or changed-address DNS recovery."
     },
     {
       "id": "public_publication",
@@ -267,6 +279,8 @@
       "Changed-address reconnect and cause of prior HA DNS resolver divergence are unqualified",
       "Public AMD64 publication is not authorized or implemented by these tests",
       "Empty public firmware catalog and remaining all-board qualification/delivery gates prevent a complete project release"
-    ]
+    ],
+    "physical_feedback_record": "docs/verification/sonoff-intel-candidate-feedback-20261110.json",
+    "final_state": "Corrected candidate daemon and matching HA package retained. Daemon ready and nonsimulated with controls disabled; user confirmed all three outputs physically OFF. Both HA entries connected, original options restored, two peers, 20 entity and six device records and all 15 command records preserved."
   }
 }

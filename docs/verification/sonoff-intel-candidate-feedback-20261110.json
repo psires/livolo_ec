@@ -1,0 +1,27 @@
+{
+  "date": "2026-11-10",
+  "scope": "Exact-unit engineering check of one designated one-gang bench switch with the final AMD64 candidate and Home Assistant Container. This does not qualify all boards, architectures, firmware, or Supervisor/HA OS.",
+  "candidate": {
+    "source_revision": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+    "daemon_image_id": "sha256:8ba5557107e031ed0806573eca95919863b3fa3597ea401d03253c2e1cc2aeb6",
+    "ha_zip_sha256": "a686f715ff9b814ce610568d52cbad1931c5554d272c7f31cfc33b7b7944cca1",
+    "radio_firmware": "0.14"
+  },
+  "procedure": "After the separately recorded disabled-mode candidate lifecycle tests, the existing network seeds and experimental output mode were temporarily enabled for one physical feedback cycle. HA and the daemon reconnected; the user confirmed all three outputs initially OFF. The operator observed native and HA state without an application query, output or pairing command.",
+  "initial_prompt_clarification": "The user initially reported nothing changed. The user subsequently clarified that the first requested physical press had not been performed. The absence of a report at that point is not a switch or candidate failure. The user then explicitly performed a new coordinated ON/OFF cycle.",
+  "monitoring_limit": "The first passive monitor captured 12:26:12.946 through 12:27:43.364 UTC and then ended with HA API HTTP 401 after its access token expired. The operator refreshed that token and started a new passive monitor, which captured 12:28:56.582 through 12:31:43.322 UTC. There was an observation gap between those traces. Both actual coordinated edges below occurred in the second trace. The second monitor ended with connection refused when the daemon was deliberately stopped for the planned restoration after both edges were captured.",
+  "edges": [
+    {"physical":"ON","user_confirmed":true,"native_state":"ON","native_last_seen_utc":"2026-11-10T12:30:22.062Z","ha_state":"ON","ha_last_changed_utc":"2026-11-10T12:30:22.071Z","other_outputs_unchanged":true},
+    {"physical":"OFF","user_confirmed":true,"native_state":"OFF","native_last_seen_utc":"2026-11-10T12:31:08.039Z","ha_state":"OFF","ha_last_changed_utc":"2026-11-10T12:31:08.056Z","other_outputs_unchanged":true}
+  ],
+  "timestamp_limit": "Timestamps are native state.last_seen and HA entity last_changed, truncated to milliseconds; they are not a latency qualification.",
+  "ledger": "All 15 daemon command records exactly matched the retained prior post-control snapshot; no application query, set or pairing command was made during this phase.",
+  "restoration": "The user confirmed all three outputs physically OFF. Original wrapper options were restored byte-for-byte; the same candidate image, current database and journal were retained. The physical daemon was ready, nonsimulated, with controls disabled, host heartbeat, raw query mode, the same two peers and firmware 0.14. Both HA entries were loaded and connected; all 20 Livolo entity and six device registry records and all 15 command records matched the pre-activation inventory.",
+  "provenance": "The sole Linux operator retained private native and HA API observation traces and restoration evidence. Physical observations were relayed by the coordinating chat. No raw UART or RF capture was performed; reviewers assess sanitized operator evidence rather than independent live capture.",
+  "private_evidence_sha256": {
+    "initial_trace": "b64a44fbe6e655e1f5d3a2d92a03a0f8f0df2c1fc9f39cfeb175e29014ad98ad",
+    "actual_cycle_trace": "6d11116456c6013e17182e5fbb6b8a53f0e6cedb06e569f551fc7f6dd3188b3b",
+    "final_registry": "a336fa2713c8668df192e6918f29b457bb03b5400418fc4be7ccca5d683b11c1"
+  },
+  "limitations": ["This is passive feedback evidence for one candidate bench output, not candidate HA-origin output-control qualification.","Same-address lifecycle reconnect evidence is documented separately; this check does not establish changed-address DNS recovery.","No public image publication or firmware-release qualification is claimed."]
+}
