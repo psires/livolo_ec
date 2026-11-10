@@ -63,21 +63,41 @@ class LivoloCoordinator(DataUpdateCoordinator):
 
     async def _listen(self):
         """Reconnect with bounded backoff and mark stale transport unavailable."""
+        LOGGER.debug(
+            "Livolo coordinator entry=%s client=%s",
+            self.entry.entry_id,
+            self.client.diagnostic_id,
+        )
         delay = 1
         while True:
             try:
                 async for envelope in self.client.events():
+                    was_connected = self.connected
                     self.connected = True
                     self.accept(envelope)
+                    if not was_connected:
+                        LOGGER.debug(
+                            "Livolo coordinator entry=%s client=%s connected=true",
+                            self.entry.entry_id,
+                            self.client.diagnostic_id,
+                        )
                     delay = 1
             except AuthenticationError:
                 self.entry.async_start_reauth(self.hass)
                 return
             except IncompatibleError as error:
-                LOGGER.error("Livolo endpoint is incompatible: %s", error)
+                LOGGER.error(
+                    "Livolo endpoint is incompatible: %s", type(error).__name__
+                )
                 return
-            except LivoloError:
-                LOGGER.debug("Livolo API disconnected; reconnecting")
+            except LivoloError as error:
+                LOGGER.debug(
+                    "Livolo coordinator entry=%s client=%s disconnected error_class=%s retry_seconds=%s",
+                    self.entry.entry_id,
+                    self.client.diagnostic_id,
+                    type(error).__name__,
+                    delay,
+                )
             finally:
                 self.connected = False
                 self.async_update_listeners()

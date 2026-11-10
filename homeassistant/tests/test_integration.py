@@ -368,3 +368,43 @@ async def test_diagnostics_omit_secrets_and_history(hass, envelope):
         "update_supported": True,
         "trial": False,
     }
+
+
+async def test_stream_retries_after_error_and_accepts_snapshot(hass, envelope):
+    """A failed stream retries once and accepts a fresh snapshot.
+
+    @param hass Real HA test instance.
+    @param envelope Valid snapshot fixture.
+    """
+    from custom_components.livolo_ec._client import LivoloError
+
+    attempts = 0
+    delivered = asyncio.Event()
+    hold = asyncio.Event()
+
+    class TestClient:
+        """Produce one failed stream followed by a healthy one."""
+
+        diagnostic_id = "test-client"
+
+        async def events(self):
+            """Fail the first attempt and deliver a snapshot on retry."""
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise LivoloError("timeout")
+            yield envelope
+            delivered.set()
+            await hold.wait()
+
+    coordinator = LivoloCoordinator(hass, entry(), TestClient())
+    task = asyncio.create_task(coordinator._listen())
+    try:
+        await asyncio.wait_for(delivered.wait(), 3)
+        assert attempts == 2
+        assert coordinator.connected
+        assert coordinator.data == envelope["data"]
+    finally:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task

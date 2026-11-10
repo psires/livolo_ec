@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+import logging
 import math
 import re
 import time
@@ -12,6 +13,11 @@ from urllib.parse import urlencode, urlsplit
 import uuid
 
 import aiohttp
+
+LOGGER = logging.getLogger(__name__)
+STREAM_HEARTBEAT = 20
+STREAM_HANDSHAKE_TIMEOUT = 10
+STREAM_FIRST_SNAPSHOT_TIMEOUT = 10
 
 API_VERSION = 1
 COMMISSIONING_ACTIVE = ("listening", "registering", "pairing")
@@ -370,6 +376,7 @@ class Client:
         @param token Bearer credential; never placed in a URL.
         """
         self.session = session
+        self.diagnostic_id = uuid.uuid4().hex
         self.url = normalize_url(url)
         if not token or "\n" in token or "\r" in token:
             raise ValueError("An API token is required")
@@ -431,14 +438,69 @@ class Client:
         return envelope
 
     async def events(self) -> AsyncIterator[dict[str, Any]]:
-        """Yield validated snapshots until disconnect; the owner chooses reconnect policy."""
+        """Yield validated snapshots with bounded startup and unbounded stream life."""
+        attempt = uuid.uuid4().hex
+        phase = "handshake"
+        started = time.monotonic()
+        LOGGER.debug(
+            "Livolo stream client=%s attempt=%s phase=%s outcome=start",
+            self.diagnostic_id,
+            attempt,
+            phase,
+        )
         try:
-            async with self.session.ws_connect(
-                self.url + "/api/v1/events",
-                headers=self._headers,
-                heartbeat=20,
-                max_msg_size=2**20,
-            ) as socket:
+            socket = await asyncio.wait_for(
+                self.session.ws_connect(
+                    self.url + "/api/v1/events",
+                    headers=self._headers,
+                    heartbeat=STREAM_HEARTBEAT,
+                    max_msg_size=2**20,
+                ),
+                timeout=STREAM_HANDSHAKE_TIMEOUT,
+            )
+            async with socket:
+                LOGGER.debug(
+                    "Livolo stream client=%s attempt=%s phase=%s elapsed=%.3f outcome=complete",
+                    self.diagnostic_id,
+                    attempt,
+                    phase,
+                    time.monotonic() - started,
+                )
+                phase = "first_snapshot"
+                started = time.monotonic()
+                LOGGER.debug(
+                    "Livolo stream client=%s attempt=%s phase=%s outcome=start",
+                    self.diagnostic_id,
+                    attempt,
+                    phase,
+                )
+                message = await asyncio.wait_for(
+                    socket.receive(), timeout=STREAM_FIRST_SNAPSHOT_TIMEOUT
+                )
+                if message.type == aiohttp.WSMsgType.ERROR:
+                    raise LivoloError("Event connection failed")
+                if message.type != aiohttp.WSMsgType.TEXT:
+                    raise LivoloError("Event stream closed before first snapshot")
+                envelope = message.json()
+                if not isinstance(envelope, dict):
+                    raise IncompatibleError("Invalid event")
+                snapshot_data(envelope)
+                LOGGER.debug(
+                    "Livolo stream client=%s attempt=%s phase=%s elapsed=%.3f outcome=complete",
+                    self.diagnostic_id,
+                    attempt,
+                    phase,
+                    time.monotonic() - started,
+                )
+                phase = "established_stream"
+                started = time.monotonic()
+                LOGGER.debug(
+                    "Livolo stream client=%s attempt=%s phase=%s outcome=start",
+                    self.diagnostic_id,
+                    attempt,
+                    phase,
+                )
+                yield envelope
                 async for message in socket:
                     if message.type == aiohttp.WSMsgType.TEXT:
                         envelope = message.json()
@@ -448,12 +510,32 @@ class Client:
                         yield envelope
                     elif message.type == aiohttp.WSMsgType.ERROR:
                         raise LivoloError("Event connection failed")
-        except aiohttp.WSServerHandshakeError as error:
-            if error.status in (401, 403):
-                raise AuthenticationError("API authentication failed") from error
-            raise LivoloError("Event handshake failed") from error
-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as error:
-            raise LivoloError("Event connection failed") from error
+        except BaseException as error:
+            LOGGER.debug(
+                "Livolo stream client=%s attempt=%s phase=%s elapsed=%.3f error_class=%s",
+                self.diagnostic_id,
+                attempt,
+                phase,
+                time.monotonic() - started,
+                type(error).__name__,
+            )
+            if isinstance(error, aiohttp.WSServerHandshakeError):
+                if error.status in (401, 403):
+                    raise AuthenticationError("API authentication failed") from error
+                raise LivoloError("Event handshake failed") from error
+            if isinstance(
+                error, (aiohttp.ClientError, asyncio.TimeoutError, ValueError)
+            ):
+                raise LivoloError("Event connection failed") from error
+            raise
+        else:
+            LOGGER.debug(
+                "Livolo stream client=%s attempt=%s phase=%s elapsed=%.3f outcome=closed",
+                self.diagnostic_id,
+                attempt,
+                phase,
+                time.monotonic() - started,
+            )
 
     async def result(self, request_id: str):
         """Look up a durable outcome without replaying the command.
