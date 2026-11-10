@@ -143,6 +143,8 @@ jobs:
           assert r['source_url'] == os.environ['SOURCE_URL'] and r['zip_url'] == os.environ['ZIP_URL']
           assert r['source_sha256'] == '7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14'
           assert r['zip_sha256'] == '8fbfb3b98179d821af017baeaac7acf141ce07e359981c28148312c0ff2466b8'
+          assert r['notice_url'] == 'https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/experimental-amd64-third-party-notices.txt'
+          assert r['notice_sha256'] == '86ad9a5c4ffb4812c0019d2bf22cd394a929d641298a25ad8c8aa5a15d5a71c3'
           with open('evidence/reviewed-candidate.json', 'w') as f:
               json.dump(r, f, indent=2)
           PY
@@ -152,6 +154,8 @@ jobs:
           curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error "$ZIP_URL" -o evidence/livolo-ec-ha-0.6.0.zip
           echo '7f7a4a744273277430cbff19a1c7522372b434ab147adcbc821395566c3a6a14  evidence/universal_silabs_flasher-0.0.31.tar.gz' | sha256sum --check
           echo '8fbfb3b98179d821af017baeaac7acf141ce07e359981c28148312c0ff2466b8  evidence/livolo-ec-ha-0.6.0.zip' | sha256sum --check
+          curl --fail --location --proto '=https' --proto-redir '=https' --silent --show-error 'https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/experimental-amd64-third-party-notices.txt' -o evidence/third-party-notices.txt
+          echo '86ad9a5c4ffb4812c0019d2bf22cd394a929d641298a25ad8c8aa5a15d5a71c3  evidence/third-party-notices.txt' | sha256sum --check
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9
         with:
           registry: ghcr.io
