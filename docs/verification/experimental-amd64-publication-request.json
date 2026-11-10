@@ -1,7 +1,7 @@
 {
-  "phase": "build",
-  "candidate_digest": "",
-  "source_url": "",
-  "zip_url": "",
-  "nonce": "candidate-20261110-01"
+  "phase": "promote",
+  "candidate_digest": "sha256:7b84b3ab6fa55fcbf7b05bce36efa5d010b1cf8aa5da999f2ec997615c3b829b",
+  "source_url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/universal_silabs_flasher-0.0.31.tar.gz",
+  "zip_url": "https://github.com/psires/livolo_ec/releases/download/container-preview-0.6.0-amd64-81cf6fb/livolo-ec-ha-0.6.0-experimental-amd64.zip",
+  "nonce": "promote-20261110-01"
 }
