@@ -1,8 +1,8 @@
 {
   "schema": 1,
-  "date_local": "2026-11-08",
+  "date_local": "2026-11-10",
   "timezone": "Europe/Warsaw",
-  "scope": "Experimental native AMD64 containers, isolated Home Assistant Container, and a separately qualified dedicated Sonoff HA flashing trial",
+  "scope": "Experimental native AMD64 containers and isolated Home Assistant Container: exact-source lifecycle validation plus separately recorded dedicated Sonoff firmware and switch trials",
   "status": "validation_in_progress_not_a_public_release",
   "required_ancestor_commit": "84003d7f1be155b646eba1e2b604de497404dc82",
   "ownership": {
@@ -17,27 +17,32 @@
     "platform": "linux/amd64",
     "storage_root": "/storage/livolo-testbed",
     "existing_ha_installation": "Unchanged; outside this testbed's scope",
-    "radio": "Dedicated Sonoff0.14 installed through HA and handed to normal service; output controls disabled, no paired devices; exact-unit experimental scope",
+    "radio": "Dedicated Sonoff firmware 0.14 with two paired bench switches and three outputs. The accepted candidate lifecycle baseline is ready with controls disabled; physical trial phases are recorded separately.",
     "supervisor_available": false
   },
   "gates": [
     {
       "id": "source_and_version_binding",
-      "status": "combined_daemon_and_ha_fix_bound_clean_builds_and_ci_passed",
-      "required_evidence": "Reviewed committed source including the required ancestor, passing checks, clean-source build context hash, exact distribution/daemon/firmware-compatibility/integration versions, and source revision bound to the resulting artifact"
+      "status": "frozen_candidate_source_recipe_and_installed_metadata_verified",
+      "required_evidence": "Reviewed committed source including the required ancestor, passing checks, clean-source build context hash, exact distribution/daemon/firmware-compatibility/integration versions, and source revision bound to the resulting artifact",
+      "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+      "record": "docs/verification/intel-amd64-candidate-lifecycle-20261110.json"
     },
     {
       "id": "native_image_identity",
-      "status": "clean_commit_identity_and_recipe_reviewed_from_operator_metadata",
-      "required_evidence": "Actual Docker image ID, linux/amd64 inspection, runtime version checks, build recipe and base-image identities; record a registry digest only if one exists and hash any delivered archive"
+      "status": "frozen_candidate_source_recipe_and_installed_metadata_verified",
+      "required_evidence": "Actual Docker image ID, linux/amd64 inspection, runtime version checks, build recipe and base-image identities; record a registry digest only if one exists and hash any delivered archive",
+      "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+      "record": "docs/verification/intel-amd64-candidate-lifecycle-20261110.json"
     },
     {
       "id": "offline_container_lifecycle",
-      "status": "clean_commit_pass_reported_by_linux_specialist",
+      "status": "exact_candidate_isolated_checks_passed_reported_by_linux_specialist",
       "required_evidence": "Fresh startup, health, authenticated API, websocket behavior, persistent configuration/catalog/database, restart and container recreation with no radio access; rerun on the committed artifact",
       "limitation": "A nonexistent serial port tests offline behavior; it does not prove simulated or physical radio control",
-      "source_commit": "8cbf4ef77bb3534490a74825f326065688020492",
-      "observed": "Authenticated API and websocket, UID 10001, ingress origin checks, first-install and recreation, persistent local catalog, SQLite integrity; no radio access"
+      "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+      "observed": "Corrected candidate image passed no-radio f48-to-candidate source-revision replacement: authenticated API/WebSocket, non-root runtime, ingress Origin checks, persistent local catalog/state and SQLite integrity.",
+      "record": "docs/verification/intel-amd64-candidate-lifecycle-20261110.json"
     },
     {
       "id": "simulated_service_and_ha_integration",
@@ -60,8 +65,12 @@
     },
     {
       "id": "amd64_upgrade_and_rollback",
-      "status": "no_previous_published_amd64_baseline",
-      "required_evidence": "Record absence honestly. First-install/recreation is not a version upgrade. If a separately source-bound historical AMD64 build is used later, identify it as a test-built baseline and test preserved data plus rollback without claiming it was previously published."
+      "status": "source_revision_replacement_rollback_reapply_passed_no_published_amd64_baseline",
+      "required_evidence": "Record absence honestly. First-install/recreation is not a version upgrade. If a separately source-bound historical AMD64 build is used later, identify it as a test-built baseline and test preserved data plus rollback without claiming it was previously published.",
+      "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+      "record": "docs/verification/intel-amd64-candidate-lifecycle-20261110.json",
+      "observed": "Same-version candidate HA ZIP activated by a planned HA restart; candidate daemon, retained f48 daemon and candidate reapply each reached a current accepted HA event stream within 120 seconds with HA continuously running. Same network, peers, registry and 15 command records retained.",
+      "limitation": "Both source revisions identify as distribution 0.6.0. This is source-revision replacement and compatible daemon rollback, not a SemVer/HACS or public AMD64 upgrade. IP address remained unchanged; earlier DNS divergence is unexplained."
     },
     {
       "id": "supervisor_app_channel",
@@ -105,6 +114,20 @@
         "new_daemon_entry_tests": 25,
         "physical_trial_performed": true
       }
+    },
+    {
+      "id": "physical_button_feedback",
+      "status": "passed_six_edges_on_f48_exact_unit",
+      "source_commit": "f48cf42c06a934876847013330d6929b472c45ac",
+      "record": "docs/verification/sonoff-intel-ha-feedback-20261110.json",
+      "observed": "User-operated ON and OFF on all three outputs matched fresh native and HA states; untargeted outputs and all 15 logical command records stayed unchanged. All outputs physically OFF and original disabled options restored.",
+      "limitation": "Physical feedback on f48 does not independently qualify all functions of a rebuilt candidate or other boards."
+    },
+    {
+      "id": "candidate_physical_feedback",
+      "status": "trial_paused_no_physical_change_reported_pending_investigation",
+      "required_evidence": "Separately scoped enable/restart, fresh user readiness, one physical ON/OFF cycle with fresh native and HA feedback, unchanged ledger and final original disabled restoration. Planned restarts must not be counted as automatic reconnect results.",
+      "observation": "During the separately scoped final-candidate physical check, the user reported no change after the requested brief one-gang press. Passive observation and protocol review remain pending; no candidate physical-feedback pass is claimed."
     },
     {
       "id": "public_publication",
@@ -219,5 +242,27 @@
     "result": "Actual HA preparation, installation, initialization and handoff passed; output disabled",
     "record": "docs/verification/sonoff-intel-ha-success-20261108.json",
     "public_qualified": false
+  },
+  "current_candidate_validation": {
+    "source_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+    "recipe_commit": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+    "platform": "linux/amd64",
+    "image_id": "sha256:8ba5557107e031ed0806573eca95919863b3fa3597ea401d03253c2e1cc2aeb6",
+    "docker_archive_sha256": "04def573d933349f392a9e965e0b3c508d7d502d85e58c4e5a94785633c17b29",
+    "context_tar_sha256": "0d888720fac2a1b94fe9009ceb3fa842cb012a7fc84cf253c2df56de142ce4ea",
+    "integration_zip_sha256": "a686f715ff9b814ce610568d52cbad1931c5554d272c7f31cfc33b7b7944cca1",
+    "distribution_version": "0.6.0",
+    "daemon_version": "0.15.0",
+    "firmware_compatibility_version": "0.14",
+    "record": "docs/verification/intel-amd64-candidate-lifecycle-20261110.json",
+    "operator": "Linux specialist, sole live testbed operator",
+    "review_basis": "Release Engineer and specialists reviewed frozen source/archive hashes and sanitized operator receipts; no independent live capture by reviewers.",
+    "public_qualified": false,
+    "remaining_limits": [
+      "Supervisor/HA OS channel qualification remains separate",
+      "Changed-address reconnect and cause of prior HA DNS resolver divergence are unqualified",
+      "Public AMD64 publication is not authorized or implemented by these tests",
+      "Empty public firmware catalog and remaining all-board qualification/delivery gates prevent a complete project release"
+    ]
   }
 }

@@ -1,0 +1,101 @@
+{
+  "date": "2026-11-10",
+  "scope": "Exact-unit engineering validation on AMD64 Home Assistant Container; source-revision replacement, not a SemVer upgrade or Supervisor/HA OS qualification.",
+  "candidate": {
+    "source_revision": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+    "recipe_revision": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+    "context_sha256": "0d888720fac2a1b94fe9009ceb3fa842cb012a7fc84cf253c2df56de142ce4ea",
+    "ha_zip_sha256": "a686f715ff9b814ce610568d52cbad1931c5554d272c7f31cfc33b7b7944cca1",
+    "image_id": "sha256:8ba5557107e031ed0806573eca95919863b3fa3597ea401d03253c2e1cc2aeb6",
+    "docker_archive_sha256": "04def573d933349f392a9e965e0b3c508d7d502d85e58c4e5a94785633c17b29",
+    "distribution_version": "0.6.0",
+    "daemon_version": "0.15.0",
+    "firmware_compatibility": "0.14",
+    "buildkit_image": "moby/buildkit@sha256:c5f8862f52499773af85bc07695b2379ef08e8002352b0df2c4864c91d78dabe",
+    "dockerfile_frontend": "docker/dockerfile@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e",
+    "python_base": "python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72",
+    "buildx_version": "v0.38.2",
+    "build_args": {
+      "RELEASE_VERSION": "0.15.0",
+      "FIRMWARE_COMPAT_VERSION": "0.14",
+      "PYTHON_IMAGE": "python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72"
+    },
+    "explicit_oci_version_label": "0.6.0",
+    "entrypoint": [
+      "python",
+      "/usr/local/lib/livolo-app.py"
+    ],
+    "initial_user": "root; wrapper drops privileges",
+    "rejected_first_image": {
+      "id": "sha256:caabfe1de0a12eb8bb2731c0a7d503844e16bb11a5b9035761ace01ddaadba12",
+      "reason": "Incorrect OCI distribution version label; not deployed."
+    },
+    "cmd": null,
+    "labels": {
+      "org.opencontainers.image.version": "0.6.0",
+      "org.opencontainers.image.revision": "81cf6fb4628987cdd9ca2ec7637e1535d9feecbe",
+      "net.sfires.livolo.daemon-version": "0.15.0",
+      "net.sfires.livolo.firmware-compat-version": "0.14"
+    },
+    "private_build_receipt_sha256": "1952a5f4cb0a664fda91ea290136154f1e6ed8a09a34f937ec1cc5c697089e71"
+  },
+  "isolated_checks": "No-radio f48-to-candidate source-revision replacement passed API, WebSocket, persistent state and SQLite integrity, non-root runtime, trusted ingress and Origin checks, local catalog persistence; installed 51 source hashes, embedded metadata, helper CLIs, unconfigured wrapper defaults output controls disabled, empty public catalog, pip check and non-root CLI passed. The harness's version-upgrade label does not imply a SemVer upgrade.",
+  "baseline": {
+    "old_image": "sha256:d9ecaf7d3814a90b6e10c4a23e564a2f2d40bb3244ea359201f35bbcbaeae404",
+    "old_revision": "f48cf42c06a934876847013330d6929b472c45ac",
+    "result": "Same immutable f48 image replaced in a new container; daemon became ready with the same network and two peers. HA pairing/version sensors became available after the new container started and the physical integration reported an accepted event stream. HA process remained running; command ledger unchanged.",
+    "reconnect_scope": "Same Docker address before and after; changed-address DNS recovery was not tested.",
+    "launch_representation": "Equivalent resolved bind mounts were recreated with --mount rather than original Binds syntax; the container name provides the same working hostname although Docker's explicit alias field is represented differently."
+  },
+  "ha_package_activation": "All 23 candidate ZIP files matched the activated package. One planned restart of the same HA container loaded the candidate while the f48 daemon remained running. Both original entries and all 20 Livolo entity and six device records, entry data/options and 15 daemon command records were unchanged. Candidate diagnostics exposed the supported receive counters and omitted rejection categories from the older daemon.",
+  "daemon_transitions": [
+    {
+      "from": "f48",
+      "to": "candidate",
+      "native_ready_after_start_seconds": 2.078,
+      "ha_connected_after_ready_seconds": 0.005,
+      "outage_observed": true,
+      "new_epoch": true,
+      "same_address": true,
+      "rejection_categories": "present and numeric"
+    },
+    {
+      "from": "candidate",
+      "to": "f48",
+      "native_ready_after_start_seconds": 2.088,
+      "ha_connected_after_ready_seconds": 1.013,
+      "outage_observed": true,
+      "new_epoch": true,
+      "same_address": true,
+      "rejection_categories": "omitted as expected"
+    },
+    {
+      "from": "f48",
+      "to": "candidate",
+      "native_ready_after_start_seconds": 2.076,
+      "ha_connected_after_ready_seconds": 0.005,
+      "outage_observed": true,
+      "new_epoch": true,
+      "same_address": true,
+      "rejection_categories": "present and numeric"
+    }
+  ],
+  "transition_invariants": "HA remained running during all three daemon transitions; original network and peer profiles persisted, the simulator remained connected, controls were disabled, and the same 15 daemon command records were retained. Coherent backups were captured but never restored over current databases or journals. No refresh, pairing, output, install, handoff or firmware operation was submitted.",
+  "final": "Candidate HA package and corrected candidate daemon running on the Intel testbed. Both HA entries loaded and connected; same 20 entity and six device records, two physical peers and 15 daemon command records. Output controls remain disabled; firmware remains 0.14. Live runtime source is the frozen candidate revision, regardless of later documentation-only commits.",
+  "private_evidence_sha256": {
+    "baseline": "d595769269370edf4e439bb66490f9e9489dee4ff3f68cc38d49273f588b81f8",
+    "ha_activation": "087118165d6b7bf790b831616a6504267e30d586d78a34f8a7fadebf170b26ea",
+    "candidate_first": "c753707e0e7346833b714ca630ba435f6e8b0eb7505ee5588d95685fa1094240",
+    "f48_rollback": "d341c31693c8ec0c45413e4139e286426b3fad8a23856a78d977e29ba6bf066d",
+    "candidate_reapply": "d19d2b265338c6986bc030dbb7cd90820cd0cac9882eb7fd60d45bce20f2970d",
+    "final_registry": "9bc63849a0ee333035ecf61dc3c8e6e38d8ef8f982338b57966075cbecddb186"
+  },
+  "limitations": [
+    "Timing values are measured polling observations, not latency qualifications.",
+    "This does not establish changed-address reconnect reliability or explain the previously observed HA DNS resolver divergence.",
+    "It does not qualify Supervisor/HA OS installation or update channels, other radios or architectures, or a public firmware release.",
+    "Candidate live physical control was not performed in these disabled-mode lifecycle checks.",
+    "No public registry publication or release tag is claimed."
+  ],
+  "provenance": "The sole Linux testbed operator retained private API, registry and build receipts. Release, HA and Unix reviewers assessed sanitized metadata and staged hashes; reviewers did not independently capture the live events."
+}
